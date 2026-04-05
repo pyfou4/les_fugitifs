@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "722508102779",
+    "project_id": "les-fugitifs",
+    "storage_bucket": "les-fugitifs.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:722508102779:android:b9eb77df778939fff176de",
+        "android_client_info": {
+          "package_name": "com.example.les_fugitifs_portal"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD1vfPDa7UvDW0oatO7MnrfyWZFINFlGPU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:722508102779:android:68bd2d70d9f9bb81f176de",
+        "android_client_info": {
+          "package_name": "henigma.ch.lesfugitifs"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD1vfPDa7UvDW0oatO7MnrfyWZFINFlGPU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

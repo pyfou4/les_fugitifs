@@ -1,0 +1,31 @@
+{
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "les-fugitifs",
+          "appId": "1:722508102779:android:b9eb77df778939fff176de",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "les-fugitifs",
+          "configurations": {
+            "android": "1:722508102779:android:b9eb77df778939fff176de",
+            "ios": "1:722508102779:ios:2ba8ecbb876068f4f176de",
+            "macos": "1:722508102779:ios:2ba8ecbb876068f4f176de",
+            "web": "1:722508102779:web:3128477b8f3bbb8df176de",
+            "windows": "1:722508102779:web:ceb9eab1a5feea1df176de"
+          }
+        }
+      }
+    }
+  },
+  "firestore": {
+    "database": "(default)",
+    "location": "eur3",
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}

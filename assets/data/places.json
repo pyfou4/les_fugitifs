@@ -1,0 +1,227 @@
+{
+  "places": [
+    {
+      "id": "A0",
+      "name": "Scène de crime",
+      "lat": 10.443959629080377,
+      "lng": -75.52132776335131,
+      "keywords": [
+        "scène de crime",
+        "début",
+        "commencement",
+        "garage",
+        "voiture",
+        "crime",
+        "scene",
+        "scène",
+        "meurtre",
+        "depart",
+        "début"
+      ],
+      "media": [
+        "image"
+      ],
+      "requiresAllVisited": [],
+      "requiresAnyVisited": [],
+      "revealSuspect": false,
+      "revealMotive": false
+    },
+    {
+      "id": "A1",
+      "name": "Police",
+      "lat": 10.444012384514847,
+      "lng": -75.52172473028595,
+      "keywords": [
+        "police",
+        "commissaire",
+        "commissariat",
+        "inspecteur",
+        "agent",
+        "lestrade"
+      ],
+      "media": [
+        "site"
+      ],
+      "requiresAllVisited": [
+        "A0"
+      ],
+      "requiresAnyVisited": [],
+      "revealSuspect": true,
+      "revealMotive": false
+    },
+    {
+      "id": "A2",
+      "name": "Hopital",
+      "lat": 10.444049313313661,
+      "lng": -75.52272787645866,
+      "keywords": [
+        "hopital",
+        "medecin",
+        "legiste",
+        "infirmerie",
+        "morgue",
+        "hôpital",
+        "médecin",
+        "légiste",
+        "urgence"
+      ],
+      "media": [
+        "film"
+      ],
+      "requiresAllVisited": [
+        "A0"
+      ],
+      "requiresAnyVisited": [],
+      "revealSuspect": true,
+      "revealMotive": true
+    },
+    {
+      "id": "A3",
+      "name": "Madame Brun",
+      "lat": 10.444270886014396,
+      "lng": -75.52351644590992,
+      "keywords": [
+        "madame",
+        "brun",
+        "témoin",
+        "observateur",
+        "observatrice",
+        "madame brun",
+        "temoin",
+        "voisine"
+      ],
+      "media": [
+        "film"
+      ],
+      "requiresAllVisited": [
+        "A0"
+      ],
+      "requiresAnyVisited": [],
+      "revealSuspect": false,
+      "revealMotive": true
+    },
+    {
+      "id": "B0",
+      "name": "La prison",
+      "lat": 10.444350019076444,
+      "lng": -75.52442303255614,
+      "keywords": [
+        "prison",
+        "arrêt",
+        "cellule",
+        "les iles",
+        "detenu",
+        "détenu",
+        "arret"
+      ],
+      "media": [
+        "site"
+      ],
+      "requiresAllVisited": [],
+      "requiresAnyVisited": [
+        "A1",
+        "A2",
+        "A3"
+      ],
+      "revealSuspect": true,
+      "revealMotive": false
+    },
+    {
+      "id": "B1",
+      "name": "L'appartement",
+      "lat": 10.44496198079734,
+      "lng": -75.52352181032612,
+      "keywords": [
+        "appartement",
+        "domicile",
+        "criminel",
+        "maison",
+        "chez lui",
+        "chez elle"
+      ],
+      "media": [
+        "image"
+      ],
+      "requiresAllVisited": [
+        "B0"
+      ],
+      "requiresAnyVisited": [],
+      "revealSuspect": true,
+      "revealMotive": true
+    },
+    {
+      "id": "B2",
+      "name": "La voisine",
+      "lat": 10.445204654939227,
+      "lng": -75.52285125807164,
+      "keywords": [
+        "voisine",
+        "Julie",
+        "femme",
+        "voisin"
+      ],
+      "media": [
+        "film"
+      ],
+      "requiresAllVisited": [
+        "B0"
+      ],
+      "requiresAnyVisited": [],
+      "revealSuspect": false,
+      "revealMotive": true
+    },
+    {
+      "id": "B3",
+      "name": "Le SDF",
+      "lat": 10.445072766842145,
+      "lng": -75.52160671308735,
+      "keywords": [
+        "sdf",
+        "sans",
+        "domicile",
+        "fixe",
+        "banc",
+        "public",
+        "jardin",
+        "parc",
+        "clochard",
+        "sans abri",
+        "sans domicile",
+        "homme"
+      ],
+      "media": [
+        "film"
+      ],
+      "requiresAllVisited": [
+        "B0"
+      ],
+      "requiresAnyVisited": [],
+      "revealSuspect": true,
+      "revealMotive": true
+    },
+    {
+      "id": "C0",
+      "name": "Monsieur Jaune",
+      "lat": 10.443901598086278,
+      "lng": -75.52163353517929,
+      "keywords": [
+        "monsieur",
+        "jaune",
+        "assassin",
+        "arrêt",
+        "arret"
+      ],
+      "media": [
+        "film"
+      ],
+      "requiresAllVisited": [],
+      "requiresAnyVisited": [
+        "B1",
+        "B2",
+        "B3"
+      ],
+      "revealSuspect": false,
+      "revealMotive": false
+    }
+  ]
+}

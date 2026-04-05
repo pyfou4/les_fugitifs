@@ -1,0 +1,272 @@
+Subject: Process ProcessRecord{e7eb09c 6921:com.google.android.as/u0a145} failed to complete startup
+RssHwmKb: 132288
+RssKb: 130124
+RssAnonKb: 43092
+RssShmemKb: 668
+VmSwapKb: 16624
+
+
+--- CriticalEventLog ---
+capacity: 20
+events <
+  timestamp_ms: 1774551093956
+  anr <
+    pid: 4317
+    process: "com.google.android.gms.persistent"
+    process_class: 2
+    subject: "Process ProcessRecord{f6c0164 4317:com.google.android.gms.persistent/u0a155} failed to complete startup"
+    uid: 10155
+  >
+>
+events <
+  timestamp_ms: 1774551109135
+  anr <
+    pid: 4455
+    process: "com.google.android.as"
+    process_class: 2
+    subject: "Process ProcessRecord{3ed8e06 4455:com.google.android.as/u0a145} failed to complete startup"
+    uid: 10145
+  >
+>
+events <
+  timestamp_ms: 1774551122048
+  anr <
+    pid: 4504
+    process: "com.android.phone"
+    process_class: 2
+    subject: "Process ProcessRecord{7cd413c 4504:com.android.phone/1001} failed to complete startup"
+    uid: 1001
+  >
+>
+events <
+  timestamp_ms: 1774551132699
+  anr <
+    pid: 4692
+    process: "com.google.android.gms"
+    process_class: 2
+    subject: "Process ProcessRecord{c126500 4692:com.google.android.gms/u0a155} failed to complete startup"
+    uid: 10155
+  >
+>
+events <
+  timestamp_ms: 1774551139602
+  anr <
+    pid: 4741
+    process: "com.google.android.inputmethod.latin"
+    process_class: 2
+    subject: "Process ProcessRecord{e99eea2 4741:com.google.android.inputmethod.latin/u0a166} failed to complete startup"
+    uid: 10166
+  >
+>
+events <
+  timestamp_ms: 1774551160374
+  anr <
+    pid: 5224
+    process: "com.android.phone"
+    process_class: 2
+    subject: "Process ProcessRecord{7cd413c 5224:com.android.phone/1001} failed to complete startup"
+    uid: 1001
+  >
+>
+events <
+  timestamp_ms: 1774551182394
+  install_packages <
+  >
+>
+events <
+  timestamp_ms: 1774551191344
+  native_crash <
+    pid: 5283
+    process: "com.google.android.bluetooth"
+    process_class: 2
+    uid: 1002
+  >
+>
+events <
+  timestamp_ms: 1774551194778
+  anr <
+    pid: 5573
+    process: "com.android.phone"
+    process_class: 2
+    subject: "Process ProcessRecord{7cd413c 5573:com.android.phone/1001} failed to complete startup"
+    uid: 1001
+  >
+>
+events <
+  timestamp_ms: 1774551195926
+  anr <
+    pid: 5713
+    process: "com.google.android.gms"
+    process_class: 2
+    subject: "Process ProcessRecord{e3a192c 5713:com.google.android.gms/u0a155} failed to complete startup"
+    uid: 10155
+  >
+>
+events <
+  timestamp_ms: 1774551206528
+  anr <
+    pid: 5731
+    process: "com.google.android.gms.persistent"
+    process_class: 2
+    subject: "Process ProcessRecord{492f1cb 5731:com.google.android.gms.persistent/u0a155} failed to complete startup"
+    uid: 10155
+  >
+>
+events <
+  timestamp_ms: 1774551217448
+  anr <
+    pid: 5829
+    process: "com.google.android.as"
+    process_class: 2
+    subject: "Process ProcessRecord{40bd9ff 5829:com.google.android.as/u0a145} failed to complete startup"
+    uid: 10145
+  >
+>
+events <
+  timestamp_ms: 1774551231280
+  anr <
+    pid: 5900
+    process: "com.android.phone"
+    process_class: 2
+    subject: "Process ProcessRecord{7cd413c 5900:com.android.phone/1001} failed to complete startup"
+    uid: 1001
+  >
+>
+events <
+  timestamp_ms: 1774551231930
+  anr <
+    pid: 6008
+    process: "com.google.android.gms"
+    process_class: 2
+    subject: "Process ProcessRecord{8cff700 6008:com.google.android.gms/u0a155} failed to complete startup"
+    uid: 10155
+  >
+>
+events <
+  timestamp_ms: 1774551254118
+  anr <
+    pid: 3503
+    process: "com.google.android.apps.nexuslauncher"
+    process_class: 2
+    subject: "Input dispatching timed out (7d4c844 Taskbar is not responding. Waited 5077ms for TouchModeEvent(inTouchMode=false))."
+    uid: 10191
+  >
+>
+events <
+  timestamp_ms: 1774551267414
+  anr <
+    pid: 6221
+    process: "com.android.phone"
+    process_class: 2
+    subject: "Process ProcessRecord{7cd413c 6221:com.android.phone/1001} failed to complete startup"
+    uid: 1001
+  >
+>
+events <
+  timestamp_ms: 1774551278713
+  anr <
+    pid: 6242
+    process: "com.google.android.gms"
+    process_class: 2
+    subject: "Process ProcessRecord{5e4c831 6242:com.google.android.gms/u0a155} failed to complete startup"
+    uid: 10155
+  >
+>
+events <
+  timestamp_ms: 1774551307535
+  anr <
+    pid: 6549
+    process: "com.android.phone"
+    process_class: 2
+    subject: "Process ProcessRecord{7cd413c 6549:com.android.phone/1001} failed to complete startup"
+    uid: 1001
+  >
+>
+events <
+  timestamp_ms: 1774551328816
+  anr <
+    pid: 6534
+    process: "com.google.android.gms.persistent"
+    process_class: 2
+    subject: "executing service com.google.android.gms/.magictether.service.TetherService, waited 20159ms"
+    uid: 10155
+  >
+>
+events <
+  timestamp_ms: 1774551344094
+  anr <
+    pid: 6842
+    process: "com.android.phone"
+    process_class: 2
+    subject: "Process ProcessRecord{7cd413c 6842:com.android.phone/1001} failed to complete startup"
+    uid: 1001
+  >
+>
+timestamp_ms: 1774551355976
+window_ms: 300000
+
+----- dumping pid: 6921 at 1139031
+libdebuggerd_client: tombstoned reported failure: 
+
+----- Waiting Channels: pid 6921 at 2026-03-26 18:55:56.096171600+0000 -----
+Cmd line: com.google.android.as
+
+sysTid=6921      0
+sysTid=6923      do_sigtimedwait
+sysTid=6924      pipe_read
+sysTid=6927      futex_wait_queue
+sysTid=6928      futex_wait_queue
+sysTid=6929      futex_wait_queue
+sysTid=6931      futex_wait_queue
+sysTid=6932      futex_wait_queue
+sysTid=6934      binder_ioctl_write_read
+sysTid=6936      binder_ioctl_write_read
+sysTid=6950      binder_ioctl_write_read
+sysTid=6956      futex_wait_queue
+sysTid=7079      do_epoll_wait
+sysTid=7082      futex_wait_queue
+sysTid=7084      futex_wait_queue
+sysTid=7087      futex_wait_queue
+sysTid=7088      futex_wait_queue
+sysTid=7093      futex_wait_queue
+sysTid=7094      futex_wait_queue
+sysTid=7098      futex_wait_queue
+sysTid=7122      futex_wait_queue
+sysTid=7131      futex_wait_queue
+
+----- end 6921 -----
+
+libdebuggerd_client: failed to read status response from tombstoned: Try again
+
+----- Waiting Channels: pid 6921 at 2026-03-26 18:56:06.605899900+0000 -----
+Cmd line: com.google.android.as
+
+sysTid=6921      0
+sysTid=6923      futex_wait_queue
+sysTid=6924      pipe_read
+sysTid=6927      futex_wait_queue
+sysTid=6928      futex_wait_queue
+sysTid=6929      futex_wait_queue
+sysTid=6931      futex_wait_queue
+sysTid=6932      futex_wait_queue
+sysTid=6934      binder_ioctl_write_read
+sysTid=6936      binder_ioctl_write_read
+sysTid=6950      binder_ioctl_write_read
+sysTid=6956      futex_wait_queue
+sysTid=7079      do_epoll_wait
+sysTid=7082      futex_wait_queue
+sysTid=7084      futex_wait_queue
+sysTid=7087      futex_wait_queue
+sysTid=7088      futex_wait_queue
+sysTid=7093      futex_wait_queue
+sysTid=7094      futex_wait_queue
+sysTid=7098      futex_wait_queue
+sysTid=7122      futex_wait_queue
+sysTid=7131      futex_wait_queue
+sysTid=7212      futex_wait_queue
+
+----- end 6921 -----
+
+DurationsV5: 1138974,0,48,342,694,596,5,0,493,0,0,109,0,0,0,1,13366,55,2,12381,4,1,0,0,0
+
+----- dumping ended at 1152449

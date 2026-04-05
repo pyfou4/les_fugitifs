@@ -1,0 +1,52 @@
+{
+  "suspects": [
+    {
+      "id": "anna",
+      "name": "Anna",
+      "age": 29,
+      "profession": "infirmière",
+      "build": "mince",
+      "image": "assets/images/suspects/anna.png"
+    },
+    {
+      "id": "bernadette",
+      "name": "Bernadette",
+      "age": 54,
+      "profession": "commerçante",
+      "build": "moyenne",
+      "image": "assets/images/suspects/bernadette.png"
+    },
+    {
+      "id": "chloe",
+      "name": "Chloé",
+      "age": 24,
+      "profession": "étudiante",
+      "build": "sportive",
+      "image": "assets/images/suspects/chloe.png"
+    },
+    {
+      "id": "didier",
+      "name": "Didier",
+      "age": 47,
+      "profession": "agent de sécurité",
+      "build": "massive",
+      "image": "assets/images/suspects/didier.png"
+    },
+    {
+      "id": "eric",
+      "name": "Eric",
+      "age": 38,
+      "profession": "chauffeur",
+      "build": "moyenne",
+      "image": "assets/images/suspects/eric.png"
+    },
+    {
+      "id": "fabrice",
+      "name": "Fabrice",
+      "age": 33,
+      "profession": "artisan",
+      "build": "athlétique",
+      "image": "assets/images/suspects/fabrice.png"
+    }
+  ]
+}

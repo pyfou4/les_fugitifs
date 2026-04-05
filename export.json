@@ -1,0 +1,663 @@
+{
+  "game": {
+    "id": "les_fugitifs",
+    "title": "Les Fugitifs",
+    "status": "draft",
+    "structureLocked": false,
+    "createdAt": {
+      "_seconds": 1775273306,
+      "_nanoseconds": 0
+    },
+    "updatedAt": {
+      "_seconds": 1775273327,
+      "_nanoseconds": 0
+    },
+    "structureRules": {
+      "phases": {
+        "A0": 1,
+        "A": 6,
+        "B0": 1,
+        "B": 5,
+        "C0": 1,
+        "C": 4,
+        "D0": 1
+      },
+      "totalPlaces": 19
+    },
+    "distributionRules": {
+      "suspects": {
+        "totalExpected": 6,
+        "removeAtSessionStart": 1,
+        "mustDistribute": 5
+      },
+      "motives": {
+        "totalExpected": 6,
+        "removeAtSessionStart": 1,
+        "mustDistribute": 5
+      }
+    }
+  },
+  "placeTemplates": {
+    "A0": {
+      "name": "Scène de crime",
+      "phase": "A0",
+      "phaseIndex": 0,
+      "experienceType": "media",
+      "keywords": [
+        "scène de crime",
+        "début",
+        "commencement",
+        "garage",
+        "voiture",
+        "crime",
+        "scene",
+        "scène",
+        "meurtre",
+        "depart"
+      ],
+      "id": "A0",
+      "requiresAllVisited": [],
+      "storySynopsis": "Découverte de la scène de crime et mise en contexte de l’enquête.",
+      "requiresAnyVisited": [],
+      "allowedClueStrengths": [],
+      "targetSlot": "none",
+      "targetType": "none"
+    },
+    "A1": {
+      "keywords": [
+        "police",
+        "commissaire",
+        "commissariat",
+        "inspecteur",
+        "agent",
+        "lestrade"
+      ],
+      "id": "A1",
+      "phase": "A",
+      "experienceType": "physical",
+      "targetType": "suspect",
+      "requiresAllVisited": [
+        "A0"
+      ],
+      "phaseIndex": 1,
+      "allowedClueStrengths": [
+        "strong",
+        "medium",
+        "weak"
+      ],
+      "targetSlot": "PC1",
+      "requiresAnyVisited": [],
+      "storySynopsis": "Un témoin évoque une personne qui semblait incapable d’agir seule. test",
+      "name": "Le poste de police",
+      "synopsis": "Un témoin évoque une personne qui semblait incapable d’agir seule. test",
+      "title": "Le poste de police"
+    },
+    "A2": {
+      "id": "A2",
+      "name": "Hopital",
+      "phase": "A",
+      "phaseIndex": 2,
+      "allowedClueStrengths": [
+        "strong"
+      ],
+      "keywords": [
+        "hopital",
+        "medecin",
+        "legiste",
+        "infirmerie",
+        "morgue",
+        "hôpital",
+        "médecin",
+        "légiste",
+        "urgence"
+      ],
+      "requiresAllVisited": [
+        "A0"
+      ],
+      "experienceType": "media",
+      "targetType": "motive",
+      "targetSlot": "MO1",
+      "storySynopsis": "Une caméra montre un comportement incompatible avec ce mobile.",
+      "requiresAnyVisited": []
+    },
+    "A3": {
+      "id": "A3",
+      "phase": "A",
+      "phaseIndex": 3,
+      "isActive": false,
+      "name": "",
+      "experienceType": "observation",
+      "targetType": "suspect",
+      "targetSlot": "PC2",
+      "allowedClueStrengths": [
+        "strong",
+        "weak"
+      ],
+      "storySynopsis": "Un détail sur le lieu contredit le témoignage d’un suspect.",
+      "requiresAllVisited": [
+        "A0"
+      ],
+      "requiresAnyVisited": [],
+      "synopsis": "Un détail sur le lieu contredit le témoignage d’un suspect.",
+      "title": "",
+      "keywords": [
+        "brun",
+        "voisine"
+      ]
+    },
+    "A4": {
+      "id": "A4",
+      "phase": "A",
+      "phaseIndex": 4,
+      "experienceType": "physical",
+      "targetType": "motive",
+      "targetSlot": "MO2",
+      "allowedClueStrengths": [
+        "strong",
+        "medium",
+        "weak"
+      ],
+      "storySynopsis": "Un élément prouve que ce mobile aurait nécessité des compétences spécifiques",
+      "isActive": false,
+      "name": "",
+      "requiresAllVisited": [
+        "A0"
+      ],
+      "requiresAnyVisited": []
+    },
+    "A5": {
+      "id": "A5",
+      "phase": "A",
+      "phaseIndex": 5,
+      "experienceType": "media",
+      "targetType": "suspect",
+      "targetSlot": "PC3",
+      "allowedClueStrengths": [
+        "strong"
+      ],
+      "storySynopsis": "Une déclaration disculpe clairement un des suspects.",
+      "requiresAllVisited": [
+        "A0"
+      ],
+      "isActive": false,
+      "name": "",
+      "requiresAnyVisited": []
+    },
+    "A6": {
+      "id": "A6",
+      "phase": "A",
+      "phaseIndex": 6,
+      "experienceType": "physical",
+      "targetType": "motive",
+      "targetSlot": "MO3",
+      "allowedClueStrengths": [
+        "strong",
+        "medium",
+        "weak"
+      ],
+      "storySynopsis": "Une contrainte physique rend ce mobile improbable.",
+      "requiresAllVisited": [
+        "A0"
+      ],
+      "isActive": false,
+      "name": "",
+      "requiresAnyVisited": []
+    },
+    "B0": {
+      "id": "B0",
+      "phase": "B0",
+      "phaseIndex": 0,
+      "experienceType": "media",
+      "targets": [
+        {
+          "targetType": "suspect",
+          "targetSlot": "PC4"
+        },
+        {
+          "targetType": "motive",
+          "targetSlot": "MO4"
+        }
+      ],
+      "allowedClueStrengths": [
+        "strong"
+      ],
+      "storySynopsis": "Un témoin clé change totalement la lecture des événements.",
+      "unlockRules": {
+        "visibleAfterMinPhaseVisits": {
+          "phase": "A",
+          "count": 1
+        },
+        "openAfterMinPhaseVisits": {
+          "phase": "A",
+          "count": 2
+        }
+      },
+      "requiresAllVisited": [],
+      "isActive": false,
+      "name": "",
+      "requiresAnyVisited": []
+    },
+    "B1": {
+      "id": "B1",
+      "phase": "B",
+      "phaseIndex": 1,
+      "experienceType": "physical",
+      "targetType": "suspect",
+      "targetSlot": "PC5",
+      "allowedClueStrengths": [
+        "strong",
+        "medium",
+        "weak"
+      ],
+      "storySynopsis": "Un élément de timing rend impossible la présence d’un suspect.",
+      "isActive": false,
+      "name": "",
+      "requiresAllVisited": [
+        "B0"
+      ],
+      "requiresAnyVisited": []
+    },
+    "B2": {
+      "id": "B2",
+      "phase": "B",
+      "phaseIndex": 2,
+      "experienceType": "media",
+      "targetType": "motive",
+      "targetSlot": "MO2",
+      "allowedClueStrengths": [
+        "strong"
+      ],
+      "storySynopsis": "Un document confirme définitivement une incohérence.",
+      "requiresAllVisited": [
+        "B0"
+      ],
+      "isActive": false,
+      "name": "",
+      "requiresAnyVisited": []
+    },
+    "B3": {
+      "id": "B3",
+      "phase": "B",
+      "phaseIndex": 3,
+      "experienceType": "physical",
+      "targetType": "motive",
+      "targetSlot": "MO5",
+      "allowedClueStrengths": [
+        "strong",
+        "medium",
+        "weak"
+      ],
+      "storySynopsis": "Une contrainte pratique rend ce mobile irréalisable.",
+      "requiresAllVisited": [
+        "B0"
+      ],
+      "isActive": false,
+      "name": "",
+      "requiresAnyVisited": []
+    },
+    "B4": {
+      "id": "B4",
+      "phase": "B",
+      "phaseIndex": 4,
+      "experienceType": "observation",
+      "targetType": "suspect",
+      "allowedClueStrengths": [
+        "strong",
+        "weak"
+      ],
+      "storySynopsis": "Un détail visible invalide une version des faits.",
+      "requiresAllVisited": [
+        "B0"
+      ],
+      "isActive": false,
+      "name": "",
+      "targetSlot": "PC2",
+      "requiresAnyVisited": []
+    },
+    "B5": {
+      "id": "B5",
+      "phase": "B",
+      "phaseIndex": 5,
+      "experienceType": "physical",
+      "targetSelectionMode": "one_of",
+      "allowedClueStrengths": [
+        "strong",
+        "medium",
+        "weak"
+      ],
+      "storySynopsis": "Une reconstitution met en évidence une impossibilité.",
+      "requiresAllVisited": [
+        "B0"
+      ],
+      "isActive": false,
+      "name": "",
+      "targets": [
+        {
+          "targetSlot": "PC1",
+          "targetType": "suspect"
+        },
+        {
+          "targetType": "motive",
+          "targetSlot": "MO1"
+        }
+      ],
+      "requiresAnyVisited": []
+    },
+    "C0": {
+      "id": "C0",
+      "phase": "C0",
+      "phaseIndex": 0,
+      "experienceType": "media",
+      "targetSelectionMode": "one_of",
+      "storySynopsis": "Un élément clé rapproche de la vérité.",
+      "unlockRules": {
+        "visibleAfterMinPhaseVisits": {
+          "phase": "B",
+          "count": 1
+        },
+        "openAfterMinPhaseVisits": {
+          "phase": "B",
+          "count": 2
+        }
+      },
+      "isActive": false,
+      "name": "",
+      "targets": [
+        {
+          "targetSlot": "MO5",
+          "targetType": "motive"
+        },
+        {
+          "targetType": "suspect",
+          "targetSlot": "PC5"
+        }
+      ],
+      "allowedClueStrengths": [
+        "strong"
+      ],
+      "requiresAllVisited": [],
+      "requiresAnyVisited": []
+    },
+    "C1": {
+      "id": "C1",
+      "phase": "C",
+      "phaseIndex": 1,
+      "experienceType": "physical",
+      "targets": [
+        {
+          "targetType": "suspect",
+          "targetSlot": "PC1"
+        },
+        {
+          "targetType": "suspect",
+          "targetSlot": "PC2"
+        }
+      ],
+      "targetSelectionMode": "one_of",
+      "allowedClueStrengths": [
+        "strong",
+        "medium",
+        "weak"
+      ],
+      "storySynopsis": "Une mise en situation confirme définitivement une incohérence.",
+      "requiresAllVisited": [
+        "C0"
+      ],
+      "isActive": false,
+      "name": "",
+      "requiresAnyVisited": []
+    },
+    "C2": {
+      "id": "C2",
+      "phase": "C",
+      "phaseIndex": 2,
+      "experienceType": "observation",
+      "targetSelectionMode": "one_of",
+      "allowedClueStrengths": [
+        "strong",
+        "weak"
+      ],
+      "storySynopsis": "Un détail du lieu invalide un mobile.",
+      "requiresAllVisited": [
+        "C0"
+      ],
+      "isActive": false,
+      "name": "",
+      "targets": [
+        {
+          "targetType": "motive",
+          "targetSlot": "MO3"
+        },
+        {
+          "targetType": "motive",
+          "targetSlot": "MO4"
+        }
+      ],
+      "requiresAnyVisited": []
+    },
+    "C3": {
+      "id": "C3",
+      "phase": "C",
+      "phaseIndex": 3,
+      "experienceType": "media",
+      "targets": [
+        {
+          "targetType": "suspect",
+          "targetSlot": "PC2"
+        },
+        {
+          "targetType": "motive",
+          "targetSlot": "MO2"
+        }
+      ],
+      "allowedClueStrengths": [
+        "strong"
+      ],
+      "storySynopsis": "Une révélation finale croisée verrouille plusieurs hypothèses.",
+      "requiresAllVisited": [
+        "C0"
+      ],
+      "isActive": false,
+      "name": "",
+      "requiresAnyVisited": []
+    },
+    "C4": {
+      "id": "C4",
+      "phase": "C",
+      "phaseIndex": 4,
+      "experienceType": "observation",
+      "targets": [
+        {
+          "targetType": "suspect",
+          "targetSlot": "PC3"
+        },
+        {
+          "targetType": "motive",
+          "targetSlot": "MO1"
+        }
+      ],
+      "targetSelectionMode": "one_of",
+      "allowedClueStrengths": [
+        "strong",
+        "weak"
+      ],
+      "storySynopsis": "Un dernier détail élimine les ultimes doutes.",
+      "requiresAllVisited": [
+        "C0"
+      ],
+      "isActive": false,
+      "name": "",
+      "requiresAnyVisited": []
+    },
+    "D0": {
+      "id": "D0",
+      "phase": "D0",
+      "phaseIndex": 0,
+      "experienceType": "media",
+      "storySynopsis": "Moment de l'accusation finale, remplir le questionnaire de fin",
+      "isActive": false,
+      "name": "",
+      "unlockRules": {
+        "visibleAfterMinPhaseVisits": {
+          "phase": "C",
+          "count": 1
+        },
+        "openAfterMinPhaseVisits": {
+          "phase": "C",
+          "count": 2
+        }
+      },
+      "requiresAllVisited": [],
+      "requiresAnyVisited": []
+    }
+  },
+  "suspects": {
+    "anna": {
+      "name": "Anna",
+      "profession": "infirmière",
+      "build": "mince",
+      "id": "anna",
+      "age": 29,
+      "image": "games/les_fugitifs/assets/suspects/anna.png",
+      "imagePath": "games/les_fugitifs/assets/suspects/anna.png",
+      "updatedAt": "2026-04-05T12:09:59.692"
+    }
+  },
+  "motives": {
+    "amour": {
+      "id": "amour",
+      "name": "Amour",
+      "delays": "rapide",
+      "image": "assets/images/motives/amour.png",
+      "preparations": "variable",
+      "violence": "passionnelle"
+    }
+  },
+  "site": {
+    "name": "Sion",
+    "id": "sion",
+    "gameId": "les_fugitifs",
+    "status": "draft",
+    "languageCode": "fr",
+    "coordinatesFrozenBy": "admin_portal",
+    "coordinatesFrozenAt": "2026-04-04T23:33:52.505",
+    "coordinatesFrozen": false,
+    "updatedAt": "2026-04-04T23:33:52.505"
+  },
+  "sitePlaces": {
+    "A0": {
+      "id": "A0",
+      "templateId": "A0",
+      "lat": 0,
+      "lng": 0
+    },
+    "A1": {
+      "lat": 10.444012384514847,
+      "lng": -75.52172473028595,
+      "id": "A1",
+      "templateId": "A1"
+    },
+    "A2": {
+      "lat": 10.444049313313661,
+      "lng": -75.52272787645866,
+      "id": "A2",
+      "templateId": "A2"
+    },
+    "A3": {
+      "id": "A3",
+      "templateId": "A3",
+      "lat": 0,
+      "lng": 0
+    },
+    "A4": {
+      "id": "A4",
+      "templateId": "A4",
+      "lat": 0,
+      "lng": 0
+    },
+    "A5": {
+      "id": "A5",
+      "templateId": "A5",
+      "lat": 0,
+      "lng": 0
+    },
+    "A6": {
+      "id": "A6",
+      "templateId": "A6",
+      "lat": 0,
+      "lng": 0
+    },
+    "B0": {
+      "id": "B0",
+      "templateId": "B0",
+      "lat": 0,
+      "lng": 0
+    },
+    "B1": {
+      "id": "B1",
+      "templateId": "B1",
+      "lat": 0,
+      "lng": 0
+    },
+    "B2": {
+      "id": "B2",
+      "templateId": "B2",
+      "lat": 0,
+      "lng": 0
+    },
+    "B3": {
+      "id": "B3",
+      "templateId": "B3",
+      "lat": 0,
+      "lng": 0
+    },
+    "B4": {
+      "id": "B4",
+      "templateId": "B4",
+      "lat": 0,
+      "lng": 0
+    },
+    "B5": {
+      "id": "B5",
+      "templateId": "B5",
+      "lat": 0,
+      "lng": 0
+    },
+    "C0": {
+      "id": "C0",
+      "templateId": "C0",
+      "lat": 0,
+      "lng": 0
+    },
+    "C1": {
+      "id": "C1",
+      "templateId": "C1",
+      "lat": 0,
+      "lng": 0
+    },
+    "C2": {
+      "id": "C2",
+      "templateId": "C2",
+      "lat": 0,
+      "lng": 0
+    },
+    "C3": {
+      "id": "C3",
+      "templateId": "C3",
+      "lat": 0,
+      "lng": 0
+    },
+    "C4": {
+      "id": "C4",
+      "templateId": "C4",
+      "lat": 0,
+      "lng": 0
+    },
+    "D0": {
+      "id": "D0",
+      "templateId": "D0",
+      "lat": 0,
+      "lng": 0
+    }
+  }
+}

@@ -1,0 +1,52 @@
+{
+  "motives": [
+    {
+      "id": "jalousie",
+      "name": "Jalousie",
+      "preparations": "faibles",
+      "delays": "impulsif",
+      "violence": "moyenne",
+      "image": "assets/images/motives/jalousie.png"
+    },
+    {
+      "id": "argent",
+      "name": "Argent",
+      "preparations": "élevés",
+      "delays": "longs",
+      "violence": "calculée",
+      "image": "assets/images/motives/argent.png"
+    },
+    {
+      "id": "amour",
+      "name": "Amour",
+      "preparations": "variables",
+      "delays": "rapides",
+      "violence": "passionnelle",
+      "image": "assets/images/motives/amour.png"
+    },
+    {
+      "id": "vengeance",
+      "name": "Vengeance",
+      "preparations": "élevés",
+      "delays": "longs",
+      "violence": "forte",
+      "image": "assets/images/motives/vengeance.png"
+    },
+    {
+      "id": "hasard",
+      "name": "Hasard",
+      "preparations": "nuls",
+      "delays": "immédiats",
+      "violence": "chaotique",
+      "image": "assets/images/motives/hasard.png"
+    },
+    {
+      "id": "contrat",
+      "name": "Contrat",
+      "preparations": "professionnels",
+      "delays": "planifiés",
+      "violence": "efficace",
+      "image": "assets/images/motives/contrat.png"
+    }
+  ]
+}
