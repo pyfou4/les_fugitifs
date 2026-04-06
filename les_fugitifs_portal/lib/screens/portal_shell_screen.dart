@@ -163,34 +163,7 @@ class _PortalShellScreenState extends State<PortalShellScreen> {
           ),
           const VerticalDivider(width: 1),
           Expanded(
-            child: Column(
-              children: [
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 18,
-                  ),
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF0A1220),
-                    border: Border(
-                      bottom: BorderSide(color: Color(0xFF1C2A3E)),
-                    ),
-                  ),
-                  child: Text(
-                    destination.label,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: destination.builder(),
-                ),
-              ],
-            ),
+            child: destination.builder(),
           ),
         ],
       ),

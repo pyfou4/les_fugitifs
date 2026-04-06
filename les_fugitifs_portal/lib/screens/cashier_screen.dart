@@ -1,15 +1,18 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
-import '../app.dart';
 import '../services/activation_session_service.dart';
 import '../services/browser_site_preference.dart';
+import '../services/portal_access_service.dart';
 import '../widgets/header_brand.dart';
-import 'admin_screen.dart';
-import 'creator_screen.dart';
 
 class CashierScreen extends StatefulWidget {
-  const CashierScreen({super.key});
+  final PortalAccessProfile profile;
+
+  const CashierScreen({
+    super.key,
+    required this.profile,
+  });
 
   @override
   State<CashierScreen> createState() => _CashierScreenState();
@@ -21,6 +24,7 @@ class _CashierScreenState extends State<CashierScreen>
       ActivationSessionService(
     firestore: FirebaseFirestore.instance,
   );
+  final PortalAccessService _portalAccessService = PortalAccessService();
 
   String? _currentCode;
   bool _loading = false;
@@ -58,6 +62,10 @@ class _CashierScreenState extends State<CashierScreen>
     _logoController.dispose();
     _portalController.dispose();
     super.dispose();
+  }
+
+  Future<void> _signOut() async {
+    await _portalAccessService.signOut();
   }
 
   void _syncSelectedSiteWithPreferences(
@@ -115,186 +123,6 @@ class _CashierScreenState extends State<CashierScreen>
     }
   }
 
-  Future<void> _openAdminAccess() async {
-    final controller = TextEditingController();
-    String? errorText;
-
-    final bool? granted = await showDialog<bool>(
-      context: context,
-      barrierDismissible: true,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setLocalState) {
-            return AlertDialog(
-              backgroundColor: const Color(0xFF151B25),
-              title: const Text(
-                'Accès admin',
-                style: TextStyle(color: Colors.white),
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'Saisis le mot de passe administrateur pour accéder au dashboard.',
-                    style: TextStyle(color: Color(0xFFB8C3D6)),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: controller,
-                    obscureText: true,
-                    autofocus: true,
-                    decoration: InputDecoration(
-                      labelText: 'Mot de passe',
-                      errorText: errorText,
-                    ),
-                    onSubmitted: (_) {
-                      if (controller.text == App.adminPassword) {
-                        Navigator.of(context).pop(true);
-                      } else {
-                        setLocalState(() {
-                          errorText = 'Mot de passe incorrect';
-                        });
-                      }
-                    },
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: const Text('Annuler'),
-                ),
-                FilledButton(
-                  onPressed: () {
-                    if (controller.text == App.adminPassword) {
-                      Navigator.of(context).pop(true);
-                    } else {
-                      setLocalState(() {
-                        errorText = 'Mot de passe incorrect';
-                      });
-                    }
-                  },
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFFD65A00),
-                    foregroundColor: Colors.white,
-                  ),
-                  child: const Text('Entrer'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-
-    if (granted == true && mounted) {
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const AdminScreen(),
-        ),
-      );
-
-      if (!mounted) return;
-
-      setState(() {
-        _defaultSiteId = BrowserSitePreference.getDefaultSiteId();
-        _siteLocked = BrowserSitePreference.isLocked();
-
-        if (_siteLocked &&
-            _defaultSiteId != null &&
-            _selectedSiteId != _defaultSiteId) {
-          _selectedSiteId = _defaultSiteId;
-          _currentCode = null;
-          _currentGameSessionId = null;
-          _message = null;
-        }
-      });
-    }
-  }
-
-  Future<void> _openCreatorAccess() async {
-    final controller = TextEditingController();
-    String? errorText;
-
-    final bool? granted = await showDialog<bool>(
-      context: context,
-      barrierDismissible: true,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setLocalState) {
-            return AlertDialog(
-              backgroundColor: const Color(0xFF151B25),
-              title: const Text(
-                'Accès scénariste',
-                style: TextStyle(color: Colors.white),
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'Saisis le mot de passe scénariste pour accéder au créateur de scénario.',
-                    style: TextStyle(color: Color(0xFFB8C3D6)),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: controller,
-                    obscureText: true,
-                    autofocus: true,
-                    decoration: InputDecoration(
-                      labelText: 'Mot de passe',
-                      errorText: errorText,
-                    ),
-                    onSubmitted: (_) {
-                      if (controller.text == App.adminPassword) {
-                        Navigator.of(context).pop(true);
-                      } else {
-                        setLocalState(() {
-                          errorText = 'Mot de passe incorrect';
-                        });
-                      }
-                    },
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: const Text('Annuler'),
-                ),
-                FilledButton(
-                  onPressed: () {
-                    if (controller.text == App.adminPassword) {
-                      Navigator.of(context).pop(true);
-                    } else {
-                      setLocalState(() {
-                        errorText = 'Mot de passe incorrect';
-                      });
-                    }
-                  },
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFFD65A00),
-                    foregroundColor: Colors.white,
-                  ),
-                  child: const Text('Entrer'),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-
-    if (granted == true && mounted) {
-      await Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => const CreatorScreen(),
-        ),
-      );
-    }
-  }
-
   Future<void> _getCode() async {
     if (_loading) return;
 
@@ -314,7 +142,7 @@ class _CashierScreenState extends State<CashierScreen>
       final result = await _activationSessionService.assignCodeAndCreateSession(
         lockedScenarioId: _selectedScenarioId!,
         siteId: _selectedSiteId!,
-        cashierUserId: 'cashier_portal',
+        cashierUserId: widget.profile.uid,
       );
 
       if (!mounted) return;
@@ -373,26 +201,22 @@ class _CashierScreenState extends State<CashierScreen>
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
-            child: TextButton.icon(
-              onPressed: _openCreatorAccess,
-              icon: const Icon(Icons.auto_stories_outlined),
-              label: const Text('Accès scénariste'),
-              style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFFFFD7B8),
+            child: Center(
+              child: Text(
+                '${widget.profile.role.label} • ${widget.profile.displayName}',
+                style: const TextStyle(
+                  color: Color(0xFFFFD7B8),
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: TextButton.icon(
-              onPressed: _openAdminAccess,
-              icon: const Icon(Icons.lock_outline),
-              label: const Text('Accès admin'),
-              style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFFFFD7B8),
-              ),
-            ),
+          IconButton(
+            onPressed: _signOut,
+            tooltip: 'Se déconnecter',
+            icon: const Icon(Icons.logout),
           ),
+          const SizedBox(width: 8),
         ],
       ),
       body: Center(
@@ -429,33 +253,13 @@ class _CashierScreenState extends State<CashierScreen>
                             ),
                           ],
                         ),
-                        child: Column(
+                        child: const Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Container(
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(0x55FFD1A3),
-                                    blurRadius:
-                                        14 + (_logoController.value * 8),
-                                    spreadRadius: 1,
-                                  ),
-                                ],
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(16),
-                                child: Image.asset(
-                                  'assets/images/logo.png',
-                                  height: 74,
-                                  fit: BoxFit.contain,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 26),
-                            const Text(
+                            HeaderBrand(),
+                            SizedBox(height: 26),
+                            Text(
                               'HENIGMA GRID',
                               style: TextStyle(
                                 fontSize: 18,
@@ -464,8 +268,8 @@ class _CashierScreenState extends State<CashierScreen>
                                 letterSpacing: 1.4,
                               ),
                             ),
-                            const SizedBox(height: 20),
-                            const Text(
+                            SizedBox(height: 20),
+                            Text(
                               'Ouvrez la brèche.\nLe voyage commence ici.',
                               style: TextStyle(
                                 fontSize: 50,
@@ -474,8 +278,8 @@ class _CashierScreenState extends State<CashierScreen>
                                 color: Colors.white,
                               ),
                             ),
-                            const SizedBox(height: 24),
-                            const Text(
+                            SizedBox(height: 24),
+                            Text(
                               'Chaque code remis entre les bonnes mains peut devenir le seuil d’un passage vers une autre réalité.',
                               style: TextStyle(
                                 fontSize: 18,

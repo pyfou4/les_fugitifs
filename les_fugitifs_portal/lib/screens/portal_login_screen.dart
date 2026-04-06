@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/portal_access_service.dart';
 
@@ -10,6 +11,8 @@ class PortalLoginScreen extends StatefulWidget {
 }
 
 class _PortalLoginScreenState extends State<PortalLoginScreen> {
+  static const String _lastEmailKey = 'portal_last_email';
+
   final PortalAccessService _portalAccessService = PortalAccessService();
   final TextEditingController _emailCtrl = TextEditingController();
   final TextEditingController _passwordCtrl = TextEditingController();
@@ -18,10 +21,40 @@ class _PortalLoginScreenState extends State<PortalLoginScreen> {
   String? _errorText;
 
   @override
+  void initState() {
+    super.initState();
+    _loadLastEmail();
+  }
+
+  @override
   void dispose() {
     _emailCtrl.dispose();
     _passwordCtrl.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadLastEmail() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lastEmail = prefs.getString(_lastEmailKey) ?? '';
+
+      if (!mounted) return;
+
+      _emailCtrl.text = lastEmail;
+      setState(() {});
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {});
+    }
+  }
+
+  Future<void> _persistLastEmail(String email) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_lastEmailKey, email.trim());
+    } catch (_) {
+      // On n’empêche jamais la connexion si le stockage local échoue.
+    }
   }
 
   Future<void> _signIn() async {
@@ -44,24 +77,23 @@ class _PortalLoginScreenState extends State<PortalLoginScreen> {
 
     try {
       await _portalAccessService.signIn(email: email, password: password);
+      await _persistLastEmail(email);
 
       if (!mounted) return;
 
       final profile = await _portalAccessService.readCurrentProfile();
-
       if (profile == null || !profile.isActive) {
         await _portalAccessService.signOut();
         if (!mounted) return;
         setState(() {
           _errorText =
-              'Compte authentifié, mais aucun rôle portail actif n’a été trouvé.';
+          'Compte authentifié, mais aucun rôle portail actif n’a été trouvé.';
         });
-        return;
       }
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _errorText = 'Connexion refusée. Vérifie l’email et le mot de passe.';
+        _errorText = 'Connexion refusée : $e';
       });
     } finally {
       if (mounted) {
@@ -96,7 +128,7 @@ class _PortalLoginScreenState extends State<PortalLoginScreen> {
                   ),
                   const SizedBox(height: 10),
                   const Text(
-                    'Connecte-toi avec un compte Firebase Auth autorisé, puis le portail t’ouvrira la bonne porte selon ton rôle.',
+                    'Connecte-toi avec un compte Firebase Auth autorisé. Ensuite, le portail affichera toutes les zones permises par ton rôle.',
                     style: TextStyle(
                       fontSize: 15,
                       height: 1.45,
@@ -110,6 +142,8 @@ class _PortalLoginScreenState extends State<PortalLoginScreen> {
                     style: const TextStyle(color: Colors.white),
                     decoration: const InputDecoration(
                       labelText: 'Email',
+                      helperText:
+                      'Le dernier email utilisé est mémorisé sur ce navigateur.',
                     ),
                     onSubmitted: (_) => _signIn(),
                   ),
@@ -144,15 +178,17 @@ class _PortalLoginScreenState extends State<PortalLoginScreen> {
                       ),
                       icon: _isLoading
                           ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
                           : const Icon(Icons.login),
-                      label: Text(_isLoading ? 'Connexion...' : 'Se connecter'),
+                      label: Text(
+                        _isLoading ? 'Connexion...' : 'Se connecter',
+                      ),
                     ),
                   ),
                 ],

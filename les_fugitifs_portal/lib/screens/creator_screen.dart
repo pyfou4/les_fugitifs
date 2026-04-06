@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 
-import '../app.dart';
+import '../services/portal_access_service.dart';
 import '../features/scenario_lock/scenario_lock_models.dart';
 import '../features/scenario_lock/scenario_lock_service.dart';
 import '../features/site_readiness/site_readiness_models.dart';
@@ -16,7 +16,9 @@ import 'creator/creator_suspects_motives_tab.dart';
 import 'creator_print_screen.dart';
 
 class CreatorScreen extends StatefulWidget {
-  const CreatorScreen({super.key});
+  final PortalAccessProfile profile;
+
+  const CreatorScreen({super.key, required this.profile});
 
   @override
   State<CreatorScreen> createState() => _CreatorScreenState();
@@ -465,86 +467,22 @@ class _CreatorScreenState extends State<CreatorScreen>
       return true;
     }
 
-    final controller = TextEditingController();
-    String? errorText;
-
-    final bool? granted = await showDialog<bool>(
-      context: context,
-      barrierDismissible: true,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setLocalState) {
-            return AlertDialog(
-              backgroundColor: const Color(0xFF151B25),
-              title: const Text(
-                'Validation admin',
-                style: TextStyle(color: Colors.white),
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'Saisis le mot de passe administrateur pour verrouiller le scénario.',
-                    style: TextStyle(color: Color(0xFFB8C3D6)),
-                  ),
-                  const SizedBox(height: 16),
-                  TextField(
-                    controller: controller,
-                    obscureText: true,
-                    autofocus: true,
-                    decoration: InputDecoration(
-                      labelText: 'Mot de passe admin',
-                      errorText: errorText,
-                    ),
-                    onSubmitted: (_) {
-                      if (controller.text == App.adminPassword) {
-                        Navigator.of(context).pop(true);
-                      } else {
-                        setLocalState(() {
-                          errorText = 'Mot de passe incorrect';
-                        });
-                      }
-                    },
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: const Text('Annuler'),
-                ),
-                FilledButton(
-                  onPressed: () {
-                    if (controller.text == App.adminPassword) {
-                      Navigator.of(context).pop(true);
-                    } else {
-                      setLocalState(() {
-                        errorText = 'Mot de passe incorrect';
-                      });
-                    }
-                  },
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFFD65A00),
-                    foregroundColor: Colors.white,
-                  ),
-                  child: const Text('Verrouiller'),
-                ),
-              ],
-            );
-          },
+    final canLock = widget.profile.role.canAccessCreator;
+    if (!canLock) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Ton rôle ne permet pas de verrouiller un scénario.'),
+          ),
         );
-      },
-    );
-
-    controller.dispose();
-
-    if (granted == true && mounted) {
-      setState(() {
-        _adminPasswordValidatedForSession = true;
-      });
+      }
+      return false;
     }
 
-    return granted == true;
+    setState(() {
+      _adminPasswordValidatedForSession = true;
+    });
+    return true;
   }
 
   Future<void> _lockScenario() async {

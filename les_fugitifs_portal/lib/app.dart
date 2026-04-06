@@ -1,11 +1,9 @@
 import 'package:flutter/material.dart';
 
-import 'screens/cashier_screen.dart';
+import 'screens/portal_gate_screen.dart';
 
 class App extends StatelessWidget {
   const App({super.key});
-
-  static const String adminPassword = 'henigma123';
 
   @override
   Widget build(BuildContext context) {
@@ -83,7 +81,7 @@ class App extends StatelessWidget {
           }),
         ),
       ),
-      home: const CashierScreen(),
+      home: const PortalGateScreen(),
     );
   }
 }

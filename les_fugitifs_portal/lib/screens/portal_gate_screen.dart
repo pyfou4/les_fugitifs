@@ -2,11 +2,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../services/portal_access_service.dart';
-import 'admin_screen.dart';
-import 'cashier_screen.dart';
-import 'creator_screen.dart';
-import 'master_game_screen.dart';
 import 'portal_login_screen.dart';
+import 'portal_shell_screen.dart';
 
 class PortalGateScreen extends StatefulWidget {
   const PortalGateScreen({super.key});
@@ -47,21 +44,12 @@ class _PortalGateScreenState extends State<PortalGateScreen> {
             if (profile == null || !profile.isActive) {
               return _PortalAccessDeniedScreen(
                 message:
-                    'Ce compte est bien connecté, mais aucun rôle actif n’est associé dans portalUsers.',
+                    'Ce compte est connecté, mais aucun rôle actif n’est associé dans portalUsers.',
                 onSignOut: _portalAccessService.signOut,
               );
             }
 
-            switch (profile.role) {
-              case PortalUserRole.admin:
-                return AdminScreen(profile: profile);
-              case PortalUserRole.scenariste:
-                return CreatorScreen(profile: profile);
-              case PortalUserRole.caissier:
-                return CashierScreen(profile: profile);
-              case PortalUserRole.maitreJeu:
-                return MasterGameScreen(profile: profile);
-            }
+            return PortalShellScreen(profile: profile);
           },
         );
       },

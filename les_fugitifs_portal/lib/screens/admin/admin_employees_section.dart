@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:flutter/material.dart';
 
 import '../../services/portal_access_service.dart';
+import '../../services/portal_employee_admin_service.dart';
 
 class AdminEmployeesSection extends StatefulWidget {
   final PortalAccessProfile currentProfile;
@@ -17,36 +19,29 @@ class AdminEmployeesSection extends StatefulWidget {
 
 class _AdminEmployeesSectionState extends State<AdminEmployeesSection> {
   final PortalAccessService _portalAccessService = PortalAccessService();
+  final PortalEmployeeAdminService _portalEmployeeAdminService =
+      PortalEmployeeAdminService();
 
-  Future<void> _openEditor({
-    QueryDocumentSnapshot<Map<String, dynamic>>? doc,
-  }) async {
-    final data = doc?.data() ?? <String, dynamic>{};
+  Future<void> _openCreateEmployeeDialog() async {
+    final emailCtrl = TextEditingController();
+    final displayNameCtrl = TextEditingController();
+    final passwordCtrl = TextEditingController();
 
-    final uidCtrl = TextEditingController(text: (data['uid'] ?? doc?.id ?? '').toString());
-    final emailCtrl = TextEditingController(text: (data['email'] ?? '').toString());
-    final displayNameCtrl = TextEditingController(text: (data['displayName'] ?? '').toString());
-
-    PortalUserRole selectedRole = PortalAccessService.parseRoleValue(
-          (data['role'] ?? '').toString(),
-        ) ??
-        PortalUserRole.caissier;
-
-    bool isActive = (data['isActive'] ?? true) == true;
+    PortalUserRole selectedRole = PortalUserRole.scenariste;
+    bool isActive = true;
     String? errorText;
-    bool isSaving = false;
 
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      barrierDismissible: !isSaving,
-      builder: (context) {
+      barrierDismissible: true,
+      builder: (dialogContext) {
         return StatefulBuilder(
           builder: (context, setLocalState) {
             return AlertDialog(
               backgroundColor: const Color(0xFF151B25),
-              title: Text(
-                doc == null ? 'Ajouter un accès portail' : 'Modifier l’accès portail',
-                style: const TextStyle(color: Colors.white),
+              title: const Text(
+                'Créer un nouvel employé',
+                style: TextStyle(color: Colors.white),
               ),
               content: SizedBox(
                 width: 560,
@@ -57,7 +52,7 @@ class _AdminEmployeesSectionState extends State<AdminEmployeesSection> {
                       const Align(
                         alignment: Alignment.centerLeft,
                         child: Text(
-                          'Important: le compte Firebase Auth doit déjà exister. Ici, tu gères le rôle portail associé au uid.',
+                          'Cette action crée à la fois le compte Firebase Authentication et le document portalUsers.',
                           style: TextStyle(
                             color: Color(0xFFB8C3D6),
                             height: 1.45,
@@ -66,19 +61,205 @@ class _AdminEmployeesSectionState extends State<AdminEmployeesSection> {
                       ),
                       const SizedBox(height: 16),
                       TextField(
+                        controller: emailCtrl,
+                        keyboardType: TextInputType.emailAddress,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: InputDecoration(
+                          labelText: 'Email',
+                          errorText: errorText,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: displayNameCtrl,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: const InputDecoration(
+                          labelText: 'Nom affiché',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      TextField(
+                        controller: passwordCtrl,
+                        obscureText: true,
+                        style: const TextStyle(color: Colors.white),
+                        decoration: const InputDecoration(
+                          labelText: 'Mot de passe temporaire',
+                          helperText: '6 caractères minimum.',
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      DropdownButtonFormField<PortalUserRole>(
+                        value: selectedRole,
+                        dropdownColor: const Color(0xFF171E2A),
+                        decoration: const InputDecoration(
+                          labelText: 'Rôle',
+                        ),
+                        items: PortalUserRole.values
+                            .map(
+                              (role) => DropdownMenuItem(
+                                value: role,
+                                child: Text(role.label),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setLocalState(() {
+                            selectedRole = value;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      SwitchListTile.adaptive(
+                        value: isActive,
+                        onChanged: (value) {
+                          setLocalState(() {
+                            isActive = value;
+                          });
+                        },
+                        title: const Text(
+                          'Compte actif',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        contentPadding: EdgeInsets.zero,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Annuler'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    final email = emailCtrl.text.trim();
+                    final displayName = displayNameCtrl.text.trim();
+                    final password = passwordCtrl.text;
+
+                    if (email.isEmpty || displayName.isEmpty || password.isEmpty) {
+                      setLocalState(() {
+                        errorText =
+                            'Email, nom affiché et mot de passe obligatoires.';
+                      });
+                      return;
+                    }
+
+                    Navigator.of(dialogContext).pop({
+                      'email': email,
+                      'displayName': displayName,
+                      'password': password,
+                      'role': selectedRole,
+                      'isActive': isActive,
+                    });
+                  },
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFD65A00),
+                    foregroundColor: Colors.white,
+                  ),
+                  child: const Text('Créer le compte'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+
+    emailCtrl.dispose();
+    displayNameCtrl.dispose();
+    passwordCtrl.dispose();
+
+    if (result == null) return;
+
+    try {
+      await _portalEmployeeAdminService.createPortalEmployee(
+        email: result['email'] as String,
+        displayName: result['displayName'] as String,
+        password: result['password'] as String,
+        role: result['role'] as PortalUserRole,
+        isActive: result['isActive'] as bool,
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Nouvel employé créé avec succès.'),
+        ),
+      );
+    } on FirebaseFunctionsException catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.message ?? 'La création de l’employé a échoué.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur inattendue : $e'),
+        ),
+      );
+    }
+  }
+
+  Future<void> _openEditor({
+    QueryDocumentSnapshot<Map<String, dynamic>>? doc,
+  }) async {
+    final data = doc?.data() ?? <String, dynamic>{};
+
+    final uidCtrl = TextEditingController(
+      text: (data['uid'] ?? doc?.id ?? '').toString(),
+    );
+    final emailCtrl = TextEditingController(
+      text: (data['email'] ?? '').toString(),
+    );
+    final displayNameCtrl = TextEditingController(
+      text: (data['displayName'] ?? '').toString(),
+    );
+
+    PortalUserRole selectedRole = PortalAccessService.parseRoleValue(
+          (data['role'] ?? '').toString(),
+        ) ??
+        PortalUserRole.caissier;
+
+    bool isActive = (data['isActive'] ?? true) == true;
+    String? errorText;
+
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      barrierDismissible: true,
+      builder: (dialogContext) {
+        return StatefulBuilder(
+          builder: (context, setLocalState) {
+            return AlertDialog(
+              backgroundColor: const Color(0xFF151B25),
+              title: const Text(
+                'Modifier l’accès portail',
+                style: TextStyle(color: Colors.white),
+              ),
+              content: SizedBox(
+                width: 560,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextField(
                         controller: uidCtrl,
-                        enabled: !isSaving && doc == null,
+                        enabled: false,
                         style: const TextStyle(color: Colors.white),
                         decoration: InputDecoration(
                           labelText: 'UID Firebase Auth',
-                          helperText: 'Utilise exactement l’ID utilisateur visible dans Firebase Authentication.',
                           errorText: errorText,
                         ),
                       ),
                       const SizedBox(height: 12),
                       TextField(
                         controller: emailCtrl,
-                        enabled: !isSaving,
                         style: const TextStyle(color: Colors.white),
                         decoration: const InputDecoration(
                           labelText: 'Email',
@@ -87,7 +268,6 @@ class _AdminEmployeesSectionState extends State<AdminEmployeesSection> {
                       const SizedBox(height: 12),
                       TextField(
                         controller: displayNameCtrl,
-                        enabled: !isSaving,
                         style: const TextStyle(color: Colors.white),
                         decoration: const InputDecoration(
                           labelText: 'Nom affiché',
@@ -108,31 +288,27 @@ class _AdminEmployeesSectionState extends State<AdminEmployeesSection> {
                               ),
                             )
                             .toList(),
-                        onChanged: isSaving
-                            ? null
-                            : (value) {
-                                if (value == null) return;
-                                setLocalState(() {
-                                  selectedRole = value;
-                                });
-                              },
+                        onChanged: (value) {
+                          if (value == null) return;
+                          setLocalState(() {
+                            selectedRole = value;
+                          });
+                        },
                       ),
                       const SizedBox(height: 12),
                       SwitchListTile.adaptive(
                         value: isActive,
-                        onChanged: isSaving
-                            ? null
-                            : (value) {
-                                setLocalState(() {
-                                  isActive = value;
-                                });
-                              },
+                        onChanged: (value) {
+                          setLocalState(() {
+                            isActive = value;
+                          });
+                        },
                         title: const Text(
                           'Compte actif',
                           style: TextStyle(color: Colors.white),
                         ),
                         subtitle: const Text(
-                          'Si désactivé, la connexion reste possible côté Auth mais l’accès portail sera refusé.',
+                          'Si désactivé, l’accès portail sera refusé au prochain login.',
                           style: TextStyle(color: Color(0xFF9AA7BC)),
                         ),
                         contentPadding: EdgeInsets.zero,
@@ -143,37 +319,30 @@ class _AdminEmployeesSectionState extends State<AdminEmployeesSection> {
               ),
               actions: [
                 TextButton(
-                  onPressed: isSaving ? null : () => Navigator.of(context).pop(),
+                  onPressed: () => Navigator.of(dialogContext).pop(),
                   child: const Text('Annuler'),
                 ),
                 FilledButton(
-                  onPressed: isSaving
-                      ? null
-                      : () async {
-                          final uid = uidCtrl.text.trim();
-                          final email = emailCtrl.text.trim();
-                          final displayName = displayNameCtrl.text.trim();
+                  onPressed: () {
+                    final uid = uidCtrl.text.trim();
+                    final email = emailCtrl.text.trim();
+                    final displayName = displayNameCtrl.text.trim();
 
-                          if (uid.isEmpty || email.isEmpty || displayName.isEmpty) {
-                            setLocalState(() {
-                              errorText = 'UID, email et nom affiché obligatoires.';
-                            });
-                            return;
-                          }
+                    if (uid.isEmpty || email.isEmpty || displayName.isEmpty) {
+                      setLocalState(() {
+                        errorText = 'UID, email et nom affiché obligatoires.';
+                      });
+                      return;
+                    }
 
-                          setLocalState(() {
-                            isSaving = true;
-                            errorText = null;
-                          });
-
-                          Navigator.of(context).pop({
-                            'uid': uid,
-                            'email': email,
-                            'displayName': displayName,
-                            'role': selectedRole,
-                            'isActive': isActive,
-                          });
-                        },
+                    Navigator.of(dialogContext).pop({
+                      'uid': uid,
+                      'email': email,
+                      'displayName': displayName,
+                      'role': selectedRole,
+                      'isActive': isActive,
+                    });
+                  },
                   style: FilledButton.styleFrom(
                     backgroundColor: const Color(0xFFD65A00),
                     foregroundColor: Colors.white,
@@ -205,12 +374,8 @@ class _AdminEmployeesSectionState extends State<AdminEmployeesSection> {
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            doc == null
-                ? 'Accès portail créé.'
-                : 'Accès portail mis à jour.',
-          ),
+        const SnackBar(
+          content: Text('Accès portail mis à jour.'),
         ),
       );
     } catch (e) {
@@ -292,7 +457,7 @@ class _AdminEmployeesSectionState extends State<AdminEmployeesSection> {
                           ),
                           SizedBox(height: 8),
                           Text(
-                            'Attribue un rôle portail à un compte Firebase Auth existant. Admin voit tout, puis la hiérarchie se resserre vers scénariste, caisse et MJ.',
+                            'Crée un compte complet ou modifie un accès existant. Admin voit tout, puis la hiérarchie se resserre vers scénariste, caisse et MJ.',
                             style: TextStyle(
                               color: Color(0xFF9AA7BC),
                               height: 1.45,
@@ -303,13 +468,13 @@ class _AdminEmployeesSectionState extends State<AdminEmployeesSection> {
                     ),
                     const SizedBox(width: 16),
                     FilledButton.icon(
-                      onPressed: () => _openEditor(),
+                      onPressed: _openCreateEmployeeDialog,
                       style: FilledButton.styleFrom(
                         backgroundColor: const Color(0xFFD65A00),
                         foregroundColor: Colors.white,
                       ),
                       icon: const Icon(Icons.person_add_alt_1),
-                      label: const Text('Ajouter un accès'),
+                      label: const Text('Créer un employé'),
                     ),
                   ],
                 ),
@@ -330,7 +495,7 @@ class _AdminEmployeesSectionState extends State<AdminEmployeesSection> {
                       border: Border.all(color: const Color(0xFF233041)),
                     ),
                     child: const Text(
-                      'Aucun accès portail pour l’instant. Crée d’abord un utilisateur dans Firebase Authentication, puis ajoute ici son UID.',
+                      'Aucun accès portail pour l’instant.',
                       style: TextStyle(
                         color: Color(0xFFB8C3D6),
                         height: 1.45,

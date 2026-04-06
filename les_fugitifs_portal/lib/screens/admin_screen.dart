@@ -4,19 +4,23 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../services/browser_site_preference.dart';
+import '../services/portal_access_service.dart';
 import '../widgets/header_brand.dart';
 import 'admin/admin_actions_section.dart';
 import 'admin/admin_batches_section.dart';
 import 'admin/admin_cashier_site_section.dart';
 import 'admin/admin_filters_section.dart';
 import 'admin/admin_intro_section.dart';
+import 'admin/admin_employees_section.dart';
 import 'admin/admin_low_stock_alert_section.dart';
 import 'admin/admin_scenarios_breakdown_section.dart';
 import 'admin/admin_sites_breakdown_section.dart';
 import 'admin/admin_stats_section.dart';
 
 class AdminScreen extends StatefulWidget {
-  const AdminScreen({super.key});
+  final PortalAccessProfile profile;
+
+  const AdminScreen({super.key, required this.profile});
 
   @override
   State<AdminScreen> createState() => _AdminScreenState();
@@ -550,6 +554,10 @@ class _AdminScreenState extends State<AdminScreen> {
                             const SizedBox(height: 20),
                             if (lowStock) const AdminLowStockAlertSection(),
                             if (lowStock) const SizedBox(height: 20),
+                            AdminEmployeesSection(
+                              currentProfile: widget.profile,
+                            ),
+                            const SizedBox(height: 24),
                             AdminCashierSiteSection(
                               defaultSiteId: _defaultSiteId,
                               siteLocked: _siteLocked,

@@ -34,6 +34,18 @@ extension PortalUserRoleX on PortalUserRole {
         return 'Maître de jeu';
     }
   }
+
+  bool get canAccessAdmin => this == PortalUserRole.admin;
+
+  bool get canAccessCreator =>
+      this == PortalUserRole.admin || this == PortalUserRole.scenariste;
+
+  bool get canAccessCashier =>
+      this == PortalUserRole.admin ||
+      this == PortalUserRole.scenariste ||
+      this == PortalUserRole.caissier;
+
+  bool get canAccessMasterGame => true;
 }
 
 class PortalAccessProfile {
@@ -83,16 +95,11 @@ class PortalAccessService {
     if (user == null) return null;
 
     final snap = await _firestore.collection('portalUsers').doc(user.uid).get();
-    if (!snap.exists) {
-      return null;
-    }
+    if (!snap.exists) return null;
 
     final data = snap.data() ?? <String, dynamic>{};
-    final role = _parseRole((data['role'] ?? '').toString().trim());
-
-    if (role == null) {
-      return null;
-    }
+    final role = parseRoleValue((data['role'] ?? '').toString().trim());
+    if (role == null) return null;
 
     return PortalAccessProfile(
       uid: user.uid,
@@ -124,9 +131,7 @@ class PortalAccessService {
     }, SetOptions(merge: true));
   }
 
-  static PortalUserRole? parseRoleValue(String raw) => _parseRole(raw);
-
-  static PortalUserRole? _parseRole(String raw) {
+  static PortalUserRole? parseRoleValue(String raw) {
     switch (raw.trim().toLowerCase()) {
       case 'admin':
         return PortalUserRole.admin;
