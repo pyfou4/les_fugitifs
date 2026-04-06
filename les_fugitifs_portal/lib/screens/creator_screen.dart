@@ -9,6 +9,7 @@ import '../features/site_readiness/site_readiness_models.dart';
 import '../features/site_readiness/site_readiness_service.dart';
 import 'creator/creator_image_picker.dart';
 import 'creator/creator_image_picker_model.dart';
+import 'creator/creator_questionnaire_tab.dart';
 import 'creator/creator_scenario_tab.dart';
 import 'creator/creator_sites_tab.dart';
 import 'creator/creator_storage_image_preview.dart';
@@ -47,6 +48,9 @@ class _CreatorScreenState extends State<CreatorScreen>
           .doc('les_fugitifs')
           .collection('motives');
 
+  static final DocumentReference<Map<String, dynamic>> _gameRef =
+      FirebaseFirestore.instance.collection('games').doc('les_fugitifs');
+
   final ScenarioLockService _scenarioLockService = ScenarioLockService(
     firestore: FirebaseFirestore.instance,
   );
@@ -66,9 +70,21 @@ class _CreatorScreenState extends State<CreatorScreen>
 
   String? _selectedId;
   Map<String, dynamic>? _selectedData;
+  final TextEditingController _gameRulesCtrl = TextEditingController();
+  final TextEditingController _briefingCtrl = TextEditingController();
   final TextEditingController _nameCtrl = TextEditingController();
   final TextEditingController _synopsisCtrl = TextEditingController();
   final TextEditingController _keywordCtrl = TextEditingController();
+
+  final TextEditingController _killerQuestionCtrl = TextEditingController();
+  final TextEditingController _motiveQuestionCtrl = TextEditingController();
+  final TextEditingController _a0QuestionCtrl = TextEditingController();
+  final TextEditingController _b0QuestionCtrl = TextEditingController();
+  final TextEditingController _c0QuestionCtrl = TextEditingController();
+
+  late final List<TextEditingController> _sideQuestionCtrls;
+  late final List<String?> _sideQuestionPlaceIds;
+  bool _gameConfigurationLoaded = false;
 
   List<String> _keywords = [];
 
@@ -76,6 +92,7 @@ class _CreatorScreenState extends State<CreatorScreen>
   bool _isLocking = false;
   bool _isCreatingSite = false;
   bool _adminPasswordValidatedForSession = false;
+  bool _isQuestionnaireSaving = false;
 
   List<ScenarioValidationIssue> _lockIssues = const [];
   String? _lastLockedScenarioId;
@@ -85,12 +102,27 @@ class _CreatorScreenState extends State<CreatorScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
+    _sideQuestionCtrls = List<TextEditingController>.generate(
+      5,
+      (_) => TextEditingController(),
+    );
+    _sideQuestionPlaceIds = List<String?>.filled(5, null);
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _gameRulesCtrl.dispose();
+    _briefingCtrl.dispose();
+    _killerQuestionCtrl.dispose();
+    _motiveQuestionCtrl.dispose();
+    _a0QuestionCtrl.dispose();
+    _b0QuestionCtrl.dispose();
+    _c0QuestionCtrl.dispose();
+    for (final ctrl in _sideQuestionCtrls) {
+      ctrl.dispose();
+    }
     _nameCtrl.dispose();
     _synopsisCtrl.dispose();
     _keywordCtrl.dispose();
@@ -287,6 +319,98 @@ class _CreatorScreenState extends State<CreatorScreen>
     });
   }
 
+
+  void _syncGameConfiguration(Map<String, dynamic>? data) {
+    if (_gameConfigurationLoaded) return;
+
+    _gameRulesCtrl.text = (data?['gameRules'] ?? '').toString().trim();
+    _briefingCtrl.text = (data?['briefing'] ?? '').toString().trim();
+
+    final finalQuestionnaire =
+        (data?['finalQuestionnaire'] as Map<String, dynamic>?) ??
+            <String, dynamic>{};
+    final mainQuestions =
+        (finalQuestionnaire['mainQuestions'] as Map<String, dynamic>?) ??
+            <String, dynamic>{};
+    final sideQuestions =
+        (finalQuestionnaire['sideQuestions'] as List<dynamic>?) ?? <dynamic>[];
+
+    _killerQuestionCtrl.text = (mainQuestions['killer'] ?? '').toString().trim();
+    _motiveQuestionCtrl.text = (mainQuestions['motive'] ?? '').toString().trim();
+    _a0QuestionCtrl.text = (mainQuestions['A0'] ?? '').toString().trim();
+    _b0QuestionCtrl.text = (mainQuestions['B0'] ?? '').toString().trim();
+    _c0QuestionCtrl.text = (mainQuestions['C0'] ?? '').toString().trim();
+
+    for (int i = 0; i < _sideQuestionCtrls.length; i++) {
+      final raw = i < sideQuestions.length ? sideQuestions[i] : null;
+      if (raw is Map) {
+        final placeId = (raw['placeId'] ?? '').toString().trim();
+        _sideQuestionPlaceIds[i] = placeId.isEmpty ? null : placeId;
+        _sideQuestionCtrls[i].text =
+            (raw['question'] ?? '').toString().trim();
+      } else {
+        _sideQuestionPlaceIds[i] = null;
+        _sideQuestionCtrls[i].clear();
+      }
+    }
+
+    _gameConfigurationLoaded = true;
+  }
+
+  Future<void> _saveQuestionnaire() async {
+    if (_isQuestionnaireSaving) return;
+
+    setState(() {
+      _isQuestionnaireSaving = true;
+    });
+
+    try {
+      final sideQuestions = List<Map<String, dynamic>>.generate(5, (index) {
+        return {
+          'slot': index + 1,
+          'placeId': (_sideQuestionPlaceIds[index] ?? '').trim(),
+          'question': _sideQuestionCtrls[index].text.trim(),
+        };
+      });
+
+      await _gameRef.set({
+        'finalQuestionnaire': {
+          'mainQuestions': {
+            'killer': _killerQuestionCtrl.text.trim(),
+            'motive': _motiveQuestionCtrl.text.trim(),
+            'A0': _a0QuestionCtrl.text.trim(),
+            'B0': _b0QuestionCtrl.text.trim(),
+            'C0': _c0QuestionCtrl.text.trim(),
+          },
+          'sideQuestions': sideQuestions,
+        },
+        'updatedAt': DateTime.now().toIso8601String(),
+      }, SetOptions(merge: true));
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Questionnaire final sauvegardé.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur pendant la sauvegarde du questionnaire : $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isQuestionnaireSaving = false;
+        });
+      }
+    }
+  }
+
+  void _updateSideQuestionPlace(int index, String? value) {
+    setState(() {
+      _sideQuestionPlaceIds[index] = value;
+    });
+  }
+
   Future<void> _save() async {
     if (_selectedId == null || _isSaving) return;
 
@@ -303,10 +427,16 @@ class _CreatorScreenState extends State<CreatorScreen>
         'keywords': _keywords,
       });
 
+      await _gameRef.set({
+        'gameRules': _gameRulesCtrl.text.trim(),
+        'briefing': _briefingCtrl.text.trim(),
+        'updatedAt': DateTime.now().toIso8601String(),
+      }, SetOptions(merge: true));
+
       if (!mounted) return;
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Lieu sauvegardé.')),
+        const SnackBar(content: Text('Lieu et textes globaux sauvegardés.')),
       );
 
       setState(() {
@@ -808,6 +938,16 @@ class _CreatorScreenState extends State<CreatorScreen>
     return copy;
   }
 
+  List<String> _questionnaireAvailablePlaceIds(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) {
+    final ids = docs.map((doc) => doc.id).where((id) {
+      return id != 'A0' && id != 'B0' && id != 'C0' && id != 'D0';
+    }).toList();
+    ids.sort();
+    return ids;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -835,6 +975,7 @@ class _CreatorScreenState extends State<CreatorScreen>
             Tab(text: 'Scénario'),
             Tab(text: 'Sites'),
             Tab(text: 'Suspects & Mobiles'),
+            Tab(text: 'Questionnaire'),
           ],
         ),
       ),
@@ -873,39 +1014,81 @@ class _CreatorScreenState extends State<CreatorScreen>
             });
           }
 
-          return TabBarView(
-            controller: _tabController,
-            children: [
-              CreatorScenarioTab(
-                docs: docs,
-                docsById: docsById,
-                selectedId: _selectedId,
-                selectedData: _selectedData,
-                nameCtrl: _nameCtrl,
-                synopsisCtrl: _synopsisCtrl,
-                keywordCtrl: _keywordCtrl,
-                keywords: _keywords,
-                isSaving: _isSaving,
-                isLocking: _isLocking,
-                lockIssues: _lockIssues,
-                lastLockedScenarioId: _lastLockedScenarioId,
-                groupColorBuilder: _groupColor,
-                experienceTypeBuilder: _experienceType,
-                experienceLabelBuilder: _experienceLabel,
-                displayNameBuilder: _displayName,
-                revealedCategoriesReader: _readDisplayRevealCategories,
-                revealedSummaryBuilder: _revealedInfoSummary,
-                onSelectDoc: _selectDoc,
-                onSelectFromMap: _selectFromMap,
-                onAddKeyword: _addKeyword,
-                onRemoveKeyword: _removeKeyword,
-                onSave: _isSaving ? null : () => _save(),
-                onLockScenario: _isLocking ? null : () => _lockScenario(),
-                onOpenPrintView: _openPrintView,
-              ),
-              _buildSitesTab(docs),
-              _buildSuspectsMotivesTab(),
-            ],
+          return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+            stream: _gameRef.snapshots(),
+            builder: (context, gameSnapshot) {
+              if (gameSnapshot.connectionState == ConnectionState.waiting &&
+                  !gameSnapshot.hasData) {
+                return const Center(child: CircularProgressIndicator());
+              }
+
+              if (gameSnapshot.hasError) {
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Text(
+                      'Erreur Firestore (game) : ${gameSnapshot.error}',
+                      style: const TextStyle(
+                        color: Colors.redAccent,
+                        fontSize: 18,
+                      ),
+                    ),
+                  ),
+                );
+              }
+
+              _syncGameConfiguration(gameSnapshot.data?.data());
+
+              return TabBarView(
+                controller: _tabController,
+                children: [
+                  CreatorScenarioTab(
+                    docs: docs,
+                    docsById: docsById,
+                    selectedId: _selectedId,
+                    selectedData: _selectedData,
+                    nameCtrl: _nameCtrl,
+                    synopsisCtrl: _synopsisCtrl,
+                    keywordCtrl: _keywordCtrl,
+                    keywords: _keywords,
+                    gameRulesCtrl: _gameRulesCtrl,
+                    briefingCtrl: _briefingCtrl,
+                    isSaving: _isSaving,
+                    isLocking: _isLocking,
+                    lockIssues: _lockIssues,
+                    lastLockedScenarioId: _lastLockedScenarioId,
+                    groupColorBuilder: _groupColor,
+                    experienceTypeBuilder: _experienceType,
+                    experienceLabelBuilder: _experienceLabel,
+                    displayNameBuilder: _displayName,
+                    revealedCategoriesReader: _readDisplayRevealCategories,
+                    revealedSummaryBuilder: _revealedInfoSummary,
+                    onSelectDoc: _selectDoc,
+                    onSelectFromMap: _selectFromMap,
+                    onAddKeyword: _addKeyword,
+                    onRemoveKeyword: _removeKeyword,
+                    onSave: _isSaving ? null : () => _save(),
+                    onLockScenario: _isLocking ? null : () => _lockScenario(),
+                    onOpenPrintView: _openPrintView,
+                  ),
+                  _buildSitesTab(docs),
+                  _buildSuspectsMotivesTab(),
+                  CreatorQuestionnaireTab(
+                    availablePlaceIds: _questionnaireAvailablePlaceIds(docs),
+                    killerQuestionCtrl: _killerQuestionCtrl,
+                    motiveQuestionCtrl: _motiveQuestionCtrl,
+                    a0QuestionCtrl: _a0QuestionCtrl,
+                    b0QuestionCtrl: _b0QuestionCtrl,
+                    c0QuestionCtrl: _c0QuestionCtrl,
+                    sideQuestionCtrls: _sideQuestionCtrls,
+                    sideQuestionPlaceIds: _sideQuestionPlaceIds,
+                    isSaving: _isQuestionnaireSaving,
+                    onSave: _saveQuestionnaire,
+                    onSideQuestionPlaceChanged: _updateSideQuestionPlace,
+                  ),
+                ],
+              );
+            },
           );
         },
       ),

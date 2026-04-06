@@ -16,6 +16,8 @@ class CreatorScenarioTab extends StatelessWidget {
   final TextEditingController synopsisCtrl;
   final TextEditingController keywordCtrl;
   final List<String> keywords;
+  final TextEditingController gameRulesCtrl;
+  final TextEditingController briefingCtrl;
   final bool isSaving;
   final bool isLocking;
   final List<ScenarioValidationIssue> lockIssues;
@@ -24,14 +26,14 @@ class CreatorScenarioTab extends StatelessWidget {
   final String Function(Map<String, dynamic> data) experienceTypeBuilder;
   final String Function(String type) experienceLabelBuilder;
   final String Function(String id, Map<String, dynamic> data)
-  displayNameBuilder;
+      displayNameBuilder;
   final List<String> Function(Map<String, dynamic> data)
-  revealedCategoriesReader;
+      revealedCategoriesReader;
   final String Function(Map<String, dynamic> data) revealedSummaryBuilder;
   final void Function(QueryDocumentSnapshot<Map<String, dynamic>> doc)
-  onSelectDoc;
+      onSelectDoc;
   final void Function(String id, Map<String, Map<String, dynamic>> docsById)
-  onSelectFromMap;
+      onSelectFromMap;
   final VoidCallback onAddKeyword;
   final ValueChanged<String> onRemoveKeyword;
   final VoidCallback? onSave;
@@ -48,6 +50,8 @@ class CreatorScenarioTab extends StatelessWidget {
     required this.synopsisCtrl,
     required this.keywordCtrl,
     required this.keywords,
+    required this.gameRulesCtrl,
+    required this.briefingCtrl,
     required this.isSaving,
     required this.isLocking,
     required this.lockIssues,
@@ -111,6 +115,8 @@ class CreatorScenarioTab extends StatelessWidget {
                   synopsisCtrl: synopsisCtrl,
                   keywordCtrl: keywordCtrl,
                   keywords: keywords,
+                  gameRulesCtrl: gameRulesCtrl,
+                  briefingCtrl: briefingCtrl,
                   isSaving: isSaving,
                   isLocking: isLocking,
                   groupColorBuilder: groupColorBuilder,

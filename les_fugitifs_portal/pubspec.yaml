@@ -27,3 +27,5 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/logo.png
+    - assets/images/fond_tele_publique.png
+    - assets/images/logo_fugitifs.png
