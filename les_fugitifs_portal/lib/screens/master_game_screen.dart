@@ -137,7 +137,8 @@ class _MasterGameScreenState extends State<MasterGameScreen> {
               }
 
               final Map<String, _PlaceTemplate> templates = <String, _PlaceTemplate>{
-                for (final doc in (placeSnapshot.data?.docs ?? <QueryDocumentSnapshot<Map<String, dynamic>>>[]))
+                for (final doc in (placeSnapshot.data?.docs ??
+                    <QueryDocumentSnapshot<Map<String, dynamic>>>[]))
                   doc.id: _PlaceTemplate.fromDoc(doc),
               };
 
@@ -266,6 +267,12 @@ class _MasterGameScreenState extends State<MasterGameScreen> {
     final humanEnabledCount = sessions
         .where((session) => session.humanHelpEnabled)
         .length;
+    final pendingAssistanceCount = sessions
+        .where((session) => session.assistanceState == _AssistanceState.pending)
+        .length;
+    final claimedAssistanceCount = sessions
+        .where((session) => session.assistanceState == _AssistanceState.claimed)
+        .length;
 
     return Card(
       child: Padding(
@@ -283,7 +290,7 @@ class _MasterGameScreenState extends State<MasterGameScreen> {
             ),
             const SizedBox(height: 10),
             const Text(
-              'Vue d’ensemble des lieux, des équipes et des points chauds. Le code couleur raconte le niveau d’attention, pas l’identité du groupe.',
+              'Vue d’ensemble des lieux, des équipes et des points chauds. Le code couleur raconte le niveau d’attention, pas l’identité du groupe. Le panneau d’assistance te permet maintenant de suivre, prendre et clôturer les demandes humaines.',
               style: TextStyle(
                 color: Color(0xFF9AA7BC),
                 height: 1.5,
@@ -299,6 +306,8 @@ class _MasterGameScreenState extends State<MasterGameScreen> {
                 _buildMetricPill('Orange', '$warningCount'),
                 _buildMetricPill('Rouge', '$dangerCount'),
                 _buildMetricPill('Aide humaine autorisée', '$humanEnabledCount'),
+                _buildMetricPill('Assistance en attente', '$pendingAssistanceCount'),
+                _buildMetricPill('Assistance prise en charge', '$claimedAssistanceCount'),
               ],
             ),
           ],
@@ -684,17 +693,39 @@ class _MasterGameScreenState extends State<MasterGameScreen> {
                 ),
               )
             else
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: sessions
-                    .map(
-                      (session) => _buildSessionChip(
-                        session: session,
-                        highlighted: session.id == _selectedSessionId,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (sessions.any((session) => session.assistanceState != _AssistanceState.none))
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: sessions
+                            .where((session) => session.assistanceState != _AssistanceState.none)
+                            .map(
+                              (session) => _buildAssistanceBadge(
+                                session.assistanceStateLabel,
+                                _assistanceStateColor(session.assistanceState),
+                              ),
+                            )
+                            .toList(growable: false),
                       ),
-                    )
-                    .toList(growable: false),
+                    ),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: sessions
+                        .map(
+                          (session) => _buildSessionChip(
+                            session: session,
+                            highlighted: session.id == _selectedSessionId,
+                          ),
+                        )
+                        .toList(growable: false),
+                  ),
+                ],
               ),
           ],
         ),
@@ -833,17 +864,39 @@ class _MasterGameScreenState extends State<MasterGameScreen> {
                 ),
               )
             else
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: sessions
-                    .map(
-                      (session) => _buildSessionChip(
-                        session: session,
-                        highlighted: session.id == _selectedSessionId,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (sessions.any((session) => session.assistanceState != _AssistanceState.none))
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: sessions
+                            .where((session) => session.assistanceState != _AssistanceState.none)
+                            .map(
+                              (session) => _buildAssistanceBadge(
+                                '${session.teamCode.isNotEmpty ? session.teamCode : session.teamName} · ${session.assistanceStateLabel}',
+                                _assistanceStateColor(session.assistanceState),
+                              ),
+                            )
+                            .toList(growable: false),
                       ),
-                    )
-                    .toList(growable: false),
+                    ),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: sessions
+                        .map(
+                          (session) => _buildSessionChip(
+                            session: session,
+                            highlighted: session.id == _selectedSessionId,
+                          ),
+                        )
+                        .toList(growable: false),
+                  ),
+                ],
               ),
           ],
         ),
@@ -963,6 +1016,7 @@ class _MasterGameScreenState extends State<MasterGameScreen> {
                           ),
                         ),
                         child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Container(
                               width: 42,
@@ -1022,6 +1076,13 @@ class _MasterGameScreenState extends State<MasterGameScreen> {
                                         label: 'Blocage',
                                         value: session.blockageLabel,
                                       ),
+                                      if (session.assistanceState != _AssistanceState.none)
+                                        _AssistanceInlineChip(
+                                          label: session.assistanceStateLabel,
+                                          color: _assistanceStateColor(
+                                            session.assistanceState,
+                                          ),
+                                        ),
                                     ],
                                   ),
                                 ],
@@ -1091,162 +1152,594 @@ class _MasterGameScreenState extends State<MasterGameScreen> {
 
     final tone = _sessionTone(session);
 
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        session.teamName,
+                        style: const TextStyle(
+                          fontSize: 30,
+                          fontWeight: FontWeight.w900,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 9,
+                      ),
+                      decoration: BoxDecoration(
+                        color: tone.background,
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: tone.border),
+                      ),
+                      child: Text(
+                        session.statusLabel,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${session.scenarioTitle} · ${session.siteIdLabel}',
+                  style: const TextStyle(
+                    color: Color(0xFF93A2B7),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    _buildInfoTile('Lieu actuel', session.currentNodeId),
+                    _buildInfoTile('Phase', session.currentPhase),
+                    _buildInfoTile('Temps restant', session.remainingLabel),
+                    _buildInfoTile('Aides IA', '${session.aiHelpCount}'),
+                    _buildInfoTile('Blocage', session.blockageLabel),
+                    _buildInfoTile(
+                      'Aide humaine',
+                      session.humanHelpEnabled ? 'Oui' : 'Non',
+                    ),
+                    _buildInfoTile(
+                      'Assistance',
+                      session.assistanceStateLabel,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 28),
+                const Text(
+                  'Actions MJ',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: [
+                    FilledButton.icon(
+                      onPressed: () => _toggleHumanHelp(session),
+                      icon: Icon(
+                        session.humanHelpEnabled
+                            ? Icons.support_agent_outlined
+                            : Icons.support_agent,
+                      ),
+                      label: Text(
+                        session.humanHelpEnabled
+                            ? 'Couper l’aide humaine'
+                            : 'Autoriser l’aide humaine',
+                      ),
+                    ),
+                    FilledButton.icon(
+                      onPressed: () => _extendSessionByOneHour(session),
+                      icon: const Icon(Icons.schedule),
+                      label: const Text('Ajouter 1h'),
+                    ),
+                    FilledButton.icon(
+                      onPressed: () => _showAddNoteDialog(session),
+                      icon: const Icon(Icons.note_add_outlined),
+                      label: const Text('Ajouter une note'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: session.humanEscalationRequired &&
+                              session.assistanceState != _AssistanceState.claimed
+                          ? () => _markEscalationClaimed(session)
+                          : null,
+                      icon: const Icon(Icons.flag_outlined),
+                      label: const Text('Prendre en charge'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: session.assistanceState == _AssistanceState.claimed ||
+                              session.assistanceState == _AssistanceState.pending
+                          ? () => _markEscalationResolved(session)
+                          : null,
+                      icon: const Icon(Icons.check_circle_outline),
+                      label: const Text('Marquer résolue'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: session.humanHelpEnabled &&
+                              session.assistanceState == _AssistanceState.resolved
+                          ? () => _reopenEscalation(session)
+                          : null,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Relancer'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 28),
+                _buildAssistancePanel(session),
+                const SizedBox(height: 28),
+                const Text(
+                  'Progression visible',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _buildStringChipWrap(
+                  session.visitedNodeIds,
+                  const Color(0xFF2E8B57),
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  'Lieux ouverts',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _buildStringChipWrap(
+                  session.openNodeIds,
+                  const Color(0xFFD65A00),
+                ),
+                const SizedBox(height: 18),
+                const Text(
+                  'Infos runtime',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                _buildRuntimeLine('Dernière progression', session.lastProgressAtLabel),
+                _buildRuntimeLine(
+                  'Dernière demande d’aide',
+                  session.lastHelpRequestAtLabel,
+                ),
+                _buildRuntimeLine('Fin effective', session.effectiveEndsAtLabel),
+                _buildRuntimeLine('Escalade', session.escalationLabel),
+                _buildRuntimeLine(
+                  'Aide humaine autorisée',
+                  session.humanHelpEnabled ? 'Oui' : 'Non',
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 24),
+        _buildRecentNotesCard(session.id),
+        const SizedBox(height: 24),
+        _buildTimelineCard(session.id),
+      ],
+    );
+  }
+
+  Widget _buildAssistancePanel(_GameSession session) {
+    final stateColor = _assistanceStateColor(session.assistanceState);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFF101925),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFF263245)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Assistance humaine',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Zone dédiée au suivi des demandes humaines. Elle permet de voir si une équipe attend une aide, si elle est déjà prise en charge, ou si le traitement est terminé.',
+            style: TextStyle(
+              color: Color(0xFF8C99AE),
+              height: 1.45,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _buildAssistanceBadge(
+                'État ${session.assistanceStateLabel}',
+                stateColor,
+              ),
+              _buildAssistanceBadge(
+                session.humanHelpEnabled
+                    ? 'Aide humaine autorisée'
+                    : 'Aide humaine coupée',
+                session.humanHelpEnabled
+                    ? const Color(0xFF2E8B57)
+                    : const Color(0xFF54708F),
+              ),
+              if (session.humanEscalationRequired)
+                _buildAssistanceBadge(
+                  'Escalade active',
+                  const Color(0xFFC74343),
+                ),
+              if (!session.humanEscalationRequired &&
+                  session.assistanceState == _AssistanceState.none &&
+                  session.lastHelpRequestAt != null)
+                _buildAssistanceBadge(
+                  'Historique d’aide',
+                  const Color(0xFFD65A00),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildRuntimeLine(
+            'Dernière demande',
+            session.lastHelpRequestAtLabel,
+          ),
+          _buildRuntimeLine(
+            'Statut d’escalade',
+            session.escalationLabel,
+          ),
+          _buildRuntimeLine(
+            'Niveau de blocage',
+            session.blockageLabel,
+          ),
+          _buildRuntimeLine(
+            'Aides IA déjà utilisées',
+            '${session.aiHelpCount}',
+          ),
+          if (session.hasHelpContext) ...[
+            const SizedBox(height: 14),
+            const Text(
+              'Contexte transmis par le joueur',
+              style: TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w900,
+                fontSize: 15,
+              ),
+            ),
+            const SizedBox(height: 10),
+            _buildRuntimeLine(
+              'Lieu ciblé',
+              session.helpPlaceLabel,
+            ),
+            if (session.helpKeywords.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _buildStringChipWrap(
+                  session.helpKeywords,
+                  const Color(0xFF5AA6FF),
+                ),
+              ),
+            if (session.helpRequiresAll.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _buildInfoCallout(
+                  title: 'Prérequis obligatoires encore utiles',
+                  body: session.helpRequiresAll.join(', '),
+                  tone: const Color(0xFFD65A00),
+                ),
+              ),
+            if (session.helpRequiresAny.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _buildInfoCallout(
+                  title: 'Prérequis alternatifs possibles',
+                  body: session.helpRequiresAny.join(', '),
+                  tone: const Color(0xFF7E87FF),
+                ),
+              ),
+            if (session.helpRevealSummary.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _buildInfoCallout(
+                  title: 'Valeur potentielle du lieu',
+                  body: session.helpRevealSummary,
+                  tone: const Color(0xFF2E8B57),
+                ),
+              ),
+          ],
+          if (!session.humanHelpEnabled) ...[
+            const SizedBox(height: 10),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF152336),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFF54708F)),
+              ),
+              child: const Text(
+                'L’aide humaine est actuellement désactivée pour cette session. Une équipe peut donc rester bloquée sans pouvoir être relayée vers un humain.',
+                style: TextStyle(
+                  color: Color(0xFFDCE6F5),
+                  height: 1.4,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildRecentNotesCard(String sessionId) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    session.teamName,
-                    style: const TextStyle(
-                      fontSize: 30,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 9,
-                  ),
-                  decoration: BoxDecoration(
-                    color: tone.background,
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: tone.border),
-                  ),
-                  child: Text(
-                    session.statusLabel,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ],
+            const Text(
+              'Dernières notes MJ',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                color: Colors.white,
+              ),
             ),
             const SizedBox(height: 8),
-            Text(
-              '${session.scenarioTitle} · ${session.siteIdLabel}',
-              style: const TextStyle(
-                color: Color(0xFF93A2B7),
-                fontWeight: FontWeight.w600,
+            const Text(
+              'Les notes ajoutées par les MJ aident à garder le contexte sans toucher à la logique de session.',
+              style: TextStyle(
+                color: Color(0xFF8C99AE),
+                height: 1.45,
               ),
             ),
-            const SizedBox(height: 18),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                _buildInfoTile('Lieu actuel', session.currentNodeId),
-                _buildInfoTile('Phase', session.currentPhase),
-                _buildInfoTile('Temps restant', session.remainingLabel),
-                _buildInfoTile('Aides IA', '${session.aiHelpCount}'),
-                _buildInfoTile('Blocage', session.blockageLabel),
-                _buildInfoTile(
-                  'Aide humaine',
-                  session.humanHelpEnabled ? 'Oui' : 'Non',
-                ),
-              ],
+            const SizedBox(height: 16),
+            StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: FirebaseFirestore.instance
+                  .collection('gameSessions')
+                  .doc(sessionId)
+                  .collection('mjNotes')
+                  .orderBy('createdAt', descending: true)
+                  .limit(5)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+
+                if (snapshot.hasError) {
+                  return Text(
+                    'Erreur notes MJ : ${snapshot.error}',
+                    style: const TextStyle(color: Colors.redAccent),
+                  );
+                }
+
+                final docs = snapshot.data?.docs ?? const [];
+
+                if (docs.isEmpty) {
+                  return const Text(
+                    'Aucune note MJ pour cette session.',
+                    style: TextStyle(
+                      color: Color(0xFF6F7C90),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  );
+                }
+
+                return Column(
+                  children: docs.map((doc) {
+                    final data = doc.data();
+                    final createdAt = _formatDateTime(_readDate(data['createdAt']));
+                    final author = (data['createdByName'] ?? 'MJ').toString();
+                    final text = (data['text'] ?? '').toString().trim();
+
+                    return Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF111A27),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: const Color(0xFF263245)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '$author · $createdAt',
+                            style: const TextStyle(
+                              color: Color(0xFFAED0FF),
+                              fontWeight: FontWeight.w800,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            text.isEmpty ? '—' : text,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              height: 1.45,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(growable: false),
+                );
+              },
             ),
-            const SizedBox(height: 28),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTimelineCard(String sessionId) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
             const Text(
-              'Actions MJ',
+              'Timeline récente',
               style: TextStyle(
-                fontSize: 16,
+                fontSize: 18,
                 fontWeight: FontWeight.w900,
                 color: Colors.white,
               ),
             ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: [
-                FilledButton.icon(
-                  onPressed: () => _toggleHumanHelp(session),
-                  icon: Icon(
-                    session.humanHelpEnabled
-                        ? Icons.support_agent_outlined
-                        : Icons.support_agent,
-                  ),
-                  label: Text(
-                    session.humanHelpEnabled
-                        ? 'Couper l’aide humaine'
-                        : 'Autoriser l’aide humaine',
-                  ),
-                ),
-                FilledButton.icon(
-                  onPressed: () => _extendSessionByOneHour(session),
-                  icon: const Icon(Icons.schedule),
-                  label: const Text('Ajouter 1h'),
-                ),
-                FilledButton.icon(
-                  onPressed: () => _showAddNoteDialog(session),
-                  icon: const Icon(Icons.note_add_outlined),
-                  label: const Text('Ajouter une note'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: session.humanEscalationRequired
-                      ? () => _markEscalationClaimed(session)
-                      : null,
-                  icon: const Icon(Icons.flag_outlined),
-                  label: const Text('Prendre en charge'),
-                ),
-              ],
-            ),
-            const SizedBox(height: 28),
+            const SizedBox(height: 8),
             const Text(
-              'Progression visible',
+              'Historique rapide des événements de session, utile pour recoller le film sans ouvrir Firestore à la main.',
               style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w900,
-                color: Colors.white,
+                color: Color(0xFF8C99AE),
+                height: 1.45,
               ),
             ),
-            const SizedBox(height: 12),
-            _buildStringChipWrap(
-              session.visitedNodeIds,
-              const Color(0xFF2E8B57),
-            ),
-            const SizedBox(height: 18),
-            const Text(
-              'Lieux ouverts',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w900,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 12),
-            _buildStringChipWrap(
-              session.openNodeIds,
-              const Color(0xFFD65A00),
-            ),
-            const SizedBox(height: 18),
-            const Text(
-              'Infos runtime',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w900,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(height: 12),
-            _buildRuntimeLine('Dernière progression', session.lastProgressAtLabel),
-            _buildRuntimeLine(
-              'Dernière demande d’aide',
-              session.lastHelpRequestAtLabel,
-            ),
-            _buildRuntimeLine('Fin effective', session.effectiveEndsAtLabel),
-            _buildRuntimeLine('Escalade', session.escalationLabel),
-            _buildRuntimeLine(
-              'Aide humaine autorisée',
-              session.humanHelpEnabled ? 'Oui' : 'Non',
+            const SizedBox(height: 16),
+            StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+              stream: FirebaseFirestore.instance
+                  .collection('gameSessions')
+                  .doc(sessionId)
+                  .collection('timeline')
+                  .orderBy('createdAt', descending: true)
+                  .limit(8)
+                  .snapshots(),
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 12),
+                    child: Center(child: CircularProgressIndicator()),
+                  );
+                }
+
+                if (snapshot.hasError) {
+                  return Text(
+                    'Erreur timeline : ${snapshot.error}',
+                    style: const TextStyle(color: Colors.redAccent),
+                  );
+                }
+
+                final docs = snapshot.data?.docs ?? const [];
+
+                if (docs.isEmpty) {
+                  return const Text(
+                    'Aucune entrée timeline pour cette session.',
+                    style: TextStyle(
+                      color: Color(0xFF6F7C90),
+                      fontWeight: FontWeight.w600,
+                    ),
+                  );
+                }
+
+                return Column(
+                  children: docs.map((doc) {
+                    final data = doc.data();
+                    final createdAt = _formatDateTime(_readDate(data['createdAt']));
+                    final label = (data['label'] ?? '').toString().trim();
+                    final type = (data['type'] ?? '').toString().trim();
+                    final source = (data['source'] ?? '').toString().trim();
+
+                    return Container(
+                      width: double.infinity,
+                      margin: const EdgeInsets.only(bottom: 10),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF111A27),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: const Color(0xFF263245)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '$createdAt · ${source.isEmpty ? 'runtime' : source}',
+                            style: const TextStyle(
+                              color: Color(0xFFAED0FF),
+                              fontWeight: FontWeight.w800,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            label.isEmpty ? type : label,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              height: 1.45,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          if (type.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              type,
+                              style: const TextStyle(
+                                color: Color(0xFF8C99AE),
+                                fontWeight: FontWeight.w600,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                          if ((data['placeName'] ?? '').toString().trim().isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            Text(
+                              'Lieu: ${(data['placeName'] ?? '').toString().trim()}',
+                              style: const TextStyle(
+                                color: Color(0xFFDCE6F5),
+                                fontWeight: FontWeight.w700,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                          if (_readStringList(data['keywords']).isNotEmpty) ...[
+                            const SizedBox(height: 8),
+                            _buildStringChipWrap(
+                              _readStringList(data['keywords']),
+                              const Color(0xFF5AA6FF),
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+                  }).toList(growable: false),
+                );
+              },
             ),
           ],
         ),
@@ -1324,6 +1817,44 @@ class _MasterGameScreenState extends State<MasterGameScreen> {
     );
   }
 
+  Widget _buildInfoCallout({
+    required String title,
+    required String body,
+    required Color tone,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: tone.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: tone.withOpacity(0.7)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              color: tone,
+              fontWeight: FontWeight.w900,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            body,
+            style: const TextStyle(
+              color: Color(0xFFDCE6F5),
+              height: 1.4,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildRuntimeLine(String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
@@ -1352,6 +1883,38 @@ class _MasterGameScreenState extends State<MasterGameScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildAssistanceBadge(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.14),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withOpacity(0.75)),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w800,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+
+  Color _assistanceStateColor(_AssistanceState state) {
+    switch (state) {
+      case _AssistanceState.pending:
+        return const Color(0xFFC74343);
+      case _AssistanceState.claimed:
+        return const Color(0xFFD65A00);
+      case _AssistanceState.resolved:
+        return const Color(0xFF2E8B57);
+      case _AssistanceState.none:
+        return const Color(0xFF54708F);
+    }
   }
 
   _AttentionLevel _worstAttentionLevel(List<_GameSession> sessions) {
@@ -1427,25 +1990,6 @@ class _MasterGameScreenState extends State<MasterGameScreen> {
           dot: Color(0xFF7F8CA0),
         );
     }
-  }
-
-  void _resetGraphZoom() {
-    _graphTransformController.value = Matrix4.identity();
-    setState(() {});
-  }
-
-  void _zoomInGraph() {
-    final current = _graphTransformController.value.clone();
-    current.scale(1.15);
-    _graphTransformController.value = current;
-    setState(() {});
-  }
-
-  void _zoomOutGraph() {
-    final current = _graphTransformController.value.clone();
-    current.scale(0.87);
-    _graphTransformController.value = current;
-    setState(() {});
   }
 
   void _openBroadcastScreen() {
@@ -1613,6 +2157,7 @@ class _MasterGameScreenState extends State<MasterGameScreen> {
 
     await sessionRef.update({
       'humanEscalationStatus': 'claimed',
+      'humanEscalationRequired': true,
     });
 
     await _addTimelineEntry(
@@ -1631,6 +2176,65 @@ class _MasterGameScreenState extends State<MasterGameScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('Escalade prise en charge pour ${session.teamName}.'),
+      ),
+    );
+  }
+
+  Future<void> _markEscalationResolved(_GameSession session) async {
+    final sessionRef =
+        FirebaseFirestore.instance.collection('gameSessions').doc(session.id);
+
+    await sessionRef.update({
+      'humanEscalationStatus': 'resolved',
+      'humanEscalationRequired': false,
+    });
+
+    await _addTimelineEntry(
+      sessionId: session.id,
+      type: 'human_escalation_resolved',
+      label: 'Assistance humaine marquée comme résolue par le MJ',
+      source: 'mj',
+    );
+
+    await _addMjAction(
+      sessionId: session.id,
+      type: 'mark_escalation_resolved',
+    );
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Assistance résolue pour ${session.teamName}.'),
+      ),
+    );
+  }
+
+  Future<void> _reopenEscalation(_GameSession session) async {
+    final sessionRef =
+        FirebaseFirestore.instance.collection('gameSessions').doc(session.id);
+
+    await sessionRef.update({
+      'humanEscalationStatus': 'pending',
+      'humanEscalationRequired': true,
+      'lastHelpRequestAt': DateTime.now().toUtc().toIso8601String(),
+    });
+
+    await _addTimelineEntry(
+      sessionId: session.id,
+      type: 'human_escalation_reopened',
+      label: 'Escalade humaine relancée par le MJ',
+      source: 'mj',
+    );
+
+    await _addMjAction(
+      sessionId: session.id,
+      type: 'reopen_escalation',
+    );
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Escalade relancée pour ${session.teamName}.'),
       ),
     );
   }
@@ -1867,6 +2471,36 @@ class _MiniFactChip extends StatelessWidget {
   }
 }
 
+class _AssistanceInlineChip extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _AssistanceInlineChip({
+    required this.label,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withOpacity(0.75)),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontWeight: FontWeight.w700,
+          fontSize: 12,
+        ),
+      ),
+    );
+  }
+}
+
 class _GraphColumn {
   final String title;
   final String subtitle;
@@ -1899,6 +2533,13 @@ enum _AttentionLevel {
   warning,
   danger,
   restricted,
+}
+
+enum _AssistanceState {
+  none,
+  pending,
+  claimed,
+  resolved,
 }
 
 class _PlaceTemplate {
@@ -1971,6 +2612,7 @@ class _GameSession {
   final List<String> openNodeIds;
   final List<String> blockedNodeIds;
   final List<String> completedNodeIds;
+  final Map<String, dynamic> lastHelpContext;
 
   const _GameSession({
     required this.id,
@@ -2005,6 +2647,7 @@ class _GameSession {
     required this.openNodeIds,
     required this.blockedNodeIds,
     required this.completedNodeIds,
+    required this.lastHelpContext,
   });
 
   factory _GameSession.fromDoc(
@@ -2046,6 +2689,7 @@ class _GameSession {
       openNodeIds: _readStringList(data['openNodeIds']),
       blockedNodeIds: _readStringList(data['blockedNodeIds']),
       completedNodeIds: _readStringList(data['completedNodeIds']),
+      lastHelpContext: _readStringDynamicMap(data['lastHelpContext']),
     );
   }
 
@@ -2069,6 +2713,35 @@ class _GameSession {
     }
 
     return _AttentionLevel.normal;
+  }
+
+  _AssistanceState get assistanceState {
+    final status = humanEscalationStatus.trim().toLowerCase();
+
+    if (humanEscalationRequired) {
+      if (status == 'claimed') return _AssistanceState.claimed;
+      if (status == 'resolved') return _AssistanceState.resolved;
+      return _AssistanceState.pending;
+    }
+
+    if (status == 'resolved') {
+      return _AssistanceState.resolved;
+    }
+
+    return _AssistanceState.none;
+  }
+
+  String get assistanceStateLabel {
+    switch (assistanceState) {
+      case _AssistanceState.pending:
+        return 'En attente';
+      case _AssistanceState.claimed:
+        return 'Prise en charge';
+      case _AssistanceState.resolved:
+        return 'Résolue';
+      case _AssistanceState.none:
+        return 'Aucune';
+    }
   }
 
   String get attentionLabel {
@@ -2125,7 +2798,9 @@ class _GameSession {
       if (humanEscalationStatus == 'resolved') return 'Résolue';
       return 'Demandée';
     }
-    return 'Aucune';
+    return humanEscalationStatus.trim().toLowerCase() == 'resolved'
+        ? 'Résolue'
+        : 'Aucune';
   }
 
   String get remainingLabel {
@@ -2136,6 +2811,40 @@ class _GameSession {
     final minutes = absoluteMinutes % 60;
     final formatted = '${hours}h${minutes.toString().padLeft(2, '0')}';
     return totalMinutes >= 0 ? formatted : '-$formatted';
+  }
+
+  bool get hasHelpContext => lastHelpContext.isNotEmpty;
+
+  String get helpPlaceLabel {
+    final placeId = (lastHelpContext['placeId'] ?? '').toString().trim();
+    final placeName = (lastHelpContext['placeName'] ?? '').toString().trim();
+    if (placeId.isEmpty && placeName.isEmpty) return '—';
+    if (placeId.isNotEmpty && placeName.isNotEmpty) return '$placeId · $placeName';
+    return placeId.isNotEmpty ? placeId : placeName;
+  }
+
+  List<String> get helpKeywords => _readStringList(lastHelpContext['keywords']);
+
+  List<String> get helpRequiresAll =>
+      _readStringList(lastHelpContext['requiresAllVisited']);
+
+  List<String> get helpRequiresAny =>
+      _readStringList(lastHelpContext['requiresAnyVisited']);
+
+  String get helpRevealSummary {
+    final revealSuspect = _readBool(lastHelpContext['revealSuspect']);
+    final revealMotive = _readBool(lastHelpContext['revealMotive']);
+
+    if (revealSuspect && revealMotive) {
+      return 'Ce lieu peut potentiellement clarifier la piste suspect et la piste mobile.';
+    }
+    if (revealSuspect) {
+      return 'Ce lieu peut potentiellement clarifier la piste suspect.';
+    }
+    if (revealMotive) {
+      return 'Ce lieu peut potentiellement clarifier la piste mobile.';
+    }
+    return '';
   }
 
   String get lastProgressAtLabel => _formatDateTime(lastProgressAt);
@@ -2180,12 +2889,23 @@ int _readInt(dynamic value) {
 bool _readBool(dynamic value) {
   if (value is bool) return value;
   if (value is String) return value.toLowerCase() == 'true';
+  if (value is num) return value != 0;
   return false;
 }
 
 List<String> _readStringList(dynamic value) {
   if (value is Iterable) {
-    return value.map((item) => item.toString()).toList(growable: false);
+    return value
+        .map((item) => item.toString().trim())
+        .where((item) => item.isNotEmpty)
+        .toList(growable: false);
   }
   return const <String>[];
+}
+
+Map<String, dynamic> _readStringDynamicMap(dynamic value) {
+  if (value is Map) {
+    return value.map((key, item) => MapEntry(key.toString(), item));
+  }
+  return const <String, dynamic>{};
 }

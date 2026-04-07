@@ -43,6 +43,29 @@ async function main() {
   // Site Sion
   result.site = await exportDocument("sites/sion");
   result.sitePlaces = await exportCollection("sites/sion/places");
+try {
+  result.sessions = await exportCollection("sessions");
+} catch (e) {
+  result.sessions = { _error: "collection sessions introuvable" };
+}
+
+try {
+  result.gameSessions = await exportCollection("gameSessions");
+} catch (e) {
+  result.gameSessions = { _error: "collection gameSessions introuvable" };
+}
+
+try {
+  result.runtimeSessions = await exportCollection("runtimeSessions");
+} catch (e) {
+  result.runtimeSessions = { _error: "collection runtimeSessions introuvable" };
+}
+
+try {
+  result.portalUsers = await exportCollection("portalUsers");
+} catch (e) {
+  result.portalUsers = { _error: "collection portalUsers introuvable" };
+}
 
   fs.writeFileSync("export.json", JSON.stringify(result, null, 2), "utf8");
 

@@ -74,6 +74,7 @@ class _CreatorScreenState extends State<CreatorScreen>
   final TextEditingController _briefingCtrl = TextEditingController();
   final TextEditingController _nameCtrl = TextEditingController();
   final TextEditingController _synopsisCtrl = TextEditingController();
+  final TextEditingController _mediaNotesCtrl = TextEditingController();
   final TextEditingController _keywordCtrl = TextEditingController();
 
   final TextEditingController _killerQuestionCtrl = TextEditingController();
@@ -125,6 +126,7 @@ class _CreatorScreenState extends State<CreatorScreen>
     }
     _nameCtrl.dispose();
     _synopsisCtrl.dispose();
+    _mediaNotesCtrl.dispose();
     _keywordCtrl.dispose();
     super.dispose();
   }
@@ -267,6 +269,10 @@ class _CreatorScreenState extends State<CreatorScreen>
       _nameCtrl.text = (data['title'] ?? data['name'] ?? '').toString().trim();
       _synopsisCtrl.text =
           (data['storySynopsis'] ?? data['synopsis'] ?? '').toString().trim();
+      _mediaNotesCtrl.text =
+          (data['mediaNotes'] ?? data['mediaDescription'] ?? '')
+              .toString()
+              .trim();
       _keywords = _normalizeKeywords(data['keywords']);
     });
   }
@@ -281,6 +287,10 @@ class _CreatorScreenState extends State<CreatorScreen>
       _nameCtrl.text = (data['title'] ?? data['name'] ?? '').toString().trim();
       _synopsisCtrl.text =
           (data['storySynopsis'] ?? data['synopsis'] ?? '').toString().trim();
+      _mediaNotesCtrl.text =
+          (data['mediaNotes'] ?? data['mediaDescription'] ?? '')
+              .toString()
+              .trim();
       _keywords = _normalizeKeywords(data['keywords']);
     });
   }
@@ -318,7 +328,6 @@ class _CreatorScreenState extends State<CreatorScreen>
       _keywords = _keywords.where((e) => e != value).toList();
     });
   }
-
 
   void _syncGameConfiguration(Map<String, dynamic>? data) {
     if (_gameConfigurationLoaded) return;
@@ -424,6 +433,8 @@ class _CreatorScreenState extends State<CreatorScreen>
         'name': _nameCtrl.text.trim(),
         'storySynopsis': _synopsisCtrl.text.trim(),
         'synopsis': _synopsisCtrl.text.trim(),
+        'mediaNotes': _mediaNotesCtrl.text.trim(),
+        'mediaDescription': _mediaNotesCtrl.text.trim(),
         'keywords': _keywords,
       });
 
@@ -447,6 +458,8 @@ class _CreatorScreenState extends State<CreatorScreen>
             'name': _nameCtrl.text.trim(),
             'storySynopsis': _synopsisCtrl.text.trim(),
             'synopsis': _synopsisCtrl.text.trim(),
+            'mediaNotes': _mediaNotesCtrl.text.trim(),
+            'mediaDescription': _mediaNotesCtrl.text.trim(),
             'keywords': _keywords,
           };
         }
@@ -716,7 +729,6 @@ class _CreatorScreenState extends State<CreatorScreen>
       'updatedAt': DateTime.now().toIso8601String(),
     }, SetOptions(merge: true));
   }
-
 
   Future<void> _validateCurrentSiteReadiness(String siteId) async {
     if (_isValidatingSiteReadiness) return;
@@ -1049,6 +1061,7 @@ class _CreatorScreenState extends State<CreatorScreen>
                     selectedData: _selectedData,
                     nameCtrl: _nameCtrl,
                     synopsisCtrl: _synopsisCtrl,
+                    mediaNotesCtrl: _mediaNotesCtrl,
                     keywordCtrl: _keywordCtrl,
                     keywords: _keywords,
                     gameRulesCtrl: _gameRulesCtrl,

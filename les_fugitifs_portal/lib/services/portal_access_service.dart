@@ -54,6 +54,7 @@ class PortalAccessProfile {
   final String displayName;
   final PortalUserRole role;
   final bool isActive;
+  final bool mustChangePassword;
 
   const PortalAccessProfile({
     required this.uid,
@@ -61,6 +62,7 @@ class PortalAccessProfile {
     required this.displayName,
     required this.role,
     required this.isActive,
+    this.mustChangePassword = false,
   });
 }
 
@@ -109,7 +111,36 @@ class PortalAccessService {
           .trim(),
       role: role,
       isActive: (data['isActive'] ?? true) == true,
+      mustChangePassword: _readMustChangePassword(data),
     );
+  }
+
+  Future<void> updateCurrentPasswordAndClearFirstAccess({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw Exception('Aucun utilisateur connecté.');
+    }
+
+    final email = (user.email ?? '').trim();
+    if (email.isEmpty) {
+      throw Exception('Impossible de réauthentifier ce compte sans email.');
+    }
+
+    final credential = EmailAuthProvider.credential(
+      email: email,
+      password: currentPassword,
+    );
+
+    await user.reauthenticateWithCredential(credential);
+    await user.updatePassword(newPassword);
+
+    await _firestore.collection('portalUsers').doc(user.uid).set({
+      'mustChangePassword': false,
+      'passwordChangedAt': DateTime.now().toUtc().toIso8601String(),
+    }, SetOptions(merge: true));
   }
 
   Future<void> upsertPortalUser({
@@ -119,6 +150,7 @@ class PortalAccessService {
     required PortalUserRole role,
     required bool isActive,
     required String updatedBy,
+    bool mustChangePassword = false,
   }) async {
     await _firestore.collection('portalUsers').doc(uid).set({
       'uid': uid,
@@ -126,6 +158,7 @@ class PortalAccessService {
       'displayName': displayName.trim(),
       'role': role.firestoreValue,
       'isActive': isActive,
+      'mustChangePassword': mustChangePassword,
       'updatedAt': DateTime.now().toIso8601String(),
       'updatedBy': updatedBy,
     }, SetOptions(merge: true));
@@ -146,5 +179,26 @@ class PortalAccessService {
       default:
         return null;
     }
+  }
+
+  static bool _readMustChangePassword(Map<String, dynamic> data) {
+    final candidates = [
+      data['mustChangePassword'],
+      data['forcePasswordChange'],
+      data['requirePasswordChange'],
+      data['firstLoginPasswordResetRequired'],
+    ];
+
+    for (final value in candidates) {
+      if (value is bool) return value;
+      if (value is String) {
+        final normalized = value.trim().toLowerCase();
+        if (normalized == 'true') return true;
+        if (normalized == 'false') return false;
+      }
+      if (value is num) return value != 0;
+    }
+
+    return false;
   }
 }

@@ -1,16 +1,16 @@
-import 'dart:html' as html;
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+
+import '../services/web_print.dart';
 
 class CreatorPrintScreen extends StatelessWidget {
   const CreatorPrintScreen({super.key});
 
   static final CollectionReference<Map<String, dynamic>> _placesRef =
-  FirebaseFirestore.instance
-      .collection('games')
-      .doc('les_fugitifs')
-      .collection('placeTemplates');
+      FirebaseFirestore.instance
+          .collection('games')
+          .doc('les_fugitifs')
+          .collection('placeTemplates');
 
   String _experienceType(Map<String, dynamic> data) {
     final raw = (data['experienceType'] ?? data['type'] ?? '')
@@ -121,8 +121,17 @@ class CreatorPrintScreen extends StatelessWidget {
     return ordered;
   }
 
-  void _print() {
-    html.window.print();
+  Future<void> _print(BuildContext context) async {
+    final printed = await triggerWebPrint();
+    if (!printed && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'L’impression directe est disponible sur la version Web du portail.',
+          ),
+        ),
+      );
+    }
   }
 
   @override
@@ -140,7 +149,7 @@ class CreatorPrintScreen extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: FilledButton.icon(
-              onPressed: _print,
+              onPressed: () => _print(context),
               icon: const Icon(Icons.print_outlined),
               label: const Text('Imprimer'),
             ),
@@ -203,10 +212,11 @@ class CreatorPrintScreen extends StatelessWidget {
                 ...docs.map((doc) {
                   final data = doc.data();
                   final title =
-                  (data['title'] ?? data['name'] ?? '').toString().trim();
-                  final synopsis = (data['storySynopsis'] ?? data['synopsis'] ?? '')
-                      .toString()
-                      .trim();
+                      (data['title'] ?? data['name'] ?? '').toString().trim();
+                  final synopsis =
+                      (data['storySynopsis'] ?? data['synopsis'] ?? '')
+                          .toString()
+                          .trim();
                   final type = _experienceLabel(_experienceType(data));
                   final reveal = _readDisplayRevealCategories(data);
 

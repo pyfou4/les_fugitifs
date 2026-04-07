@@ -14,6 +14,7 @@ class CreatorScenarioTab extends StatelessWidget {
   final Map<String, dynamic>? selectedData;
   final TextEditingController nameCtrl;
   final TextEditingController synopsisCtrl;
+  final TextEditingController mediaNotesCtrl;
   final TextEditingController keywordCtrl;
   final List<String> keywords;
   final TextEditingController gameRulesCtrl;
@@ -48,6 +49,7 @@ class CreatorScenarioTab extends StatelessWidget {
     required this.selectedData,
     required this.nameCtrl,
     required this.synopsisCtrl,
+    required this.mediaNotesCtrl,
     required this.keywordCtrl,
     required this.keywords,
     required this.gameRulesCtrl,
@@ -113,6 +115,7 @@ class CreatorScenarioTab extends StatelessWidget {
                   selectedData: selectedData,
                   nameCtrl: nameCtrl,
                   synopsisCtrl: synopsisCtrl,
+                  mediaNotesCtrl: mediaNotesCtrl,
                   keywordCtrl: keywordCtrl,
                   keywords: keywords,
                   gameRulesCtrl: gameRulesCtrl,

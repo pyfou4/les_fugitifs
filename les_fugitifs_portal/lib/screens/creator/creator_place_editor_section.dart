@@ -7,6 +7,7 @@ class CreatorPlaceEditorSection extends StatelessWidget {
   final Map<String, dynamic>? selectedData;
   final TextEditingController nameCtrl;
   final TextEditingController synopsisCtrl;
+  final TextEditingController mediaNotesCtrl;
   final TextEditingController keywordCtrl;
   final List<String> keywords;
   final TextEditingController gameRulesCtrl;
@@ -33,6 +34,7 @@ class CreatorPlaceEditorSection extends StatelessWidget {
     required this.selectedData,
     required this.nameCtrl,
     required this.synopsisCtrl,
+    required this.mediaNotesCtrl,
     required this.keywordCtrl,
     required this.keywords,
     required this.gameRulesCtrl,
@@ -281,6 +283,31 @@ class CreatorPlaceEditorSection extends StatelessWidget {
                   label: 'Synopsis',
                   color: color,
                   multiline: true,
+                ),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: mediaNotesCtrl,
+                maxLines: 5,
+                minLines: 4,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  height: 1.3,
+                ),
+                decoration: _fieldDecoration(
+                  label: 'Médias',
+                  color: color,
+                  multiline: true,
+                ),
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Décris ici le média imaginé pour ce lieu et ce qu’il raconte. Exemple: vidéo de télé-journal, audio d’interrogatoire, caméra de surveillance, voix off, etc.',
+                style: TextStyle(
+                  color: Color(0xFFAAB7C8),
+                  height: 1.35,
+                  fontSize: 13,
                 ),
               ),
               const SizedBox(height: 10),

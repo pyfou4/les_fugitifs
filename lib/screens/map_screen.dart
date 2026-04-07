@@ -16,6 +16,7 @@ class MapScreen extends StatefulWidget {
   final List<PlaceNode> places;
   final ValueChanged<String> onPlaceVisited;
   final ValueChanged<PlaceNode> onOpenPlaceMedia;
+  final ValueChanged<PlaceNode>? onPlaceSelected;
 
   const MapScreen({
     super.key,
@@ -23,6 +24,7 @@ class MapScreen extends StatefulWidget {
     required this.places,
     required this.onPlaceVisited,
     required this.onOpenPlaceMedia,
+    this.onPlaceSelected,
   });
 
   @override
@@ -108,6 +110,13 @@ class _MapScreenState extends State<MapScreen> {
     });
   }
 
+  void _setSelectedPlace(PlaceNode place) {
+    setState(() {
+      _selectedPlace = place;
+    });
+    widget.onPlaceSelected?.call(place);
+  }
+
   Future<void> _initLocationTracking() async {
     if (!mounted) return;
 
@@ -168,7 +177,7 @@ class _MapScreenState extends State<MapScreen> {
           distanceFilter: 5,
         ),
       ).listen(
-            (position) async {
+        (position) async {
           await _handleNewPosition(
             position,
             shouldCenter: !_hasCenteredOnUser,
@@ -196,9 +205,9 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _handleNewPosition(
-      Position position, {
-        required bool shouldCenter,
-      }) async {
+    Position position, {
+    required bool shouldCenter,
+  }) async {
     final userLatLng = LatLng(position.latitude, position.longitude);
 
     if (!mounted) return;
@@ -223,9 +232,9 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   Future<void> _moveCameraTo(
-      LatLng target, {
-        double zoom = 16,
-      }) async {
+    LatLng target, {
+    double zoom = 16,
+  }) async {
     if (!_controller.isCompleted) return;
 
     final controller = await _controller.future;
@@ -422,8 +431,9 @@ class _MapScreenState extends State<MapScreen> {
       return;
     }
 
+    _setSelectedPlace(matchedPlace);
+
     setState(() {
-      _selectedPlace = matchedPlace;
       _currentRoute = null;
       _showRouteBanner = false;
       _showHeardBanner = true;
@@ -469,6 +479,8 @@ class _MapScreenState extends State<MapScreen> {
       return;
     }
 
+    _setSelectedPlace(place);
+
     setState(() {
       _isLoadingRoute = true;
       _currentRoute = null;
@@ -486,7 +498,7 @@ class _MapScreenState extends State<MapScreen> {
           'Content-Type': 'application/json',
           'X-Goog-Api-Key': kGoogleMapsApiKey,
           'X-Goog-FieldMask':
-          'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline',
+              'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline',
         },
         body: jsonEncode({
           'origin': {
@@ -526,8 +538,8 @@ class _MapScreenState extends State<MapScreen> {
 
       final route = routes.first as Map<String, dynamic>;
       final encodedPolyline =
-      ((route['polyline'] as Map<String, dynamic>)['encodedPolyline'])
-      as String;
+          ((route['polyline'] as Map<String, dynamic>)['encodedPolyline'])
+              as String;
       final distanceMeters = (route['distanceMeters'] as num).toInt();
       final durationText = route['duration'] as String;
 
@@ -623,6 +635,7 @@ class _MapScreenState extends State<MapScreen> {
             BitmapDescriptor.hueGreen,
           ),
           onTap: () {
+            _setSelectedPlace(place);
             widget.onOpenPlaceMedia(place);
           },
         ),

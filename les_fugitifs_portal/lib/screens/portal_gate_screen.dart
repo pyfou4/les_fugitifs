@@ -49,6 +49,13 @@ class _PortalGateScreenState extends State<PortalGateScreen> {
               );
             }
 
+            if (profile.mustChangePassword) {
+              return _PortalForcePasswordChangeScreen(
+                profile: profile,
+                portalAccessService: _portalAccessService,
+              );
+            }
+
             return PortalShellScreen(profile: profile);
           },
         );
@@ -137,6 +144,269 @@ class _PortalAccessDeniedScreen extends StatelessWidget {
                     ),
                     icon: const Icon(Icons.logout),
                     label: const Text('Se déconnecter'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PortalForcePasswordChangeScreen extends StatefulWidget {
+  final PortalAccessProfile profile;
+  final PortalAccessService portalAccessService;
+
+  const _PortalForcePasswordChangeScreen({
+    required this.profile,
+    required this.portalAccessService,
+  });
+
+  @override
+  State<_PortalForcePasswordChangeScreen> createState() =>
+      _PortalForcePasswordChangeScreenState();
+}
+
+class _PortalForcePasswordChangeScreenState
+    extends State<_PortalForcePasswordChangeScreen> {
+  final TextEditingController _currentPasswordCtrl = TextEditingController();
+  final TextEditingController _newPasswordCtrl = TextEditingController();
+  final TextEditingController _confirmPasswordCtrl = TextEditingController();
+
+  bool _isLoading = false;
+  bool _obscureCurrent = true;
+  bool _obscureNew = true;
+  bool _obscureConfirm = true;
+  String? _errorText;
+
+  @override
+  void dispose() {
+    _currentPasswordCtrl.dispose();
+    _newPasswordCtrl.dispose();
+    _confirmPasswordCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_isLoading) return;
+
+    final currentPassword = _currentPasswordCtrl.text;
+    final newPassword = _newPasswordCtrl.text;
+    final confirmPassword = _confirmPasswordCtrl.text;
+
+    if (currentPassword.isEmpty ||
+        newPassword.isEmpty ||
+        confirmPassword.isEmpty) {
+      setState(() {
+        _errorText = 'Tous les champs sont obligatoires.';
+      });
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      setState(() {
+        _errorText = 'Le nouveau mot de passe doit contenir au moins 8 caractères.';
+      });
+      return;
+    }
+
+    if (newPassword != confirmPassword) {
+      setState(() {
+        _errorText = 'La confirmation ne correspond pas au nouveau mot de passe.';
+      });
+      return;
+    }
+
+    if (currentPassword == newPassword) {
+      setState(() {
+        _errorText = 'Choisis un nouveau mot de passe différent de l’actuel.';
+      });
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _errorText = null;
+    });
+
+    try {
+      await widget.portalAccessService.updateCurrentPasswordAndClearFirstAccess(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+      );
+      if (!mounted) return;
+      setState(() {});
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorText = 'Impossible de changer le mot de passe : $e';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  InputDecoration _passwordDecoration({
+    required String label,
+    required bool obscure,
+    required VoidCallback onToggle,
+  }) {
+    return InputDecoration(
+      labelText: label,
+      suffixIcon: IconButton(
+        tooltip: obscure ? 'Afficher le mot de passe' : 'Masquer le mot de passe',
+        onPressed: onToggle,
+        icon: Icon(
+          obscure ? Icons.visibility_off_outlined : Icons.visibility_outlined,
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0A0D14),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 620),
+          child: Card(
+            child: Padding(
+              padding: const EdgeInsets.all(28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Changement de mot de passe requis',
+                    style: TextStyle(
+                      fontSize: 30,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Le compte ${widget.profile.displayName} doit changer son mot de passe avant d’accéder au portail.',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      height: 1.45,
+                      color: Color(0xFF9AA7BC),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  TextField(
+                    controller: _currentPasswordCtrl,
+                    obscureText: _obscureCurrent,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _passwordDecoration(
+                      label: 'Mot de passe actuel',
+                      obscure: _obscureCurrent,
+                      onToggle: () {
+                        setState(() {
+                          _obscureCurrent = !_obscureCurrent;
+                        });
+                      },
+                    ),
+                    onSubmitted: (_) => _submit(),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: _newPasswordCtrl,
+                    obscureText: _obscureNew,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _passwordDecoration(
+                      label: 'Nouveau mot de passe',
+                      obscure: _obscureNew,
+                      onToggle: () {
+                        setState(() {
+                          _obscureNew = !_obscureNew;
+                        });
+                      },
+                    ),
+                    onSubmitted: (_) => _submit(),
+                  ),
+                  const SizedBox(height: 14),
+                  TextField(
+                    controller: _confirmPasswordCtrl,
+                    obscureText: _obscureConfirm,
+                    style: const TextStyle(color: Colors.white),
+                    decoration: _passwordDecoration(
+                      label: 'Confirmer le nouveau mot de passe',
+                      obscure: _obscureConfirm,
+                      onToggle: () {
+                        setState(() {
+                          _obscureConfirm = !_obscureConfirm;
+                        });
+                      },
+                    ),
+                    onSubmitted: (_) => _submit(),
+                  ),
+                  const SizedBox(height: 14),
+                  const Text(
+                    'Ce blocage est volontaire: tant que le mot de passe provisoire n’a pas été remplacé, l’accès au portail reste verrouillé.',
+                    style: TextStyle(
+                      color: Color(0xFFAED0FF),
+                      height: 1.45,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  if (_errorText != null) ...[
+                    const SizedBox(height: 14),
+                    Text(
+                      _errorText!,
+                      style: const TextStyle(
+                        color: Color(0xFFFFB4AB),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: _isLoading
+                              ? null
+                              : () => widget.portalAccessService.signOut(),
+                          icon: const Icon(Icons.logout),
+                          label: const Text('Se déconnecter'),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        flex: 2,
+                        child: FilledButton.icon(
+                          onPressed: _isLoading ? null : _submit,
+                          style: FilledButton.styleFrom(
+                            backgroundColor: const Color(0xFFD65A00),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 18),
+                          ),
+                          icon: _isLoading
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.white,
+                                  ),
+                                )
+                              : const Icon(Icons.lock_reset),
+                          label: Text(
+                            _isLoading
+                                ? 'Mise à jour...'
+                                : 'Changer le mot de passe',
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),

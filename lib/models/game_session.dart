@@ -14,6 +14,13 @@ class GameSession {
   final Set<String> playerMarkedSuspectIds;
   final Set<String> playerMarkedMotiveIds;
 
+  final bool humanHelpEnabled;
+  final bool humanEscalationRequired;
+  final String humanEscalationStatus;
+  final int aiHelpCount;
+  final String currentBlockageLevel;
+  final String? lastHelpRequestAt;
+
   GameSession({
     required this.id,
     required this.activationCode,
@@ -28,6 +35,12 @@ class GameSession {
     this.expiresAt,
     Set<String>? playerMarkedSuspectIds,
     Set<String>? playerMarkedMotiveIds,
+    this.humanHelpEnabled = false,
+    this.humanEscalationRequired = false,
+    this.humanEscalationStatus = '',
+    this.aiHelpCount = 0,
+    this.currentBlockageLevel = '',
+    this.lastHelpRequestAt,
   })  : playerMarkedSuspectIds = playerMarkedSuspectIds ?? <String>{},
         playerMarkedMotiveIds = playerMarkedMotiveIds ?? <String>{};
 
@@ -46,6 +59,12 @@ class GameSession {
       'motiveByPlace': motiveByPlace,
       'playerMarkedSuspectIds': playerMarkedSuspectIds.toList(),
       'playerMarkedMotiveIds': playerMarkedMotiveIds.toList(),
+      'humanHelpEnabled': humanHelpEnabled,
+      'humanEscalationRequired': humanEscalationRequired,
+      'humanEscalationStatus': humanEscalationStatus,
+      'aiHelpCount': aiHelpCount,
+      'currentBlockageLevel': currentBlockageLevel,
+      'lastHelpRequestAt': lastHelpRequestAt,
     };
   }
 
@@ -68,6 +87,12 @@ class GameSession {
           Set<String>.from(json['playerMarkedSuspectIds'] as List<dynamic>? ?? []),
       playerMarkedMotiveIds:
           Set<String>.from(json['playerMarkedMotiveIds'] as List<dynamic>? ?? []),
+      humanHelpEnabled: _readBool(json['humanHelpEnabled']),
+      humanEscalationRequired: _readBool(json['humanEscalationRequired']),
+      humanEscalationStatus: (json['humanEscalationStatus'] ?? '').toString(),
+      aiHelpCount: _readInt(json['aiHelpCount']),
+      currentBlockageLevel: (json['currentBlockageLevel'] ?? '').toString(),
+      lastHelpRequestAt: json['lastHelpRequestAt']?.toString(),
     );
   }
 
@@ -104,11 +129,43 @@ class GameSession {
                 runtime['playerMarkedMotiveIds'] ??
                 const <dynamic>[]) as List<dynamic>,
       ),
+      humanHelpEnabled: _readBool(
+        json['humanHelpEnabled'] ?? runtime['humanHelpEnabled'],
+      ),
+      humanEscalationRequired: _readBool(
+        json['humanEscalationRequired'] ?? runtime['humanEscalationRequired'],
+      ),
+      humanEscalationStatus: (
+        json['humanEscalationStatus'] ?? runtime['humanEscalationStatus'] ?? ''
+      ).toString(),
+      aiHelpCount: _readInt(
+        json['aiHelpCount'] ?? runtime['aiHelpCount'],
+      ),
+      currentBlockageLevel: (
+        json['currentBlockageLevel'] ?? runtime['currentBlockageLevel'] ?? ''
+      ).toString(),
+      lastHelpRequestAt: (
+        json['lastHelpRequestAt'] ?? runtime['lastHelpRequestAt']
+      )?.toString(),
     );
   }
 
   static Map<String, String?> _readNullableStringMap(dynamic raw) {
     if (raw is! Map) return <String, String?>{};
     return raw.map((key, value) => MapEntry(key.toString(), value?.toString()));
+  }
+
+  static bool _readBool(dynamic value) {
+    if (value is bool) return value;
+    if (value is String) return value.toLowerCase() == 'true';
+    if (value is num) return value != 0;
+    return false;
+  }
+
+  static int _readInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
   }
 }

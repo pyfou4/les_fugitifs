@@ -12,18 +12,22 @@ class PortalLoginScreen extends StatefulWidget {
 
 class _PortalLoginScreenState extends State<PortalLoginScreen> {
   static const String _lastEmailKey = 'portal_last_email';
+  static const String _rememberPasswordKey = 'portal_remember_password';
+  static const String _savedPasswordKey = 'portal_saved_password';
 
   final PortalAccessService _portalAccessService = PortalAccessService();
   final TextEditingController _emailCtrl = TextEditingController();
   final TextEditingController _passwordCtrl = TextEditingController();
 
   bool _isLoading = false;
+  bool _obscurePassword = true;
+  bool _rememberPassword = false;
   String? _errorText;
 
   @override
   void initState() {
     super.initState();
-    _loadLastEmail();
+    _loadSavedCredentials();
   }
 
   @override
@@ -33,25 +37,42 @@ class _PortalLoginScreenState extends State<PortalLoginScreen> {
     super.dispose();
   }
 
-  Future<void> _loadLastEmail() async {
+  Future<void> _loadSavedCredentials() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final lastEmail = prefs.getString(_lastEmailKey) ?? '';
+      final rememberPassword = prefs.getBool(_rememberPasswordKey) ?? false;
+      final savedPassword =
+          rememberPassword ? (prefs.getString(_savedPasswordKey) ?? '') : '';
 
       if (!mounted) return;
 
       _emailCtrl.text = lastEmail;
-      setState(() {});
+      _passwordCtrl.text = savedPassword;
+      setState(() {
+        _rememberPassword = rememberPassword;
+      });
     } catch (_) {
       if (!mounted) return;
       setState(() {});
     }
   }
 
-  Future<void> _persistLastEmail(String email) async {
+  Future<void> _persistCredentials({
+    required String email,
+    required String password,
+  }) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_lastEmailKey, email.trim());
+
+      if (_rememberPassword) {
+        await prefs.setBool(_rememberPasswordKey, true);
+        await prefs.setString(_savedPasswordKey, password);
+      } else {
+        await prefs.setBool(_rememberPasswordKey, false);
+        await prefs.remove(_savedPasswordKey);
+      }
     } catch (_) {
       // On n’empêche jamais la connexion si le stockage local échoue.
     }
@@ -77,7 +98,7 @@ class _PortalLoginScreenState extends State<PortalLoginScreen> {
 
     try {
       await _portalAccessService.signIn(email: email, password: password);
-      await _persistLastEmail(email);
+      await _persistCredentials(email: email, password: password);
 
       if (!mounted) return;
 
@@ -87,7 +108,7 @@ class _PortalLoginScreenState extends State<PortalLoginScreen> {
         if (!mounted) return;
         setState(() {
           _errorText =
-          'Compte authentifié, mais aucun rôle portail actif n’a été trouvé.';
+              'Compte authentifié, mais aucun rôle portail actif n’a été trouvé.';
         });
       }
     } catch (e) {
@@ -143,22 +164,65 @@ class _PortalLoginScreenState extends State<PortalLoginScreen> {
                     decoration: const InputDecoration(
                       labelText: 'Email',
                       helperText:
-                      'Le dernier email utilisé est mémorisé sur ce navigateur.',
+                          'Le dernier email utilisé est mémorisé sur cet appareil.',
                     ),
                     onSubmitted: (_) => _signIn(),
                   ),
                   const SizedBox(height: 14),
                   TextField(
                     controller: _passwordCtrl,
-                    obscureText: true,
+                    obscureText: _obscurePassword,
                     style: const TextStyle(color: Colors.white),
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Mot de passe',
+                      suffixIcon: IconButton(
+                        tooltip: _obscurePassword
+                            ? 'Afficher le mot de passe'
+                            : 'Masquer le mot de passe',
+                        onPressed: () {
+                          setState(() {
+                            _obscurePassword = !_obscurePassword;
+                          });
+                        },
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_off_outlined
+                              : Icons.visibility_outlined,
+                        ),
+                      ),
                     ),
                     onSubmitted: (_) => _signIn(),
                   ),
-                  const SizedBox(height: 14),
-                  if (_errorText != null)
+                  const SizedBox(height: 10),
+                  CheckboxListTile(
+                    value: _rememberPassword,
+                    contentPadding: EdgeInsets.zero,
+                    controlAffinity: ListTileControlAffinity.leading,
+                    activeColor: const Color(0xFFD65A00),
+                    title: const Text(
+                      'Mémoriser le mot de passe sur cet appareil',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: const Text(
+                      'À réserver à un poste de travail de confiance.',
+                      style: TextStyle(
+                        color: Color(0xFF9AA7BC),
+                        height: 1.35,
+                      ),
+                    ),
+                    onChanged: _isLoading
+                        ? null
+                        : (value) {
+                            setState(() {
+                              _rememberPassword = value ?? false;
+                            });
+                          },
+                  ),
+                  if (_errorText != null) ...[
+                    const SizedBox(height: 4),
                     Text(
                       _errorText!,
                       style: const TextStyle(
@@ -166,6 +230,7 @@ class _PortalLoginScreenState extends State<PortalLoginScreen> {
                         fontWeight: FontWeight.w600,
                       ),
                     ),
+                  ],
                   const SizedBox(height: 18),
                   SizedBox(
                     width: double.infinity,
@@ -178,13 +243,13 @@ class _PortalLoginScreenState extends State<PortalLoginScreen> {
                       ),
                       icon: _isLoading
                           ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
                           : const Icon(Icons.login),
                       label: Text(
                         _isLoading ? 'Connexion...' : 'Se connecter',
