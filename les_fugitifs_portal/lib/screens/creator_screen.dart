@@ -94,6 +94,8 @@ class _CreatorScreenState extends State<CreatorScreen>
   bool _isCreatingSite = false;
   bool _adminPasswordValidatedForSession = false;
   bool _isQuestionnaireSaving = false;
+  bool _isUnlocking = false;
+  bool _isScenarioLocked = false;
 
   List<ScenarioValidationIssue> _lockIssues = const [];
   String? _lastLockedScenarioId;
@@ -312,6 +314,11 @@ class _CreatorScreenState extends State<CreatorScreen>
   }
 
   void _addKeyword() {
+    if (_isScenarioLocked) {
+      _showLockedSnackBar();
+      return;
+    }
+
     final value = _keywordCtrl.text.trim().toLowerCase();
     if (value.isEmpty) return;
 
@@ -324,9 +331,91 @@ class _CreatorScreenState extends State<CreatorScreen>
   }
 
   void _removeKeyword(String value) {
+    if (_isScenarioLocked) {
+      _showLockedSnackBar();
+      return;
+    }
+
     setState(() {
       _keywords = _keywords.where((e) => e != value).toList();
     });
+  }
+
+  void _showLockedSnackBar() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Scénario verrouillé. Déverrouille-le avant toute modification.'),
+      ),
+    );
+  }
+
+  Widget _wrapCreatorTabLocked({
+    required bool locked,
+    required Widget child,
+  }) {
+    if (!locked) return child;
+
+    return Stack(
+      children: [
+        IgnorePointer(
+          ignoring: true,
+          child: child,
+        ),
+        Positioned.fill(
+          child: Container(
+            color: const Color(0x9907111F),
+            alignment: Alignment.center,
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 560),
+              margin: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: const Color(0xFF111D32),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: const Color(0xFF263854)),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x66000000),
+                    blurRadius: 24,
+                    offset: Offset(0, 12),
+                  ),
+                ],
+              ),
+              child: const Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.lock_outline_rounded,
+                    color: Color(0xFFFFD7B8),
+                    size: 44,
+                  ),
+                  SizedBox(height: 14),
+                  Text(
+                    'Scénario verrouillé',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  SizedBox(height: 10),
+                  Text(
+                    'Le créateur est entièrement figé tant que le scénario reste verrouillé. Seul un déverrouillage permet de reprendre les modifications.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Color(0xFFB8C3D6),
+                      height: 1.45,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
   }
 
   void _syncGameConfiguration(Map<String, dynamic>? data) {
@@ -367,6 +456,11 @@ class _CreatorScreenState extends State<CreatorScreen>
   }
 
   Future<void> _saveQuestionnaire() async {
+    if (_isScenarioLocked) {
+      _showLockedSnackBar();
+      return;
+    }
+
     if (_isQuestionnaireSaving) return;
 
     setState(() {
@@ -415,12 +509,22 @@ class _CreatorScreenState extends State<CreatorScreen>
   }
 
   void _updateSideQuestionPlace(int index, String? value) {
+    if (_isScenarioLocked) {
+      _showLockedSnackBar();
+      return;
+    }
+
     setState(() {
       _sideQuestionPlaceIds[index] = value;
     });
   }
 
   Future<void> _save() async {
+    if (_isScenarioLocked) {
+      _showLockedSnackBar();
+      return;
+    }
+
     if (_selectedId == null || _isSaving) return;
 
     setState(() {
@@ -629,7 +733,7 @@ class _CreatorScreenState extends State<CreatorScreen>
   }
 
   Future<void> _lockScenario() async {
-    if (_isLocking) return;
+    if (_isScenarioLocked || _isLocking) return;
 
     final granted = await _requestAdminValidation();
     if (!granted) return;
@@ -764,6 +868,81 @@ class _CreatorScreenState extends State<CreatorScreen>
       if (mounted) {
         setState(() {
           _isValidatingSiteReadiness = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _unlockScenario() async {
+    if (_isUnlocking) return;
+
+    final canUnlock = widget.profile.role.canAccessCreator;
+    if (!canUnlock) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Seul un admin peut déverrouiller le scénario.'),
+          ),
+        );
+      }
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF151B25),
+          title: const Text(
+            'Déverrouiller le scénario',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: const Text(
+            'Le créateur redeviendra modifiable pour tous les rôles autorisés. Continuer ?',
+            style: TextStyle(color: Color(0xFFB8C3D6), height: 1.45),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Annuler'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFD65A00),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Déverrouiller'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    setState(() {
+      _isUnlocking = true;
+    });
+
+    try {
+      await _scenarioLockService.unlockCurrentScenario(
+        unlockedBy: 'admin_portal',
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Scénario déverrouillé.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur pendant le déverrouillage : $e')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUnlocking = false;
         });
       }
     }
@@ -973,6 +1152,30 @@ class _CreatorScreenState extends State<CreatorScreen>
             fontWeight: FontWeight.w800,
           ),
         ),
+        actions: [
+          if (_isScenarioLocked)
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: FilledButton.icon(
+                onPressed: _isUnlocking ? null : _unlockScenario,
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFFD65A00),
+                  foregroundColor: Colors.white,
+                ),
+                icon: _isUnlocking
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white,
+                        ),
+                      )
+                    : const Icon(Icons.lock_open_rounded),
+                label: Text(_isUnlocking ? 'Déverrouillage...' : 'Déverrouiller'),
+              ),
+            ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           labelStyle: const TextStyle(
@@ -1049,55 +1252,73 @@ class _CreatorScreenState extends State<CreatorScreen>
                 );
               }
 
-              _syncGameConfiguration(gameSnapshot.data?.data());
+              final gameData = gameSnapshot.data?.data();
+              final isScenarioLocked = gameData?['creatorLocked'] == true;
+
+              if (_isScenarioLocked != isScenarioLocked) {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (!mounted) return;
+                  setState(() {
+                    _isScenarioLocked = isScenarioLocked;
+                  });
+                });
+              }
+
+              _syncGameConfiguration(gameData);
 
               return TabBarView(
                 controller: _tabController,
                 children: [
-                  CreatorScenarioTab(
-                    docs: docs,
-                    docsById: docsById,
-                    selectedId: _selectedId,
-                    selectedData: _selectedData,
-                    nameCtrl: _nameCtrl,
-                    synopsisCtrl: _synopsisCtrl,
-                    mediaNotesCtrl: _mediaNotesCtrl,
-                    keywordCtrl: _keywordCtrl,
-                    keywords: _keywords,
-                    gameRulesCtrl: _gameRulesCtrl,
-                    briefingCtrl: _briefingCtrl,
-                    isSaving: _isSaving,
-                    isLocking: _isLocking,
-                    lockIssues: _lockIssues,
-                    lastLockedScenarioId: _lastLockedScenarioId,
-                    groupColorBuilder: _groupColor,
-                    experienceTypeBuilder: _experienceType,
-                    experienceLabelBuilder: _experienceLabel,
-                    displayNameBuilder: _displayName,
-                    revealedCategoriesReader: _readDisplayRevealCategories,
-                    revealedSummaryBuilder: _revealedInfoSummary,
-                    onSelectDoc: _selectDoc,
-                    onSelectFromMap: _selectFromMap,
-                    onAddKeyword: _addKeyword,
-                    onRemoveKeyword: _removeKeyword,
-                    onSave: _isSaving ? null : () => _save(),
-                    onLockScenario: _isLocking ? null : () => _lockScenario(),
-                    onOpenPrintView: _openPrintView,
+                  _wrapCreatorTabLocked(
+                    locked: isScenarioLocked,
+                    child: CreatorScenarioTab(
+                      docs: docs,
+                      docsById: docsById,
+                      selectedId: _selectedId,
+                      selectedData: _selectedData,
+                      nameCtrl: _nameCtrl,
+                      synopsisCtrl: _synopsisCtrl,
+                      mediaNotesCtrl: _mediaNotesCtrl,
+                      keywordCtrl: _keywordCtrl,
+                      keywords: _keywords,
+                      gameRulesCtrl: _gameRulesCtrl,
+                      briefingCtrl: _briefingCtrl,
+                      isSaving: _isSaving,
+                      isLocking: _isLocking,
+                      lockIssues: _lockIssues,
+                      lastLockedScenarioId: _lastLockedScenarioId,
+                      groupColorBuilder: _groupColor,
+                      experienceTypeBuilder: _experienceType,
+                      experienceLabelBuilder: _experienceLabel,
+                      displayNameBuilder: _displayName,
+                      revealedCategoriesReader: _readDisplayRevealCategories,
+                      revealedSummaryBuilder: _revealedInfoSummary,
+                      onSelectDoc: _selectDoc,
+                      onSelectFromMap: _selectFromMap,
+                      onAddKeyword: _addKeyword,
+                      onRemoveKeyword: _removeKeyword,
+                      onSave: (_isSaving || isScenarioLocked) ? null : () => _save(),
+                      onLockScenario: (_isLocking || isScenarioLocked) ? null : () => _lockScenario(),
+                      onOpenPrintView: _openPrintView,
+                    ),
                   ),
                   _buildSitesTab(docs),
-                  _buildSuspectsMotivesTab(),
-                  CreatorQuestionnaireTab(
-                    availablePlaceIds: _questionnaireAvailablePlaceIds(docs),
-                    killerQuestionCtrl: _killerQuestionCtrl,
-                    motiveQuestionCtrl: _motiveQuestionCtrl,
-                    a0QuestionCtrl: _a0QuestionCtrl,
-                    b0QuestionCtrl: _b0QuestionCtrl,
-                    c0QuestionCtrl: _c0QuestionCtrl,
-                    sideQuestionCtrls: _sideQuestionCtrls,
-                    sideQuestionPlaceIds: _sideQuestionPlaceIds,
-                    isSaving: _isQuestionnaireSaving,
-                    onSave: _saveQuestionnaire,
-                    onSideQuestionPlaceChanged: _updateSideQuestionPlace,
+                  _wrapCreatorTabLocked(locked: isScenarioLocked, child: _buildSuspectsMotivesTab()),
+                  _wrapCreatorTabLocked(
+                    locked: isScenarioLocked,
+                    child: CreatorQuestionnaireTab(
+                      availablePlaceIds: _questionnaireAvailablePlaceIds(docs),
+                      killerQuestionCtrl: _killerQuestionCtrl,
+                      motiveQuestionCtrl: _motiveQuestionCtrl,
+                      a0QuestionCtrl: _a0QuestionCtrl,
+                      b0QuestionCtrl: _b0QuestionCtrl,
+                      c0QuestionCtrl: _c0QuestionCtrl,
+                      sideQuestionCtrls: _sideQuestionCtrls,
+                      sideQuestionPlaceIds: _sideQuestionPlaceIds,
+                      isSaving: _isQuestionnaireSaving,
+                      onSave: isScenarioLocked ? () {} : _saveQuestionnaire,
+                      onSideQuestionPlaceChanged: _updateSideQuestionPlace,
+                    ),
                   ),
                 ],
               );
@@ -1276,6 +1497,11 @@ class _CreatorScreenState extends State<CreatorScreen>
     required String label,
     required DocumentReference<Map<String, dynamic>> ref,
   }) async {
+    if (_isScenarioLocked) {
+      _showLockedSnackBar();
+      return;
+    }
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) {
@@ -1321,6 +1547,11 @@ class _CreatorScreenState extends State<CreatorScreen>
     QueryDocumentSnapshot<Map<String, dynamic>>? doc,
     required List<QueryDocumentSnapshot<Map<String, dynamic>>> allDocs,
   }) async {
+    if (_isScenarioLocked) {
+      _showLockedSnackBar();
+      return;
+    }
+
     if (doc == null && allDocs.length >= 6) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -1764,6 +1995,11 @@ class _CreatorScreenState extends State<CreatorScreen>
     QueryDocumentSnapshot<Map<String, dynamic>>? doc,
     required List<QueryDocumentSnapshot<Map<String, dynamic>>> allDocs,
   }) async {
+    if (_isScenarioLocked) {
+      _showLockedSnackBar();
+      return;
+    }
+
     if (doc == null && allDocs.length >= 6) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

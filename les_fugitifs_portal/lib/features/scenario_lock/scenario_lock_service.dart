@@ -127,4 +127,21 @@ class ScenarioLockService {
       issues: validation.issues,
     );
   }
+
+  /// 🔓 UNLOCK
+  Future<void> unlockCurrentScenario({
+    required String unlockedBy,
+  }) async {
+    final nowIso = DateTime.now().toIso8601String();
+
+    await _gameRef.set(
+      {
+        'creatorLocked': false,
+        'status': 'draft',
+        'creatorUnlockedAt': nowIso,
+        'creatorUnlockedBy': unlockedBy,
+      },
+      SetOptions(merge: true),
+    );
+  }
 }
