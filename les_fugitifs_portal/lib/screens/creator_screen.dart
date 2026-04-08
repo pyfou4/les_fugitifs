@@ -714,12 +714,12 @@ class _CreatorScreenState extends State<CreatorScreen>
       return true;
     }
 
-    final canLock = widget.profile.role.canAccessCreator;
+    final canLock = widget.profile.role == PortalUserRole.admin;
     if (!canLock) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Ton rôle ne permet pas de verrouiller un scénario.'),
+            content: Text('Seul un administrateur peut verrouiller un scénario.'),
           ),
         );
       }
@@ -876,7 +876,7 @@ class _CreatorScreenState extends State<CreatorScreen>
   Future<void> _unlockScenario() async {
     if (_isUnlocking) return;
 
-    final canUnlock = widget.profile.role.canAccessCreator;
+    final canUnlock = widget.profile.role == PortalUserRole.admin;
     if (!canUnlock) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -933,6 +933,16 @@ class _CreatorScreenState extends State<CreatorScreen>
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Scénario déverrouillé.')),
+      );
+    } on FirebaseException catch (e) {
+      if (!mounted) return;
+
+      final message = e.code == 'permission-denied'
+          ? 'Seul un administrateur peut déverrouiller le scénario.'
+          : 'Erreur pendant le déverrouillage : ${e.message ?? e.code}';
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
       );
     } catch (e) {
       if (!mounted) return;
@@ -1153,7 +1163,7 @@ class _CreatorScreenState extends State<CreatorScreen>
           ),
         ),
         actions: [
-          if (_isScenarioLocked)
+          if (_isScenarioLocked && widget.profile.role == PortalUserRole.admin)
             Padding(
               padding: const EdgeInsets.only(right: 16),
               child: FilledButton.icon(
@@ -1173,6 +1183,19 @@ class _CreatorScreenState extends State<CreatorScreen>
                       )
                     : const Icon(Icons.lock_open_rounded),
                 label: Text(_isUnlocking ? 'Déverrouillage...' : 'Déverrouiller'),
+              ),
+            )
+          else if (_isScenarioLocked)
+            const Padding(
+              padding: EdgeInsets.only(right: 16),
+              child: Center(
+                child: Text(
+                  'Déverrouillage réservé à l’admin',
+                  style: TextStyle(
+                    color: Color(0xFFFFD7B8),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
             ),
         ],
@@ -1254,6 +1277,7 @@ class _CreatorScreenState extends State<CreatorScreen>
 
               final gameData = gameSnapshot.data?.data();
               final isScenarioLocked = gameData?['creatorLocked'] == true;
+              final isAdmin = widget.profile.role == PortalUserRole.admin;
 
               if (_isScenarioLocked != isScenarioLocked) {
                 WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1298,7 +1322,7 @@ class _CreatorScreenState extends State<CreatorScreen>
                       onAddKeyword: _addKeyword,
                       onRemoveKeyword: _removeKeyword,
                       onSave: (_isSaving || isScenarioLocked) ? null : () => _save(),
-                      onLockScenario: (_isLocking || isScenarioLocked) ? null : () => _lockScenario(),
+                      onLockScenario: (!isAdmin || _isLocking || isScenarioLocked) ? null : () => _lockScenario(),
                       onOpenPrintView: _openPrintView,
                     ),
                   ),

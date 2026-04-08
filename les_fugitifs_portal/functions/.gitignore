@@ -1,2 +1,17 @@
-node_modules/
-*.local
+# 🔒 Firebase Admin (TRÈS IMPORTANT)
+functions/serviceAccountKey.json
+
+# 🔒 fichiers sensibles éventuels
+functions/.env
+
+# Flutter / build
+build/
+.dart_tool/
+.packages
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
