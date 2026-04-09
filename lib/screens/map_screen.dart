@@ -8,7 +8,6 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import 'package:http/http.dart' as http;
 
-import '../constants/app_constants.dart';
 import '../models/place_node.dart';
 
 class MapScreen extends StatefulWidget {
@@ -489,59 +488,32 @@ class _MapScreenState extends State<MapScreen> {
 
     try {
       final uri = Uri.parse(
-        'https://routes.googleapis.com/directions/v2:computeRoutes',
+        'https://us-central1-les-fugitifs.cloudfunctions.net/computeRoute',
       );
 
       final response = await http.post(
         uri,
         headers: {
           'Content-Type': 'application/json',
-          'X-Goog-Api-Key': kGoogleMapsApiKey,
-          'X-Goog-FieldMask':
-              'routes.duration,routes.distanceMeters,routes.polyline.encodedPolyline',
         },
         body: jsonEncode({
-          'origin': {
-            'location': {
-              'latLng': {
-                'latitude': _userMarker!.position.latitude,
-                'longitude': _userMarker!.position.longitude,
-              }
-            }
-          },
-          'destination': {
-            'location': {
-              'latLng': {
-                'latitude': place.lat,
-                'longitude': place.lng,
-              }
-            }
-          },
-          'travelMode': 'WALK',
-          'languageCode': 'fr-FR',
-          'units': 'METRIC',
+          'originLat': _userMarker!.position.latitude,
+          'originLng': _userMarker!.position.longitude,
+          'destinationLat': place.lat,
+          'destinationLng': place.lng,
         }),
       );
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw Exception(
-          'Erreur Routes API ${response.statusCode}: ${response.body}',
+          'Erreur Cloud Function ${response.statusCode}: ${response.body}',
         );
       }
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
-      final routes = data['routes'] as List<dynamic>?;
-
-      if (routes == null || routes.isEmpty) {
-        throw Exception('Aucun itinéraire retourné');
-      }
-
-      final route = routes.first as Map<String, dynamic>;
-      final encodedPolyline =
-          ((route['polyline'] as Map<String, dynamic>)['encodedPolyline'])
-              as String;
-      final distanceMeters = (route['distanceMeters'] as num).toInt();
-      final durationText = route['duration'] as String;
+      final encodedPolyline = data['encodedPolyline'] as String;
+      final distanceMeters = (data['distanceMeters'] as num).toInt();
+      final durationText = data['duration'] as String;
 
       final decodedPoints = _decodePolyline(encodedPolyline);
 

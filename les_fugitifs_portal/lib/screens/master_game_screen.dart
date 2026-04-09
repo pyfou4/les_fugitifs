@@ -1028,9 +1028,11 @@ class _MasterGameScreenState extends State<MasterGameScreen> {
                               ),
                               child: Center(
                                 child: Text(
-                                  session.teamCode.isNotEmpty
-                                      ? session.teamCode.characters.first
-                                      : session.teamName.characters.first,
+                                  _safeInitial(
+                                    session.teamCode.isNotEmpty
+                                        ? session.teamCode
+                                        : session.teamName,
+                                  ),
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontWeight: FontWeight.w900,
@@ -1257,6 +1259,11 @@ class _MasterGameScreenState extends State<MasterGameScreen> {
                       onPressed: () => _showAddNoteDialog(session),
                       icon: const Icon(Icons.note_add_outlined),
                       label: const Text('Ajouter une note'),
+                    ),
+                    FilledButton.icon(
+                      onPressed: () => _showSendHumanHelpMessageDialog(session),
+                      icon: const Icon(Icons.mark_chat_unread_outlined),
+                      label: const Text('Envoyer un message'),
                     ),
                     OutlinedButton.icon(
                       onPressed: session.humanEscalationRequired &&
@@ -2239,6 +2246,85 @@ class _MasterGameScreenState extends State<MasterGameScreen> {
     );
   }
 
+
+  Future<void> _showSendHumanHelpMessageDialog(_GameSession session) async {
+    _noteController.clear();
+
+    await showDialog<void>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: const Color(0xFF131A24),
+          title: const Text(
+            'Envoyer un message au joueur',
+            style: TextStyle(color: Colors.white),
+          ),
+          content: TextField(
+            controller: _noteController,
+            maxLines: 5,
+            decoration: const InputDecoration(
+              labelText: 'Message',
+              hintText: 'Exemple : Retournez vers A0 puis ouvrez la carte.',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Annuler'),
+            ),
+            FilledButton(
+              onPressed: () async {
+                final text = _noteController.text.trim();
+                if (text.isEmpty) return;
+
+                Navigator.pop(context);
+                await _sendHumanHelpMessage(session, text);
+
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Message envoyé à ${session.teamName}.'),
+                  ),
+                );
+              },
+              child: const Text('Envoyer'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _sendHumanHelpMessage(_GameSession session, String text) async {
+    final sessionRef =
+        FirebaseFirestore.instance.collection('gameSessions').doc(session.id);
+    final now = DateTime.now().toUtc().toIso8601String();
+
+    await sessionRef.collection('humanHelpMessages').add({
+      'title': 'Réponse du maître du jeu',
+      'text': text,
+      'from': 'mj',
+      'createdAt': now,
+      'createdByUid': widget.profile.uid,
+      'createdByName': widget.profile.displayName,
+    });
+
+    await _addTimelineEntry(
+      sessionId: session.id,
+      type: 'human_help_message_sent',
+      label: 'Le MJ a envoyé un message au joueur',
+      source: 'mj',
+    );
+
+    await _addMjAction(
+      sessionId: session.id,
+      type: 'send_human_help_message',
+      payload: {
+        'text': text,
+      },
+    );
+  }
+
   Future<void> _showAddNoteDialog(_GameSession session) async {
     _noteController.clear();
 
@@ -2850,6 +2936,13 @@ class _GameSession {
   String get lastProgressAtLabel => _formatDateTime(lastProgressAt);
   String get lastHelpRequestAtLabel => _formatDateTime(lastHelpRequestAt);
   String get effectiveEndsAtLabel => _formatDateTime(effectiveEndsAt);
+}
+
+
+String _safeInitial(String value) {
+  final trimmed = value.trim();
+  if (trimmed.isEmpty) return '?';
+  return trimmed.characters.first;
 }
 
 String _firstNonEmpty(List<dynamic> values) {

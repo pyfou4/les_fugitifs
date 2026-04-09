@@ -1,13 +1,16 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import '../models/game_session.dart';
 import '../models/motive_model.dart';
 import '../models/place_node.dart';
 import '../models/suspect_model.dart';
+import '../services/ai_service.dart';
 import '../services/runtime_session_service.dart';
 
 import 'archives_screen.dart';
@@ -31,6 +34,7 @@ enum _SosStep {
 
 class _HomeScreenState extends State<HomeScreen> {
   final RuntimeSessionService _runtimeSessionService = RuntimeSessionService();
+  final AiService _aiService = AiService();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   int currentIndex = 0;
@@ -45,11 +49,24 @@ class _HomeScreenState extends State<HomeScreen> {
   GameSession? _session;
   String? _storagePrefix;
   String? _currentHelpPlaceId;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
+      _humanHelpMessagesSubscription;
+  bool _humanHelpDialogOpen = false;
+  final TextEditingController _sosQuestionController = TextEditingController();
+  final stt.SpeechToText _sosSpeechToText = stt.SpeechToText();
 
   @override
   void initState() {
     super.initState();
     _loadGameData();
+  }
+
+  @override
+  void dispose() {
+    _humanHelpMessagesSubscription?.cancel();
+    _sosQuestionController.dispose();
+    _sosSpeechToText.stop();
+    super.dispose();
   }
 
   int get progress => _places.where((p) => p.isVisited).length.clamp(0, 9);
@@ -72,6 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _storagePrefix = 'session_${bundle.session.id}';
 
       await _loadSessionAndProgress();
+      await _startHumanHelpMessagesListener();
 
       if (!mounted) return;
       setState(() {
@@ -156,6 +174,82 @@ class _HomeScreenState extends State<HomeScreen> {
       await prefs.setString('active_game_session_id', _session!.id);
       await prefs.setString('active_activation_code', _session!.activationCode);
     }
+  }
+
+  Future<void> _startHumanHelpMessagesListener() async {
+    await _humanHelpMessagesSubscription?.cancel();
+
+    final sessionId = _session?.id;
+    if (sessionId == null || sessionId.trim().isEmpty) return;
+
+    _humanHelpMessagesSubscription = _firestore
+        .collection('gameSessions')
+        .doc(sessionId)
+        .collection('humanHelpMessages')
+        .orderBy('createdAt', descending: true)
+        .limit(1)
+        .snapshots()
+        .listen((snapshot) async {
+      if (!mounted || snapshot.docs.isEmpty) return;
+
+      final latestDoc = snapshot.docs.first;
+      final latestData = latestDoc.data();
+      final sender = (latestData['from'] ?? '').toString().trim().toLowerCase();
+      if (sender != 'mj') return;
+
+      final prefs = await SharedPreferences.getInstance();
+      final prefix = _storagePrefix ?? 'session_unknown';
+      final seenKey = '${prefix}_last_seen_human_help_message_id';
+      final lastSeenId = prefs.getString(seenKey);
+
+      if (lastSeenId == latestDoc.id) return;
+      if (_humanHelpDialogOpen) return;
+
+      if (!mounted) return;
+      _humanHelpDialogOpen = true;
+
+      final title = (latestData['title'] ?? 'Message du MJ').toString().trim();
+      final body = (latestData['text'] ?? '').toString().trim();
+      final createdAt = (latestData['createdAt'] ?? '').toString().trim();
+
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) {
+          return AlertDialog(
+            title: Text(title.isEmpty ? 'Message du MJ' : title),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(body.isEmpty
+                    ? 'Le maître du jeu a répondu à votre demande.'
+                    : body),
+                if (createdAt.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    createdAt,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF6B7280),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            actions: [
+              FilledButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Compris'),
+              ),
+            ],
+          );
+        },
+      );
+
+      _humanHelpDialogOpen = false;
+      await prefs.setString(seenKey, latestDoc.id);
+    });
   }
 
   Future<void> _syncAssistanceToFirestore({
@@ -338,6 +432,28 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return missing;
+  }
+
+  String _hintLevelLabel(String hintLevel) {
+    switch (hintLevel.trim().toLowerCase()) {
+      case 'high':
+        return 'Fort';
+      case 'medium':
+        return 'Moyen';
+      default:
+        return 'Léger';
+    }
+  }
+
+  String _hintLevelToBlockage(String hintLevel) {
+    switch (hintLevel.trim().toLowerCase()) {
+      case 'high':
+        return 'high';
+      case 'medium':
+        return 'medium';
+      default:
+        return 'low';
+    }
   }
 
   String _buildContextualAiBody(PlaceNode? place) {
@@ -565,6 +681,69 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+
+  String _buildDefaultHelpQuestion(PlaceNode? place) {
+    if (place == null) {
+      return 'Nous sommes bloqués. Quelle piste devrions-nous analyser maintenant sans spoiler la solution ?';
+    }
+
+    return 'Nous sommes bloqués sur ${place.name}. Que devrions-nous vérifier ou recouper sans révélation directe ?';
+  }
+
+  String _buildHumanHelpStatusLine(bool humanHelpEnabled) {
+    return humanHelpEnabled
+        ? 'Le canal de supervision peut encore être sollicité si l’analyse automatique ne suffit pas.'
+        : 'Le canal de supervision est fermé. Aucune intervention humaine ne peut être sollicitée pour cette session.';
+  }
+
+  bool _canUnlockHumanRelay(GameSession? session) {
+    if (session == null) return false;
+    if (!session.humanHelpEnabled) return false;
+    return session.aiHelpCount >= 4;
+  }
+
+  int _remainingAnalysesBeforeHumanRelay(GameSession? session) {
+    if (session == null || !session.humanHelpEnabled) return 0;
+    final remaining = 4 - session.aiHelpCount;
+    return remaining > 0 ? remaining : 0;
+  }
+
+  String _buildHumanRelayGateText(GameSession? session) {
+    if (session == null) {
+      return 'Analyse en cours.';
+    }
+    if (!session.humanHelpEnabled) {
+      return 'Le canal humain reste verrouillé pour cette session.';
+    }
+    final remaining = _remainingAnalysesBeforeHumanRelay(session);
+    if (remaining <= 0) {
+      return 'Relais humain déverrouillé.';
+    }
+    if (remaining == 1) {
+      return 'Encore 1 analyse avant relais humain.';
+    }
+    return 'Encore $remaining analyses avant relais humain.';
+  }
+
+
+  String _buildImmersiveResultTitle({
+    required bool needsMj,
+    required bool humanHelpEnabled,
+    required bool remoteSyncFailed,
+  }) {
+    if (needsMj) {
+      return remoteSyncFailed
+          ? 'Transmission instable'
+          : 'Signal relayé';
+    }
+
+    if (!humanHelpEnabled) {
+      return 'Canal verrouillé';
+    }
+
+    return remoteSyncFailed ? 'Trace locale conservée' : 'Trace enregistrée';
+  }
+
   Future<void> _openSosFlow() async {
     if (_session == null) {
       if (!mounted) return;
@@ -577,6 +756,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     final helpPlace = _currentHelpPlace();
+    _sosQuestionController.text = _buildDefaultHelpQuestion(helpPlace);
 
     _SosStep step = _SosStep.intro;
     String resultTitle = '';
@@ -584,68 +764,230 @@ class _HomeScreenState extends State<HomeScreen> {
     bool resultNeedsMj = false;
     bool remoteSyncFailed = false;
     String? remoteSyncError;
+    bool aiLoading = false;
+    AiHelpResponse? aiResponse;
+    bool sosListening = false;
+    bool showTextFallback = false;
+    String heardPreview = '';
 
     await showGeneralDialog<void>(
       context: context,
       barrierDismissible: true,
       barrierLabel: 'Aide',
-      barrierColor: Colors.black.withOpacity(0.70),
+      barrierColor: Colors.black.withOpacity(0.76),
       transitionDuration: const Duration(milliseconds: 220),
       pageBuilder: (context, animation, secondaryAnimation) {
         return StatefulBuilder(
           builder: (context, setLocalState) {
+            Future<void> stopListening() async {
+              if (_sosSpeechToText.isListening) {
+                await _sosSpeechToText.stop();
+              }
+              if (mounted) {
+                setLocalState(() {
+                  sosListening = false;
+                });
+              }
+            }
+
+            Future<void> startListening() async {
+              final available = await _sosSpeechToText.initialize(
+                onStatus: (status) {
+                  if (!mounted) return;
+                  if (status == 'done' || status == 'notListening') {
+                    setLocalState(() {
+                      sosListening = false;
+                    });
+                  }
+                },
+                onError: (_) {
+                  if (!mounted) return;
+                  setLocalState(() {
+                    sosListening = false;
+                    showTextFallback = !showTextFallback;
+                  });
+                },
+              );
+
+              if (!available) {
+                if (!mounted) return;
+                setLocalState(() {
+                  sosListening = false;
+                  showTextFallback = true;
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'La saisie vocale est indisponible. Utilise le champ texte.',
+                    ),
+                  ),
+                );
+                return;
+              }
+
+              setLocalState(() {
+                heardPreview = '';
+                sosListening = true;
+              });
+
+              await _sosSpeechToText.listen(
+                localeId: 'fr_FR',
+                listenMode: stt.ListenMode.confirmation,
+                onResult: (result) async {
+                  if (!mounted) return;
+                  setLocalState(() {
+                    heardPreview = result.recognizedWords.trim();
+                    if (heardPreview.isNotEmpty) {
+                      _sosQuestionController.text = heardPreview;
+                    }
+                  });
+
+                  if (result.finalResult) {
+                    await _sosSpeechToText.stop();
+                    if (!mounted) return;
+                    setLocalState(() {
+                      sosListening = false;
+                      if (heardPreview.isEmpty || heardPreview.length < 8) {
+                        showTextFallback = true;
+                      }
+                    });
+                  }
+                },
+              );
+            }
+
+            Future<void> requestAiHelp() async {
+              final current = _session;
+              if (current == null) return;
+
+              final playerQuestion = _sosQuestionController.text.trim();
+              if (playerQuestion.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Décris d’abord précisément ton blocage.'),
+                  ),
+                );
+                setLocalState(() {
+                  showTextFallback = true;
+                });
+                return;
+              }
+
+              await stopListening();
+
+              setLocalState(() {
+                step = _SosStep.ai;
+                aiLoading = true;
+                aiResponse = null;
+              });
+
+              try {
+                final response = await _aiService.getStructuredHelp(
+                  sessionId: current.id,
+                  scenarioTitle: 'Les Fugitifs',
+                  progress: progress,
+                  aiHelpCount: current.aiHelpCount,
+                  currentBlockageLevel: current.currentBlockageLevel,
+                  humanHelpEnabled: current.humanHelpEnabled,
+                  visitedPlaces: _places
+                      .where((p) => p.isVisited)
+                      .map((p) => p.id)
+                      .toList(growable: false),
+                  blockedPrerequisites: helpPlace == null
+                      ? const <String>[]
+                      : _missingPrerequisites(helpPlace),
+                  place: helpPlace == null
+                      ? null
+                      : AiHelpPlaceContext(
+                          id: helpPlace.id,
+                          name: helpPlace.name,
+                          keywords: helpPlace.keywords,
+                          requiresAllVisited: helpPlace.requiresAllVisited,
+                          requiresAnyVisited: helpPlace.requiresAnyVisited,
+                          revealSuspect: helpPlace.revealSuspect,
+                          revealMotive: helpPlace.revealMotive,
+                          mediaCount: helpPlace.media.length,
+                        ),
+                  playerQuestion: playerQuestion,
+                );
+
+                final updated = GameSession(
+                  id: current.id,
+                  activationCode: current.activationCode,
+                  lockedScenarioId: current.lockedScenarioId,
+                  siteId: current.siteId,
+                  status: current.status,
+                  startedAt: current.startedAt,
+                  expiresAt: current.expiresAt,
+                  trueSuspectId: current.trueSuspectId,
+                  trueMotiveId: current.trueMotiveId,
+                  suspectByPlace: current.suspectByPlace,
+                  motiveByPlace: current.motiveByPlace,
+                  playerMarkedSuspectIds: current.playerMarkedSuspectIds,
+                  playerMarkedMotiveIds: current.playerMarkedMotiveIds,
+                  humanHelpEnabled: current.humanHelpEnabled,
+                  humanEscalationRequired: false,
+                  humanEscalationStatus: current.humanEscalationStatus,
+                  aiHelpCount: current.aiHelpCount + 1,
+                  currentBlockageLevel: _hintLevelToBlockage(response.hintLevel),
+                  lastHelpRequestAt: DateTime.now().toUtc().toIso8601String(),
+                );
+
+                setState(() {
+                  _session = updated;
+                });
+                await _saveProgress();
+
+                remoteSyncFailed = false;
+                remoteSyncError = null;
+                try {
+                  await _syncAssistanceToFirestore(
+                    session: updated,
+                    timelineType: 'player_ai_help_used',
+                    timelineLabel: helpPlace == null
+                        ? 'Aide IA générée (${_hintLevelLabel(response.hintLevel)})'
+                        : 'Aide IA générée sur ${helpPlace.name} (${_hintLevelLabel(response.hintLevel)})',
+                  );
+                } catch (e) {
+                  remoteSyncFailed = true;
+                  remoteSyncError = e.toString();
+                }
+
+                setLocalState(() {
+                  aiResponse = response;
+                  aiLoading = false;
+                });
+              } catch (e) {
+                final errorText = e.toString();
+                setLocalState(() {
+                  aiLoading = false;
+                  aiResponse = AiHelpResponse(
+                    message: 'L’assistance IA n’a pas pu être récupérée.',
+                    hintLevel: 'low',
+                    nextAction: errorText,
+                    confidence: 0.0,
+                    responseMode: 'reframe',
+                    shouldEscalate: false,
+                    reasonTag: 'unknown',
+                  );
+                  remoteSyncFailed = true;
+                  remoteSyncError = errorText;
+                });
+              }
+            }
+
             Future<void> finishAiHelp() async {
               final current = _session;
               if (current == null) return;
 
-              final updated = GameSession(
-                id: current.id,
-                activationCode: current.activationCode,
-                lockedScenarioId: current.lockedScenarioId,
-                siteId: current.siteId,
-                status: current.status,
-                startedAt: current.startedAt,
-                expiresAt: current.expiresAt,
-                trueSuspectId: current.trueSuspectId,
-                trueMotiveId: current.trueMotiveId,
-                suspectByPlace: current.suspectByPlace,
-                motiveByPlace: current.motiveByPlace,
-                playerMarkedSuspectIds: current.playerMarkedSuspectIds,
-                playerMarkedMotiveIds: current.playerMarkedMotiveIds,
+              resultTitle = _buildImmersiveResultTitle(
+                needsMj: false,
                 humanHelpEnabled: current.humanHelpEnabled,
-                humanEscalationRequired: false,
-                humanEscalationStatus: current.humanEscalationStatus,
-                aiHelpCount: current.aiHelpCount + 1,
-                currentBlockageLevel: 'low',
-                lastHelpRequestAt: DateTime.now().toUtc().toIso8601String(),
+                remoteSyncFailed: remoteSyncFailed,
               );
-
-              setState(() {
-                _session = updated;
-              });
-              await _saveProgress();
-
-              remoteSyncFailed = false;
-              remoteSyncError = null;
-              try {
-                await _syncAssistanceToFirestore(
-                  session: updated,
-                  timelineType: 'player_ai_help_used',
-                  timelineLabel: helpPlace == null
-                      ? 'Aide IA utilisée par le joueur'
-                      : 'Aide IA utilisée par le joueur sur ${helpPlace.name}',
-                );
-              } catch (e) {
-                remoteSyncFailed = true;
-                remoteSyncError = e.toString();
-              }
-
-              resultTitle = remoteSyncFailed
-                  ? 'Aide IA locale enregistrée'
-                  : 'Aide IA envoyée';
-              resultBody = remoteSyncFailed
-                  ? 'L’aide IA a été enregistrée localement, mais la synchronisation Firestore a échoué. Le joueur peut continuer, mais le MJ ne verra pas encore cet événement.'
-                  : 'L’assistant a pris en compte le blocage et a proposé un recentrage lié au contexte actuel du joueur. La tentative a aussi été synchronisée dans Firestore.';
+              resultBody = aiResponse?.message.isNotEmpty == true
+                  ? aiResponse!.message
+                  : 'Le système a intégré une aide contextuelle au dossier.';
               resultNeedsMj = false;
 
               setLocalState(() {
@@ -656,6 +998,16 @@ class _HomeScreenState extends State<HomeScreen> {
             Future<void> escalateAfterAiFailure() async {
               final current = _session;
               if (current == null) return;
+
+              if (!_canUnlockHumanRelay(current)) {
+                if (!mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(_buildHumanRelayGateText(current)),
+                  ),
+                );
+                return;
+              }
 
               final nowIso = DateTime.now().toUtc().toIso8601String();
 
@@ -681,7 +1033,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   humanHelpEnabled: current.humanHelpEnabled,
                   humanEscalationRequired: true,
                   humanEscalationStatus: 'pending',
-                  aiHelpCount: current.aiHelpCount + 1,
+                  aiHelpCount: current.aiHelpCount,
                   currentBlockageLevel: 'medium',
                   lastHelpRequestAt: nowIso,
                 );
@@ -708,7 +1060,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   humanHelpEnabled: current.humanHelpEnabled,
                   humanEscalationRequired: false,
                   humanEscalationStatus: '',
-                  aiHelpCount: current.aiHelpCount + 1,
+                  aiHelpCount: current.aiHelpCount,
                   currentBlockageLevel: 'medium',
                   lastHelpRequestAt: nowIso,
                 );
@@ -738,19 +1090,23 @@ class _HomeScreenState extends State<HomeScreen> {
               }
 
               if (updated.humanHelpEnabled) {
-                resultTitle = remoteSyncFailed
-                    ? 'Escalade locale préparée'
-                    : 'Demande transmise au MJ';
+                resultTitle = _buildImmersiveResultTitle(
+                  needsMj: true,
+                  humanHelpEnabled: updated.humanHelpEnabled,
+                  remoteSyncFailed: remoteSyncFailed,
+                );
                 resultBody = remoteSyncFailed
-                    ? 'L’escalade a bien été préparée dans la session locale, mais l’écriture Firestore a échoué. Le MJ ne verra pas encore la demande tant que la synchronisation distante ne passera pas.'
-                    : 'L’IA n’a pas suffi. Comme l’aide humaine est autorisée dans cette session, la demande a été synchronisée vers gameSessions et doit maintenant être visible côté MJ.';
+                    ? 'L’escalade a bien été préparée dans la session locale, mais l’écriture Firestore a échoué. Le maître du jeu ne verra pas encore la demande tant que la synchronisation distante ne passera pas.'
+                    : 'L’analyse automatique n’a pas suffi. Le signal a été transmis au maître du jeu.';
               } else {
-                resultTitle = remoteSyncFailed
-                    ? 'Aide humaine indisponible'
-                    : 'Aide humaine indisponible';
+                resultTitle = _buildImmersiveResultTitle(
+                  needsMj: false,
+                  humanHelpEnabled: updated.humanHelpEnabled,
+                  remoteSyncFailed: remoteSyncFailed,
+                );
                 resultBody = remoteSyncFailed
-                    ? 'L’IA n’a pas suffi, l’aide humaine est désactivée, et la synchronisation Firestore a également échoué. La tentative reste enregistrée localement.'
-                    : 'L’IA n’a pas suffi, mais l’aide humaine n’est pas autorisée dans cette session. La tentative a tout de même été synchronisée pour garder une trace côté MJ.';
+                    ? 'L’analyse automatique n’a pas suffi, le canal humain est fermé, et la synchronisation Firestore a également échoué. La tentative reste enregistrée localement.'
+                    : 'L’analyse automatique n’a pas suffi, et aucun relais humain ne peut être sollicité pour cette session.';
               }
 
               setLocalState(() {
@@ -759,15 +1115,17 @@ class _HomeScreenState extends State<HomeScreen> {
             }
 
             final size = MediaQuery.of(context).size;
-            final maxDialogHeight = size.height * 0.84;
+            final maxDialogHeight = size.height * 0.81;
+            final canUseHumanRelay = _canUnlockHumanRelay(_session);
+            final humanRelayGateText = _buildHumanRelayGateText(_session);
 
             return SafeArea(
               child: Center(
                 child: Padding(
-                  padding: const EdgeInsets.all(20),
+                  padding: const EdgeInsets.all(18),
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
-                      maxWidth: 760,
+                      maxWidth: 520,
                       maxHeight: maxDialogHeight,
                     ),
                     child: Material(
@@ -779,13 +1137,13 @@ class _HomeScreenState extends State<HomeScreen> {
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
                             colors: [
-                              Color(0xFF101A2A),
-                              Color(0xFF0A1220),
+                              Color(0xFF0C1017),
+                              Color(0xFF080B11),
                             ],
                           ),
                           border: Border.all(
-                            color: const Color(0xFF28405D),
-                            width: 1.2,
+                            color: const Color(0xFF233247),
+                            width: 1.1,
                           ),
                           boxShadow: const [
                             BoxShadow(
@@ -796,243 +1154,286 @@ class _HomeScreenState extends State<HomeScreen> {
                           ],
                         ),
                         child: Padding(
-                          padding: const EdgeInsets.fromLTRB(26, 24, 26, 22),
-                          child: SingleChildScrollView(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      width: 46,
-                                      height: 46,
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFD65A00).withOpacity(0.15),
-                                        borderRadius: BorderRadius.circular(14),
-                                        border: Border.all(
-                                          color: const Color(0xFFD65A00).withOpacity(0.55),
+                          padding: const EdgeInsets.fromLTRB(16, 11, 16, 11),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 40,
+                                    height: 40,
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFD65A00).withOpacity(0.12),
+                                      borderRadius: BorderRadius.circular(14),
+                                      border: Border.all(
+                                        color: const Color(0xFFD65A00).withOpacity(0.35),
+                                      ),
+                                    ),
+                                    child: const Icon(
+                                      Icons.graphic_eq,
+                                      color: Color(0xFFFFD7B8),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        const Text(
+                                          'Ligne d’urgence',
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 22,
+                                            fontWeight: FontWeight.w800,
+                                          ),
                                         ),
-                                      ),
-                                      child: const Icon(
-                                        Icons.sticky_note_2_outlined,
-                                        color: Color(0xFFFFD7B8),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 14),
-                                    const Expanded(
-                                      child: Text(
-                                        'Post-it Help',
-                                        style: TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 26,
-                                          fontWeight: FontWeight.w900,
+                                        Text(
+                                          _session!.humanHelpEnabled
+                                              ? 'Canal de supervision ouvert'
+                                              : 'Canal de supervision fermé',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: Color(0xFF93A2B7),
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w600,
+                                          ),
                                         ),
-                                      ),
+                                      ],
                                     ),
-                                    IconButton(
-                                      onPressed: () => Navigator.of(context).pop(),
-                                      icon: const Icon(
-                                        Icons.close,
-                                        color: Color(0xFFD6E2F2),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 10),
-                                Text(
-                                  'Session ${_session!.id} · aide humaine ${_session!.humanHelpEnabled ? 'autorisée' : 'désactivée'} · aides IA ${_session!.aiHelpCount}',
-                                  style: const TextStyle(
-                                    color: Color(0xFF93A2B7),
-                                    height: 1.5,
                                   ),
-                                ),
-                                const SizedBox(height: 22),
-                                Wrap(
-                                  spacing: 10,
-                                  runSpacing: 10,
-                                  children: [
-                                    _HelpStepChip(
-                                      label: '1. Demande',
-                                      active: step == _SosStep.intro,
-                                      done: step.index > _SosStep.intro.index,
+                                  IconButton(
+                                    onPressed: () async {
+                                      await stopListening();
+                                      if (context.mounted) {
+                                        Navigator.of(context).pop();
+                                      }
+                                    },
+                                    icon: const Icon(
+                                      Icons.close,
+                                      color: Color(0xFFD6E2F2),
                                     ),
-                                    _HelpStepChip(
-                                      label: '2. IA',
-                                      active: step == _SosStep.ai,
-                                      done: step.index > _SosStep.ai.index,
-                                    ),
-                                    _HelpStepChip(
-                                      label: '3. Décision',
-                                      active: step == _SosStep.escalation,
-                                      done: step.index > _SosStep.escalation.index,
-                                    ),
-                                    _HelpStepChip(
-                                      label: '4. Résultat',
-                                      active: step == _SosStep.result,
-                                      done: false,
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 20),
-                                if (step == _SosStep.intro)
-                                  _HelpPanel(
-                                    title: 'Besoin d’un coup de pouce',
-                                    icon: Icons.help_outline,
-                                    body: _buildContextualAiBody(helpPlace),
-                                    bullets: _buildContextualAiBullets(helpPlace),
-                                    footer:
-                                        'Le lieu actuellement ciblé par le joueur sert maintenant de contexte pour produire une aide plus fine et pour documenter la demande côté MJ.',
                                   ),
-                                if (step == _SosStep.ai)
-                                  _HelpPanel(
-                                    title: 'Aide IA contextuelle',
-                                    icon: Icons.memory_outlined,
-                                    body: helpPlace == null
-                                        ? 'Aucun lieu n’est ciblé. L’assistant reste prudent et propose un recentrage général sur la carte, les archives ou les lieux déjà débloqués.'
-                                        : 'L’assistant se base sur ${helpPlace.id} - ${helpPlace.name}, ses mots-clés, ses prérequis et la progression du joueur pour proposer un recentrage moins générique.',
-                                    bullets: [
-                                      if (helpPlace != null)
-                                        'Lieu ciblé : ${helpPlace.id} - ${helpPlace.name}',
-                                      if (helpPlace != null && helpPlace.keywords.isNotEmpty)
-                                        'Mots-clés : ${helpPlace.keywords.take(4).join(", ")}',
-                                      'Une tentative supplémentaire augmente le compteur d’aide IA.',
-                                      'Si cela ne suffit pas, on passera à la décision humaine.',
-                                    ],
-                                    footer:
-                                        'Cette étape synchronise maintenant aussi l’événement dans Firestore pour que le MJ puisse suivre la suite.',
-                                  ),
-                                if (step == _SosStep.escalation)
-                                  _HelpPanel(
-                                    title: 'Décision d’escalade',
-                                    icon: Icons.support_agent_outlined,
-                                    body: _session!.humanHelpEnabled
-                                        ? 'L’aide humaine est autorisée dans cette session. Si l’IA ne suffit pas, la demande sera marquée en attente pour le MJ.'
-                                        : 'L’aide humaine est désactivée dans cette session. Si l’IA ne suffit pas, le joueur restera sur une information locale sans escalade MJ.',
-                                    bullets: [
-                                      'Aide humaine autorisée : ${_session!.humanHelpEnabled ? 'oui' : 'non'}',
-                                      'Compteur IA actuel : ${_session!.aiHelpCount}',
-                                      'Blocage actuel : ${_session!.currentBlockageLevel.isEmpty ? 'aucun' : _session!.currentBlockageLevel}',
-                                    ],
-                                    footer:
-                                        'Cette étape écrit désormais les champs attendus dans gameSessions afin que le bureau MJ voie la demande.',
-                                  ),
-                                if (step == _SosStep.result)
-                                  _HelpPanel(
-                                    title: resultTitle,
-                                    icon: resultNeedsMj
-                                        ? Icons.flag_outlined
-                                        : Icons.mark_chat_read_outlined,
-                                    body: resultBody,
-                                    bullets: [
-                                      'Aides IA enregistrées : ${_session!.aiHelpCount}',
-                                      'Escalade requise : ${_session!.humanEscalationRequired ? 'oui' : 'non'}',
-                                      'Statut d’escalade : ${_session!.humanEscalationStatus.isEmpty ? 'aucun' : _session!.humanEscalationStatus}',
-                                      if (remoteSyncFailed)
-                                        'Synchronisation distante : échec',
-                                      if (!remoteSyncFailed)
-                                        'Synchronisation distante : réussie',
-                                    ],
-                                    footer: remoteSyncFailed && remoteSyncError != null
-                                        ? 'Détail technique : $remoteSyncError'
-                                        : 'La session locale et la session Firestore sont maintenant alignées sur le flux d’aide.',
-                                  ),
-                                const SizedBox(height: 18),
-                                if (step == _SosStep.intro)
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: OutlinedButton(
-                                          onPressed: () => Navigator.of(context).pop(),
-                                          child: const Text('Fermer'),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        flex: 2,
-                                        child: FilledButton.icon(
-                                          onPressed: () {
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              Expanded(
+                                child: AnimatedSwitcher(
+                                  duration: const Duration(milliseconds: 180),
+                                  child: step == _SosStep.intro
+                                      ? _HelpComposerPanel(
+                                          key: const ValueKey('intro'),
+                                          place: helpPlace,
+                                          controller: _sosQuestionController,
+                                          contextBody: _buildContextualAiBody(helpPlace),
+                                          bullets: _buildContextualAiBullets(helpPlace),
+                                          isListening: sosListening,
+                                          heardPreview: heardPreview,
+                                          showTextFallback: showTextFallback,
+                                          onStartListening: startListening,
+                                          onStopListening: stopListening,
+                                          onShowTextFallback: () {
                                             setLocalState(() {
-                                              step = _SosStep.ai;
+                                              showTextFallback = !showTextFallback;
                                             });
                                           },
-                                          icon: const Icon(Icons.psychology_alt_outlined),
-                                          label: const Text('Demander une aide IA'),
+                                        )
+                                      : step == _SosStep.ai
+                                          ? (aiLoading
+                                              ? const _HelpLoadingPanel(key: ValueKey('loading'))
+                                              : _HelpPanel(
+                                                  key: const ValueKey('ai'),
+                                                  title: 'Retour de la Grid',
+                                                  icon: Icons.psychology_alt_outlined,
+                                                  body: aiResponse?.message ??
+                                                      'La Grid prépare son retour contextuel.',
+                                                  bullets: [
+                                                    if ((aiResponse?.nextAction ?? '').trim().isNotEmpty)
+                                                      aiResponse!.nextAction,
+                                                    'Indice ${_hintLevelLabel(aiResponse?.hintLevel ?? 'low')} · ${((aiResponse?.confidence ?? 0) * 100).round()}%',
+                                                    humanRelayGateText,
+                                                    'Sync distante : ${remoteSyncFailed ? 'incomplète' : 'ok'}',
+                                                  ],
+                                                  footer: remoteSyncFailed && remoteSyncError != null
+                                                      ? remoteSyncError!
+                                                      : 'Le signal a été intégré au contexte de session.',
+                                                ))
+                                          : step == _SosStep.escalation
+                                              ? _HelpPanel(
+                                                  key: const ValueKey('escalation'),
+                                                  title: 'Relais de la Grid',
+                                                  icon: Icons.support_agent_outlined,
+                                                  body: _session!.humanHelpEnabled
+                                                      ? 'La Grid n’a pas suffi. Un relais peut être préparé vers la supervision humaine.'
+                                                      : 'La Grid n’a pas suffi, mais le canal humain est verrouillé pour cette session. Seule une trace locale peut être conservée.',
+                                                  bullets: [
+                                                    if (helpPlace != null) 'Zone : ${helpPlace.name}',
+                                                    'Relais humain : ${_session!.humanHelpEnabled ? 'oui' : 'non'}',
+                                                    'Signal prêt à transmettre',
+                                                  ],
+                                                  footer:
+                                                      'Le relais prépare la transmission si la supervision est autorisée.',
+                                                )
+                                              : _HelpPanel(
+                                                  key: const ValueKey('result'),
+                                                  title: resultTitle,
+                                                  icon: resultNeedsMj
+                                                      ? Icons.flag_outlined
+                                                      : Icons.mark_chat_read_outlined,
+                                                  body: resultBody,
+                                                  bullets: [
+                                                    'Aides IA : ${_session!.aiHelpCount}',
+                                                    'Relais humain : ${_session!.humanEscalationRequired ? 'oui' : 'non'}',
+                                                    'Sync distante : ${remoteSyncFailed ? 'échec' : 'ok'}',
+                                                  ],
+                                                  footer: remoteSyncFailed && remoteSyncError != null
+                                                      ? remoteSyncError!
+                                                      : 'Le flux d’aide a été enregistré.',
+                                                ),
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              if (step == _SosStep.intro)
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: OutlinedButton(
+                                        onPressed: () async {
+                                          await stopListening();
+                                          if (context.mounted) {
+                                            Navigator.of(context).pop();
+                                          }
+                                        },
+                                        child: const Text('Fermer'),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      flex: 2,
+                                      child: FilledButton.icon(
+                                        onPressed: requestAiHelp,
+                                        icon: const Icon(Icons.psychology_alt_outlined),
+                                        label: const Text('Analyser'),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              if (step == _SosStep.ai)
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: OutlinedButton.icon(
+                                        onPressed: aiLoading
+                                            ? null
+                                            : () async {
+                                                await stopListening();
+                                                if (context.mounted) {
+                                                  Navigator.of(context).pop();
+                                                }
+                                              },
+                                        icon: const Icon(Icons.arrow_back),
+                                        label: const Text('Retour au bureau'),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: FilledButton.icon(
+                                        onPressed: aiLoading
+                                            ? null
+                                            : () {
+                                                setLocalState(() {
+                                                  if (canUseHumanRelay) {
+                                                    step = _SosStep.escalation;
+                                                  } else {
+                                                    step = _SosStep.intro;
+                                                    aiResponse = null;
+                                                    aiLoading = false;
+                                                    heardPreview = '';
+                                                    showTextFallback = true;
+                                                    _sosQuestionController.selection =
+                                                        TextSelection.fromPosition(
+                                                      TextPosition(
+                                                        offset: _sosQuestionController.text.length,
+                                                      ),
+                                                    );
+                                                  }
+                                                });
+                                              },
+                                        icon: Icon(
+                                          canUseHumanRelay
+                                              ? Icons.support_agent_outlined
+                                              : Icons.psychology_alt_outlined,
+                                        ),
+                                        label: Text(
+                                          canUseHumanRelay
+                                              ? 'Aide humaine'
+                                              : 'Approfondir',
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                if (step == _SosStep.ai)
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                                    children: [
-                                      FilledButton.icon(
-                                        onPressed: finishAiHelp,
-                                        icon: const Icon(Icons.check_circle_outline),
-                                        label: const Text('Cette aide IA me suffit'),
-                                      ),
-                                      const SizedBox(height: 10),
-                                      OutlinedButton.icon(
-                                        onPressed: () {
-                                          setLocalState(() {
-                                            step = _SosStep.escalation;
-                                          });
-                                        },
-                                        icon: const Icon(Icons.support_agent_outlined),
-                                        label: const Text('L’IA ne m’aide pas'),
-                                      ),
-                                    ],
-                                  ),
-                                if (step == _SosStep.escalation)
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                                    children: [
-                                      FilledButton.icon(
+                                    ),
+                                  ],
+                                ),
+                              if (step == _SosStep.escalation)
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: FilledButton.icon(
                                         onPressed: escalateAfterAiFailure,
                                         icon: const Icon(Icons.flag_outlined),
                                         label: Text(
                                           _session!.humanHelpEnabled
-                                              ? 'Escalader vers le MJ'
-                                              : 'Constater l’échec sans aide humaine',
+                                              ? 'Transmettre'
+                                              : 'Archiver',
                                         ),
                                       ),
-                                      const SizedBox(height: 10),
-                                      OutlinedButton.icon(
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: OutlinedButton.icon(
                                         onPressed: () {
                                           setLocalState(() {
                                             step = _SosStep.ai;
                                           });
                                         },
                                         icon: const Icon(Icons.arrow_back),
-                                        label: const Text('Retour à l’étape IA'),
+                                        label: const Text('Retour'),
                                       ),
-                                    ],
-                                  ),
-                                if (step == _SosStep.result)
-                                  Row(
-                                    children: [
-                                      Expanded(
-                                        child: OutlinedButton.icon(
-                                          onPressed: () {
-                                            setLocalState(() {
-                                              step = _SosStep.intro;
-                                            });
-                                          },
-                                          icon: const Icon(Icons.replay),
-                                          label: const Text('Rejouer le flux'),
-                                        ),
+                                    ),
+                                  ],
+                                ),
+                              if (step == _SosStep.result)
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: OutlinedButton.icon(
+                                        onPressed: () {
+                                          setLocalState(() {
+                                            step = _SosStep.intro;
+                                            aiResponse = null;
+                                            aiLoading = false;
+                                            heardPreview = '';
+                                            showTextFallback = false;
+                                            _sosQuestionController.text =
+                                                _buildDefaultHelpQuestion(helpPlace);
+                                          });
+                                        },
+                                        icon: const Icon(Icons.replay),
+                                        label: const Text('Recommencer'),
                                       ),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: FilledButton(
-                                          onPressed: () => Navigator.of(context).pop(),
-                                          child: const Text('Retour au bureau'),
-                                        ),
+                                    ),
+                                    const SizedBox(width: 10),
+                                    Expanded(
+                                      child: FilledButton(
+                                        onPressed: () => Navigator.of(context).pop(),
+                                        child: const Text('Retour'),
                                       ),
-                                    ],
-                                  ),
-                              ],
-                            ),
+                                    ),
+                                  ],
+                                ),
+                            ],
                           ),
                         ),
                       ),
@@ -1060,17 +1461,11 @@ class _HomeScreenState extends State<HomeScreen> {
       },
     );
 
+    if (_sosSpeechToText.isListening) {
+      await _sosSpeechToText.stop();
+    }
+
     if (!mounted) return;
-
-    final summary = _session == null
-        ? 'Aucune session active.'
-        : _session!.humanEscalationRequired
-            ? 'Demande d’aide synchronisée pour le MJ.'
-            : 'Session locale et Firestore mises à jour.';
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(summary)),
-    );
   }
 
   @override
@@ -1144,6 +1539,202 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
+
+class _HelpComposerPanel extends StatelessWidget {
+  final PlaceNode? place;
+  final TextEditingController controller;
+  final String contextBody;
+  final List<String> bullets;
+  final bool isListening;
+  final String heardPreview;
+  final bool showTextFallback;
+  final VoidCallback onStartListening;
+  final VoidCallback onStopListening;
+  final VoidCallback onShowTextFallback;
+
+  const _HelpComposerPanel({
+    super.key,
+    required this.place,
+    required this.controller,
+    required this.contextBody,
+    required this.bullets,
+    required this.isListening,
+    required this.heardPreview,
+    required this.showTextFallback,
+    required this.onStartListening,
+    required this.onStopListening,
+    required this.onShowTextFallback,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final subtitle = isListening ? 'Écoute en cours' : 'Signal vocal';
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxHeight < 280;
+        final ultraCompact = constraints.maxHeight < 235;
+        final panelPadding = ultraCompact ? 8.0 : (compact ? 10.0 : 12.0);
+        final micSize = ultraCompact
+            ? (showTextFallback ? 58.0 : 64.0)
+            : compact
+                ? (showTextFallback ? 64.0 : 72.0)
+                : 82.0;
+        final micIconSize = ultraCompact ? 26.0 : (compact ? 30.0 : 34.0);
+        final titleFontSize = ultraCompact ? 11.0 : (compact ? 12.0 : 13.0);
+        final previewFontSize = ultraCompact ? 12.0 : (compact ? 13.0 : 14.0);
+        final inputFontSize = ultraCompact ? 11.5 : (compact ? 12.0 : 13.0);
+        final gapSmall = ultraCompact ? 1.0 : (compact ? 2.0 : 4.0);
+        final gapMedium = ultraCompact ? 6.0 : (compact ? 8.0 : 10.0);
+        final gapInput = ultraCompact ? 3.0 : (compact ? 4.0 : 6.0);
+
+        return Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(panelPadding),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0D131D),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: const Color(0xFF223247)),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.max,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                subtitle,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: const Color(0xFFB9C7D8),
+                  fontSize: titleFontSize,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              SizedBox(height: gapMedium),
+              Center(
+                child: GestureDetector(
+                  onTap: isListening ? onStopListening : onStartListening,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    width: micSize,
+                    height: micSize,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isListening
+                          ? const Color(0xFFA83F00)
+                          : const Color(0xFFD65A00),
+                      boxShadow: [
+                        BoxShadow(
+                          color: (isListening
+                                  ? const Color(0xFFA83F00)
+                                  : const Color(0xFFD65A00))
+                              .withOpacity(0.24),
+                          blurRadius: ultraCompact ? 10 : (compact ? 14 : 18),
+                          spreadRadius: ultraCompact ? 0 : 1,
+                        ),
+                      ],
+                    ),
+                    child: Icon(
+                      isListening ? Icons.stop_rounded : Icons.mic_rounded,
+                      color: Colors.white,
+                      size: micIconSize,
+                    ),
+                  ),
+                ),
+              ),
+              SizedBox(height: gapMedium),
+              Text(
+                heardPreview.isNotEmpty
+                    ? heardPreview
+                    : (isListening ? 'Parle maintenant…' : 'Appuie pour parler'),
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: heardPreview.isNotEmpty
+                      ? Colors.white
+                      : const Color(0xFF93A2B7),
+                  height: 1.1,
+                  fontSize: previewFontSize,
+                  fontWeight:
+                      heardPreview.isNotEmpty ? FontWeight.w600 : FontWeight.w500,
+                ),
+              ),
+              SizedBox(height: gapSmall),
+              Align(
+                alignment: Alignment.center,
+                child: TextButton(
+                  onPressed: onShowTextFallback,
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: ultraCompact ? 0 : 1,
+                    ),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    visualDensity:
+                        const VisualDensity(horizontal: -4, vertical: -4),
+                  ),
+                  child: Text(
+                    showTextFallback ? 'Masquer' : 'Écrire',
+                    style: TextStyle(fontSize: ultraCompact ? 12 : 13),
+                  ),
+                ),
+              ),
+              if (showTextFallback) ...[
+                SizedBox(height: gapInput),
+                TextField(
+                  controller: controller,
+                  minLines: 1,
+                  maxLines: 1,
+                  style: TextStyle(
+                    color: Colors.white,
+                    height: 1.1,
+                    fontSize: inputFontSize,
+                  ),
+                  decoration: InputDecoration(
+                    isDense: true,
+                    hintText: 'Décris le blocage.',
+                    hintStyle: const TextStyle(
+                      color: Color(0xFF7E8CA3),
+                    ),
+                    filled: true,
+                    fillColor: const Color(0xFF121A28),
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: ultraCompact ? 6 : (compact ? 7 : 8),
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Color(0xFF2B4566),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Color(0xFF2B4566),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: Color(0xFFD65A00),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _HelpPanel extends StatelessWidget {
   final String title;
   final IconData icon;
@@ -1152,6 +1743,7 @@ class _HelpPanel extends StatelessWidget {
   final String footer;
 
   const _HelpPanel({
+    super.key,
     required this.title,
     required this.icon,
     required this.body,
@@ -1161,97 +1753,205 @@ class _HelpPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: const Color(0xFF0F1726),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: const Color(0xFF24364F)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final ultraCompact = constraints.maxHeight < 300;
+        final compact = constraints.maxHeight < 340;
+        final panelPadding = ultraCompact ? 10.0 : (compact ? 12.0 : 14.0);
+        final titleSize = ultraCompact ? 14.5 : (compact ? 16.0 : 17.0);
+        final bodySize = ultraCompact ? 12.5 : (compact ? 13.5 : 14.5);
+        final iconSize = ultraCompact ? 18.0 : 20.0;
+
+        return Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(panelPadding),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F1726),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: const Color(0xFF24364F)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, color: const Color(0xFFFFD7B8)),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Text(
-            body,
-            style: const TextStyle(
-              color: Color(0xFFD6E2F2),
-              height: 1.5,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 14),
-          ...bullets.map(
-            (bullet) => Padding(
-              padding: const EdgeInsets.only(bottom: 9),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              Row(
                 children: [
-                  const Padding(
-                    padding: EdgeInsets.only(top: 3),
-                    child: Icon(
-                      Icons.arrow_right_alt,
-                      color: Color(0xFFD65A00),
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
+                  Icon(icon, color: const Color(0xFFFFD7B8), size: iconSize),
+                  SizedBox(width: ultraCompact ? 8 : 10),
                   Expanded(
                     child: Text(
-                      bullet,
-                      style: const TextStyle(
-                        color: Color(0xFFB9C7D8),
-                        height: 1.45,
-                        fontWeight: FontWeight.w600,
+                      title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: titleSize,
+                        fontWeight: FontWeight.w900,
+                        height: 1.05,
                       ),
                     ),
                   ),
                 ],
               ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF121E31),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFF2B4566)),
-            ),
-            child: Text(
-              footer,
-              style: const TextStyle(
-                color: Color(0xFFAED0FF),
-                height: 1.45,
-                fontWeight: FontWeight.w600,
+              SizedBox(height: ultraCompact ? 4 : 6),
+              Expanded(
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        body,
+                        style: TextStyle(
+                          color: const Color(0xFFD6E2F2),
+                          height: 1.25,
+                          fontWeight: FontWeight.w500,
+                          fontSize: bodySize,
+                        ),
+                      ),
+                      if (bullets.isNotEmpty) ...[
+                        SizedBox(height: ultraCompact ? 6 : 8),
+                        ...bullets.map(
+                          (bullet) => Padding(
+                            padding: EdgeInsets.only(bottom: ultraCompact ? 6 : 8),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 1),
+                                  child: Icon(
+                                    Icons.arrow_right_alt,
+                                    color: const Color(0xFFD65A00),
+                                    size: ultraCompact ? 16 : 18,
+                                  ),
+                                ),
+                                SizedBox(width: ultraCompact ? 3 : 4),
+                                Expanded(
+                                  child: Text(
+                                    bullet,
+                                    style: TextStyle(
+                                      color: const Color(0xFFB9C7D8),
+                                      height: 1.25,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: ultraCompact ? 12 : 13,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                      SizedBox(height: ultraCompact ? 4 : 6),
+                      Container(
+                        width: double.infinity,
+                        padding: EdgeInsets.all(ultraCompact ? 6 : 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF121E31),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFF2B4566)),
+                        ),
+                        child: Text(
+                          footer,
+                          style: TextStyle(
+                            color: const Color(0xFFAED0FF),
+                            height: 1.25,
+                            fontWeight: FontWeight.w600,
+                            fontSize: ultraCompact ? 10.5 : 11.5,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                  ),
+                ),
               ),
-            ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
+    );
+  }
+}
+
+class _HelpLoadingPanel extends StatelessWidget {
+  const _HelpLoadingPanel({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final ultraCompact = constraints.maxHeight < 300;
+        final compact = constraints.maxHeight < 340;
+
+        return Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(ultraCompact ? 10 : (compact ? 12 : 16)),
+          decoration: BoxDecoration(
+            color: const Color(0xFF0F1726),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: const Color(0xFF24364F)),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  SizedBox(
+                    width: ultraCompact ? 18 : 20,
+                    height: ultraCompact ? 18 : 20,
+                    child: const CircularProgressIndicator(strokeWidth: 2.3),
+                  ),
+                  SizedBox(width: ultraCompact ? 8 : 10),
+                  Expanded(
+                    child: Text(
+                      'Interrogation de la Grid',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: ultraCompact ? 14.5 : (compact ? 16 : 17),
+                        fontWeight: FontWeight.w900,
+                        height: 1.05,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: ultraCompact ? 4 : 6),
+              Text(
+                'La Grid recoupe votre signal avec la zone active, la progression et les accès encore ouverts.',
+                maxLines: ultraCompact ? 2 : 3,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: const Color(0xFFD6E2F2),
+                  height: 1.2,
+                  fontWeight: FontWeight.w500,
+                  fontSize: ultraCompact ? 12.5 : 13.5,
+                ),
+              ),
+              SizedBox(height: ultraCompact ? 4 : 6),
+              Text(
+                'Décodage Grid…',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: const Color(0xFFAED0FF),
+                  height: 1.2,
+                  fontWeight: FontWeight.w600,
+                  fontSize: ultraCompact ? 12.5 : 13.5,
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
 
 class _HelpStepChip extends StatelessWidget {
+
   final String label;
   final bool active;
   final bool done;

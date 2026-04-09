@@ -5,6 +5,7 @@ class PlaceNode {
   final String name;
   final double lat;
   final double lng;
+  final String type;
   final List<String> keywords;
   final List<String> media;
   final List<String> requiresAllVisited;
@@ -20,6 +21,7 @@ class PlaceNode {
     required this.name,
     required this.lat,
     required this.lng,
+    this.type = 'observation',
     required this.keywords,
     required this.media,
     required this.requiresAllVisited,
@@ -31,17 +33,21 @@ class PlaceNode {
   });
 
   factory PlaceNode.fromJson(Map<String, dynamic> json) {
+    final media = (json['media'] as List<dynamic>)
+        .map((e) => e.toString())
+        .toList();
+    final keywords = (json['keywords'] as List<dynamic>)
+        .map((e) => e.toString())
+        .toList();
+
     return PlaceNode(
       id: json['id'] as String,
       name: json['name'] as String,
       lat: (json['lat'] as num).toDouble(),
       lng: (json['lng'] as num).toDouble(),
-      keywords: (json['keywords'] as List<dynamic>)
-          .map((e) => e.toString())
-          .toList(),
-      media: (json['media'] as List<dynamic>)
-          .map((e) => e.toString())
-          .toList(),
+      type: _normalizePlaceType((json['type'] ?? '').toString(), media: media, keywords: keywords),
+      keywords: keywords,
+      media: media,
       requiresAllVisited: (json['requiresAllVisited'] as List<dynamic>)
           .map((e) => e.toString())
           .toList(),
@@ -65,14 +71,17 @@ class PlaceNode {
     final anyVisited = _readStringList(
       template['requiresAnyVisited'] ?? template['requiresPlacesVisitedAny'],
     );
+    final keywords = _readStringList(template['keywords']);
+    final media = _readMedia(template);
 
     return PlaceNode(
       id: id,
       name: (template['title'] ?? template['name'] ?? id).toString().trim(),
       lat: _readDouble(sitePlace['lat']),
       lng: _readDouble(sitePlace['lng']),
-      keywords: _readStringList(template['keywords']),
-      media: _readMedia(template),
+      type: _inferRuntimeType(template, keywords: keywords, media: media),
+      keywords: keywords,
+      media: media,
       requiresAllVisited: allVisited,
       requiresAnyVisited: anyVisited,
       revealSuspect: _revealsCategory(template, 'suspect'),
@@ -153,6 +162,57 @@ class PlaceNode {
   static double _readDouble(dynamic raw) {
     if (raw is num) return raw.toDouble();
     return double.tryParse(raw?.toString().replaceAll(',', '.') ?? '') ?? 0;
+  }
+
+  static String _inferRuntimeType(
+    Map<String, dynamic> template, {
+    required List<String> keywords,
+    required List<String> media,
+  }) {
+    final explicitType = (template['type'] ?? template['placeType'] ?? template['nodeType'] ?? '')
+        .toString()
+        .trim();
+
+    return _normalizePlaceType(explicitType, media: media, keywords: keywords);
+  }
+
+  static String _normalizePlaceType(
+    String raw, {
+    required List<String> media,
+    required List<String> keywords,
+  }) {
+    final value = raw.trim().toLowerCase();
+    if (value == 'media' || value == 'observation' || value == 'physical') {
+      return value;
+    }
+
+    if (media.isNotEmpty) {
+      return 'media';
+    }
+
+    final joinedKeywords = keywords.map((e) => e.toLowerCase()).join(' ');
+
+    if (
+        joinedKeywords.contains('observer') ||
+        joinedKeywords.contains('observation') ||
+        joinedKeywords.contains('regarder') ||
+        joinedKeywords.contains('trace') ||
+        joinedKeywords.contains('indice') ||
+        joinedKeywords.contains('détail') ||
+        joinedKeywords.contains('detail')) {
+      return 'observation';
+    }
+
+    if (
+        joinedKeywords.contains('action') ||
+        joinedKeywords.contains('tester') ||
+        joinedKeywords.contains('manip') ||
+        joinedKeywords.contains('activer') ||
+        joinedKeywords.contains('ouvrir')) {
+      return 'physical';
+    }
+
+    return 'observation';
   }
 
   LatLng get latLng => LatLng(lat, lng);

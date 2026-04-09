@@ -45,7 +45,9 @@ class SessionService {
   }
 
   static bool _isAllowedStatus(String status) {
-    return status == 'active' || status == 'started';
+    return status == 'active' ||
+         status == 'started' ||
+         status == 'reserved';
   }
 
   /// Vérifie si une session locale est active ET encore valide.

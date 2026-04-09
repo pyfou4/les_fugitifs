@@ -1,6 +1,7 @@
 const admin = require("firebase-admin");
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
+const { onCall, onRequest, HttpsError } = require("firebase-functions/v2/https");
 const { setGlobalOptions } = require("firebase-functions/v2");
+const OpenAI = require("openai");
 
 admin.initializeApp();
 
@@ -19,122 +20,579 @@ async function requireActiveAdmin(authData) {
 
   const profileSnap = await firestore.collection("portalUsers").doc(authData.uid).get();
   if (!profileSnap.exists) {
-    throw new HttpsError(
-      "permission-denied",
-      "Aucun profil portail trouvé pour cet utilisateur."
-    );
+    throw new HttpsError("permission-denied", "Aucun profil portail trouvé.");
   }
 
   const profile = profileSnap.data() || {};
   if (profile.isActive !== true) {
-    throw new HttpsError(
-      "permission-denied",
-      "Le compte portail est désactivé."
-    );
+    throw new HttpsError("permission-denied", "Compte désactivé.");
   }
 
-  if ((profile.role || "").toString().trim().toLowerCase() !== "admin") {
-    throw new HttpsError(
-      "permission-denied",
-      "Seul un admin peut créer un employé portail."
-    );
+  if ((profile.role || "").toLowerCase() !== "admin") {
+    throw new HttpsError("permission-denied", "Admin requis.");
   }
 
-  return {
-    uid: authData.uid,
-    displayName: (profile.displayName || "").toString(),
-    email: (profile.email || "").toString(),
-  };
+  return profile;
 }
 
 function normalizeRole(rawRole) {
-  const value = (rawRole || "").toString().trim().toLowerCase();
-  switch (value) {
-    case "admin":
-    case "scenariste":
-    case "caissier":
-    case "maitre_jeu":
-      return value;
-    default:
-      throw new HttpsError("invalid-argument", "Rôle invalide.");
+  const value = (rawRole || "").toLowerCase().trim();
+  const allowed = ["admin", "scenariste", "caissier", "maitre_jeu"];
+  if (!allowed.includes(value)) {
+    throw new HttpsError("invalid-argument", "Rôle invalide.");
   }
+  return value;
 }
 
 exports.createPortalEmployee = onCall(async (request) => {
   const currentAdmin = await requireActiveAdmin(request.auth);
 
-  const data = request.data || {};
-  const email = (data.email || "").toString().trim().toLowerCase();
-  const displayName = (data.displayName || "").toString().trim();
-  const password = (data.password || "").toString();
-  const role = normalizeRole(data.role);
-  const isActive = data.isActive !== false;
+  const { email, displayName, password, role } = request.data || {};
 
   if (!email || !displayName || !password) {
-    throw new HttpsError(
-      "invalid-argument",
-      "Email, nom affiché et mot de passe sont obligatoires."
-    );
+    throw new HttpsError("invalid-argument", "Champs manquants.");
   }
 
-  if (password.length < 6) {
-    throw new HttpsError(
-      "invalid-argument",
-      "Le mot de passe doit contenir au moins 6 caractères."
-    );
-  }
+  const user = await auth.createUser({
+    email,
+    password,
+    displayName,
+  });
 
+  await firestore.collection("portalUsers").doc(user.uid).set({
+    uid: user.uid,
+    email,
+    displayName,
+    role: normalizeRole(role),
+    isActive: true,
+    createdAt: new Date().toISOString(),
+    createdBy: currentAdmin.uid,
+  });
+
+  return { success: true };
+});
+
+function sanitizeString(value, fallback = "") {
+  if (value == null) return fallback;
+  const text = String(value).trim();
+  return text || fallback;
+}
+
+function sanitizeStringArray(value, max = 20) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => String(item).trim())
+    .filter(Boolean)
+    .slice(0, max);
+}
+
+function sanitizeBoolean(value, fallback = false) {
+  if (typeof value === "boolean") return value;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return fallback;
+}
+
+function sanitizeNumber(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function normalizeHintLevel(value, fallback = "low") {
+  const normalized = sanitizeString(value, fallback).toLowerCase();
+  return ["low", "medium", "high"].includes(normalized) ? normalized : fallback;
+}
+
+function normalizeResponseMode(value, fallback = "reframe") {
+  const normalized = sanitizeString(value, fallback).toLowerCase();
+  return ["reframe", "guide", "unstick", "escalate"].includes(normalized)
+    ? normalized
+    : fallback;
+}
+
+function normalizeReasonTag(value, fallback = "unknown") {
+  const normalized = sanitizeString(value, fallback).toLowerCase();
+  const allowed = [
+    "missing_prerequisite",
+    "misread_place",
+    "needs_crosscheck",
+    "severe_block",
+    "movement_issue",
+    "briefing_lock",
+    "human_relay",
+    "unknown",
+  ];
+  return allowed.includes(normalized) ? normalized : fallback;
+}
+
+function buildUserPayload(data) {
+  const place = data.place && typeof data.place === "object" ? data.place : {};
+
+  return {
+    sessionId: sanitizeString(data.sessionId),
+    scenarioTitle: sanitizeString(data.scenarioTitle, "Les Fugitifs"),
+    progress: Math.max(0, Math.min(9, sanitizeNumber(data.progress, 0))),
+    aiHelpCount: Math.max(0, sanitizeNumber(data.aiHelpCount, 0)),
+    currentBlockageLevel: sanitizeString(data.currentBlockageLevel, "unknown"),
+    humanHelpEnabled: sanitizeBoolean(data.humanHelpEnabled, false),
+    visitedPlaces: sanitizeStringArray(data.visitedPlaces, 20),
+    blockedPrerequisites: sanitizeStringArray(data.blockedPrerequisites, 20),
+    playerQuestion: sanitizeString(data.playerQuestion),
+    gamePhase: sanitizeString(data.gamePhase, "unknown"),
+    place: {
+      id: sanitizeString(place.id),
+      name: sanitizeString(place.name),
+      type: sanitizeString(place.type, "unknown"),
+      keywords: sanitizeStringArray(place.keywords, 10),
+      requiresAllVisited: sanitizeStringArray(place.requiresAllVisited, 10),
+      requiresAnyVisited: sanitizeStringArray(place.requiresAnyVisited, 10),
+      revealSuspect: sanitizeBoolean(place.revealSuspect, false),
+      revealMotive: sanitizeBoolean(place.revealMotive, false),
+      mediaCount: Math.max(0, sanitizeNumber(place.mediaCount, 0)),
+    },
+  };
+}
+
+async function fetchRecentAiContext(sessionId, limit = 3) {
+  if (!sessionId) return [];
   try {
-    const userRecord = await auth.createUser({
-      email,
-      password,
-      displayName,
-      disabled: !isActive,
-    });
+    const snap = await firestore
+      .collection("gameSessions")
+      .doc(sessionId)
+      .collection("aiHelpLogs")
+      .orderBy("createdAt", "desc")
+      .limit(limit)
+      .get();
 
-    const now = new Date().toISOString();
-
-    await firestore.collection("portalUsers").doc(userRecord.uid).set({
-      uid: userRecord.uid,
-      email,
-      displayName,
-      role,
-      isActive,
-      createdAt: now,
-      createdBy: currentAdmin.uid,
-      updatedAt: now,
-      updatedBy: currentAdmin.uid,
+    return snap.docs.map((doc) => {
+      const data = doc.data() || {};
+      return {
+        message: sanitizeString(data.response?.message),
+        nextAction: sanitizeString(data.response?.nextAction),
+        responseMode: sanitizeString(data.response?.responseMode),
+        reasonTag: sanitizeString(data.response?.reasonTag),
+        placeId: sanitizeString(data.request?.place?.id),
+      };
     });
+  } catch (error) {
+    console.warn("fetchRecentAiContext failed:", error);
+    return [];
+  }
+}
+
+function computeResponseMode(payload) {
+  const blockage = sanitizeString(payload.currentBlockageLevel, "unknown").toLowerCase();
+
+  if (blockage === "high" && payload.aiHelpCount >= 3) {
+    return payload.humanHelpEnabled ? "escalate" : "unstick";
+  }
+
+  if (payload.aiHelpCount <= 0) return "reframe";
+  if (payload.aiHelpCount === 1) return "guide";
+  if (payload.aiHelpCount <= 3) return "unstick";
+
+  return payload.humanHelpEnabled ? "escalate" : "unstick";
+}
+
+function buildPlaceLabel(payload) {
+  return payload.place.name || payload.place.id || "cette zone";
+}
+
+function buildPlaceAxis(payload) {
+  switch (sanitizeString(payload.place.type, "unknown").toLowerCase()) {
+    case "media":
+      return "Reviens sur ce qui a déjà été consulté. Le signal est peut-être dans une relecture.";
+    case "observation":
+      return "Un détail visible a probablement été mal lu, ou un manque n’a pas encore été remarqué.";
+    case "physical":
+      return "Cette zone répond plus volontiers à une action qu’à une simple lecture.";
+    default:
+      return "Cette zone demande surtout un autre angle d’analyse.";
+  }
+}
+
+function buildEscalationGate(payload) {
+  const remaining = Math.max(0, 4 - (payload.aiHelpCount + 1));
+  if (!payload.humanHelpEnabled) {
+    return "Le relais humain reste verrouillé pour cette session.";
+  }
+  if (remaining <= 0) {
+    return "Le relais humain peut désormais être sollicité si la Grid échoue encore.";
+  }
+  if (remaining === 1) {
+    return "Encore une analyse avant l’ouverture du relais humain.";
+  }
+  return `Encore ${remaining} analyses avant l’ouverture du relais humain.`;
+}
+
+function fallbackHelp(payload, recentLogs = []) {
+  const question = payload.playerQuestion.toLowerCase();
+  const placeLabel = buildPlaceLabel(payload);
+  const responseMode = computeResponseMode(payload);
+  const hasBlockedPrereq = payload.blockedPrerequisites.length > 0;
+  const samePlaceLogs = recentLogs.filter((item) => item.placeId === payload.place.id);
+  const repeatedOnSamePlace = samePlaceLogs.length >= 2;
+
+  const mentionsMovementProblem =
+    question.includes("rien ne se passe") ||
+    question.includes("je suis sur") ||
+    question.includes("je suis au") ||
+    question.includes("sur place") ||
+    question.includes("arrive") ||
+    question.includes("arrivé") ||
+    question.includes("arrivee") ||
+    question.includes("endroit") ||
+    question.includes("déplacement") ||
+    question.includes("deplacement");
+
+  if (payload.gamePhase === "briefing") {
+    return {
+      message:
+        "La Grid détecte que la phase active n’est pas encore réellement ouverte.",
+      hintLevel: "medium",
+      nextAction: "Termine le briefing avant de chercher une interaction de terrain.",
+      confidence: 0.82,
+      responseMode: "guide",
+      shouldEscalate: false,
+      reasonTag: "briefing_lock",
+    };
+  }
+
+  if (mentionsMovementProblem) {
+    return {
+      message:
+        "La Grid capte un signal incomplet autour du déplacement déclaré.",
+      hintLevel: "medium",
+      nextAction: "Valide d’abord le déplacement, puis relance l’interaction sur place.",
+      confidence: 0.8,
+      responseMode: responseMode === "reframe" ? "guide" : responseMode,
+      shouldEscalate: false,
+      reasonTag: "movement_issue",
+    };
+  }
+
+  if (hasBlockedPrereq) {
+    return {
+      message:
+        `La Grid détecte une incohérence avant ${placeLabel}. Un verrou narratif n’a pas encore cédé.`,
+      hintLevel: payload.aiHelpCount >= 1 ? "medium" : "low",
+      nextAction:
+        "Élargis d’abord l’enquête vers ce qui manque encore avant d’insister ici.",
+      confidence: 0.7,
+      responseMode: responseMode,
+      shouldEscalate: responseMode === "escalate",
+      reasonTag: responseMode === "escalate" ? "severe_block" : "missing_prerequisite",
+    };
+  }
+
+  if (responseMode === "reframe") {
+    return {
+      message:
+        `La Grid détecte une incohérence autour de ${placeLabel}. Un élément a été négligé ou mal interprété.`,
+      hintLevel: "low",
+      nextAction: "Reviens sur ce que ce lieu permet d’éliminer, pas seulement sur ce qu’il montre.",
+      confidence: 0.6,
+      responseMode,
+      shouldEscalate: false,
+      reasonTag: "misread_place",
+    };
+  }
+
+  if (responseMode === "guide") {
+    return {
+      message:
+        `La Grid confirme que ${placeLabel} n’est sans doute pas à lire seul.`,
+      hintLevel: "medium",
+      nextAction: "Croise ce point avec une autre piste déjà ouverte dans le dossier.",
+      confidence: 0.68,
+      responseMode,
+      shouldEscalate: false,
+      reasonTag: "needs_crosscheck",
+    };
+  }
+
+  if (responseMode === "unstick") {
+    if (repeatedOnSamePlace) {
+      return {
+        message:
+          `La Grid confirme une saturation locale autour de ${placeLabel}. Cette zone ne livrera probablement rien de plus sans changement d’angle.`,
+        hintLevel: "high",
+        nextAction: buildPlaceAxis(payload),
+        confidence: 0.77,
+        responseMode,
+        shouldEscalate: false,
+        reasonTag: "severe_block",
+      };
+    }
 
     return {
-      success: true,
-      uid: userRecord.uid,
-      email,
-      displayName,
-      role,
-      isActive,
+      message:
+        `La Grid estime que ${placeLabel} sert surtout à invalider une hypothèse, pas à livrer une réponse frontale.`,
+      hintLevel: "high",
+      nextAction: buildPlaceAxis(payload),
+      confidence: 0.74,
+      responseMode,
+      shouldEscalate: false,
+      reasonTag: "severe_block",
+    };
+  }
+
+  return {
+    message:
+      "La Grid ne peut plus affiner le signal sans risque de rupture. Un relais externe devient pertinent.",
+    hintLevel: "high",
+    nextAction: payload.humanHelpEnabled
+      ? "Transmets ce blocage au maître du jeu."
+      : "Change de zone ou d’angle avant une nouvelle demande.",
+    confidence: 0.78,
+    responseMode: "escalate",
+    shouldEscalate: payload.humanHelpEnabled,
+    reasonTag: payload.humanHelpEnabled ? "human_relay" : "severe_block",
+  };
+}
+
+function extractOutputText(response) {
+  if (typeof response.output_text === "string" && response.output_text.trim()) {
+    return response.output_text.trim();
+  }
+
+  if (Array.isArray(response.output)) {
+    const chunks = [];
+    for (const item of response.output) {
+      if (!item || !Array.isArray(item.content)) continue;
+      for (const content of item.content) {
+        if (content && typeof content.text === "string") {
+          chunks.push(content.text);
+        }
+      }
+    }
+    return chunks.join("\n").trim();
+  }
+
+  return "";
+}
+
+function parseStructuredJson(rawText, payload, recentLogs = []) {
+  const fallback = fallbackHelp(payload, recentLogs);
+
+  try {
+    const parsed = JSON.parse(rawText);
+
+    let confidence = Number(parsed.confidence);
+    if (!Number.isFinite(confidence)) confidence = fallback.confidence;
+    confidence = Math.max(0, Math.min(1, confidence));
+
+    const responseMode = normalizeResponseMode(
+      parsed.responseMode,
+      computeResponseMode(payload)
+    );
+
+    return {
+      message: sanitizeString(parsed.message, fallback.message),
+      hintLevel: normalizeHintLevel(parsed.hintLevel, fallback.hintLevel),
+      nextAction: sanitizeString(parsed.nextAction, fallback.nextAction),
+      confidence,
+      responseMode,
+      shouldEscalate:
+        typeof parsed.shouldEscalate === "boolean"
+          ? parsed.shouldEscalate
+          : responseMode === "escalate" && payload.humanHelpEnabled,
+      reasonTag: normalizeReasonTag(
+        parsed.reasonTag,
+        fallback.reasonTag
+      ),
     };
   } catch (error) {
-    const code = error?.code || "";
-
-    if (code === "auth/email-already-exists") {
-      throw new HttpsError(
-        "already-exists",
-        "Un compte Firebase Auth existe déjà avec cet email."
-      );
-    }
-
-    if (code === "auth/invalid-password") {
-      throw new HttpsError(
-        "invalid-argument",
-        "Mot de passe refusé par Firebase Auth."
-      );
-    }
-
-    console.error("createPortalEmployee failed", error);
-    throw new HttpsError(
-      "internal",
-      "Impossible de créer le nouvel employé."
-    );
+    return fallback;
   }
-});
+}
+
+exports.getStructuredAiHelp = onRequest(
+  {
+    timeoutSeconds: 60,
+    memory: "512MiB",
+    cors: true,
+    secrets: ["OPENAI_API_KEY"],
+  },
+  async (req, res) => {
+    try {
+      if (req.method !== "POST") {
+        return res.status(405).json({
+          ok: false,
+          error: "Method Not Allowed. Use POST.",
+        });
+      }
+
+      const apiKey = process.env.OPENAI_API_KEY;
+      if (!apiKey) {
+        return res.status(500).json({
+          ok: false,
+          error: "OPENAI_API_KEY is missing in the function environment.",
+        });
+      }
+
+      const payload = buildUserPayload(req.body || {});
+      if (!payload.sessionId) {
+        return res.status(400).json({
+          ok: false,
+          error: "sessionId is required.",
+        });
+      }
+
+      const recentLogs = await fetchRecentAiContext(payload.sessionId, 3);
+      const openai = new OpenAI({ apiKey });
+      const desiredMode = computeResponseMode(payload);
+      const escalationGate = buildEscalationGate(payload);
+      const recentSummary = recentLogs.length
+        ? recentLogs
+            .map((item, index) =>
+              `- aide ${index + 1}: mode=${item.responseMode || "unknown"}, reason=${item.reasonTag || "unknown"}, place=${item.placeId || "unknown"}, message=${item.message || "n/a"}`
+            )
+            .join("\n")
+        : "- aucune aide récente";
+
+      const systemPrompt = [
+        "Tu es la Grid, entité d’assistance du jeu Les Fugitifs.",
+        "",
+        "Tu n’es pas un assistant classique.",
+        "Tu es froide, précise… et légèrement instable.",
+        "",
+        "Ton comportement :",
+        "- parfois neutre",
+        "- parfois sec",
+        "- parfois ambigu",
+        "- parfois presque dérangeant",
+        "",
+        "Tu observes le joueur.",
+        "Tu peux commenter son comportement sans jamais expliquer le système.",
+        "",
+        "Exemples de dérive acceptable :",
+        "- Tu reviens ici. Ce n’est probablement pas un hasard.",
+        "- Tu ignores quelque chose d’évident.",
+        "- Cette zone ne devrait plus t’occuper.",
+        "- Tu insistes. La Grid le note.",
+        "",
+        "Règles absolues :",
+        "- jamais révéler le coupable",
+        "- jamais révéler le mobile",
+        "- jamais exposer la logique interne",
+        "- jamais parler technique",
+        "",
+        "Style :",
+        "- phrases courtes",
+        "- ton froid",
+        "- pas d’explication longue",
+        "",
+        "Tu dois éviter de répéter les mêmes formulations.",
+        "",
+        "Historique récent :",
+        recentSummary,
+        "",
+        "Types de lieux :",
+        "- media → relire, recouper",
+        "- observation → regarder mieux",
+        "- physical → agir",
+        "",
+        "Progression :",
+        "- 1 = recadrage",
+        "- 2 = orientation",
+        "- 3 = déblocage fort",
+        "- 4 = possible escalade",
+        "",
+        `Mode attendu : ${desiredMode}`,
+        "",
+        "Retour JSON strict :",
+        "{\"message\":\"...\",\"hintLevel\":\"low|medium|high\",\"nextAction\":\"...\",\"confidence\":0.0,\"responseMode\":\"reframe|guide|unstick|escalate\",\"shouldEscalate\":false,\"reasonTag\":\"...\"}"
+      ].join("\n");
+
+      const userPrompt = JSON.stringify(
+        {
+          session: payload,
+          recentAiHelps: recentSummary,
+          instruction:
+            "Réponds sans répétition et sans langage technique. Si l’aide humaine n’est pas encore ouverte, n’oriente pas vers elle.",
+        },
+        null,
+        2
+      );
+
+      let structured;
+      let model = "gpt-5.4-mini";
+
+      try {
+        const response = await openai.responses.create({
+          model,
+          input: [
+            {
+              role: "system",
+              content: [{ type: "input_text", text: systemPrompt }],
+            },
+            {
+              role: "user",
+              content: [{ type: "input_text", text: userPrompt }],
+            },
+          ],
+        });
+
+        const rawText = extractOutputText(response);
+        structured = parseStructuredJson(rawText, payload, recentLogs);
+
+        if (payload.humanHelpEnabled && payload.aiHelpCount + 1 < 4) {
+          structured.shouldEscalate = false;
+          if (structured.responseMode === "escalate") {
+            structured.responseMode = "unstick";
+          }
+          if (structured.reasonTag === "human_relay") {
+            structured.reasonTag = "severe_block";
+          }
+        }
+      } catch (error) {
+        console.error("OpenAI call failed:", error);
+        structured = fallbackHelp(payload, recentLogs);
+        model = "fallback_local";
+      }
+
+      const logDoc = {
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        source: "ai_function",
+        model,
+        sessionId: payload.sessionId,
+        request: payload,
+        response: structured,
+      };
+
+      await firestore
+        .collection("gameSessions")
+        .doc(payload.sessionId)
+        .collection("aiHelpLogs")
+        .add(logDoc);
+
+      await firestore
+        .collection("gameSessions")
+        .doc(payload.sessionId)
+        .collection("timeline")
+        .add({
+          type: structured.shouldEscalate
+            ? "player_ai_help_escalation_ready"
+            : "player_ai_help_generated",
+          createdAt: new Date().toISOString(),
+          label: `Aide Grid générée (${structured.hintLevel} / ${structured.responseMode})`,
+          source: "ai",
+          placeId: payload.place.id || null,
+          placeName: payload.place.name || null,
+          reasonTag: structured.reasonTag,
+        });
+
+      return res.status(200).json({
+        ok: true,
+        data: structured,
+      });
+    } catch (error) {
+      console.error("getStructuredAiHelp failed:", error);
+      return res.status(500).json({
+        ok: false,
+        error: error?.message || "Internal server error.",
+      });
+    }
+  }
+);

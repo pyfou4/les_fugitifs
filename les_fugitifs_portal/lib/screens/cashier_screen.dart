@@ -180,6 +180,58 @@ class _CashierScreenState extends State<CashierScreen>
     }
   }
 
+
+  DateTime _parseScenarioDate(dynamic value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is String) {
+      return DateTime.tryParse(value) ?? DateTime.fromMillisecondsSinceEpoch(0);
+    }
+    return DateTime.fromMillisecondsSinceEpoch(0);
+  }
+
+  String _readScenarioTitle(Map<String, dynamic> data, String fallbackId) {
+    final title = (data['title'] ?? '').toString().trim();
+    if (title.isNotEmpty) return title;
+    return fallbackId;
+  }
+
+  void _syncSelectedScenarioWithLatest(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> scenarioDocs,
+  ) {
+    final availableScenarioIds = scenarioDocs.map((doc) => doc.id).toSet();
+
+    if (scenarioDocs.isEmpty) {
+      if (_selectedScenarioId != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          setState(() {
+            _selectedScenarioId = null;
+            _currentCode = null;
+            _currentGameSessionId = null;
+            _message = null;
+          });
+        });
+      }
+      return;
+    }
+
+    final latestScenarioId = scenarioDocs.first.id;
+
+    if (_selectedScenarioId == null ||
+        !availableScenarioIds.contains(_selectedScenarioId) ||
+        _selectedScenarioId != latestScenarioId) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        setState(() {
+          _selectedScenarioId = latestScenarioId;
+          _currentCode = null;
+          _currentGameSessionId = null;
+          _message = null;
+        });
+      });
+    }
+  }
+
   void _prepareNextCode() {
     _portalController.stop();
     _portalController.reset();
@@ -335,35 +387,93 @@ class _CashierScreenState extends State<CashierScreen>
                                   stream: FirebaseFirestore.instance
                                       .collection('lockedScenarios')
                                       .where('status', isEqualTo: 'locked')
-                                      .orderBy('lockedAt', descending: true)
                                       .snapshots(),
                                   builder: (context, scenarioSnapshot) {
-                                    final scenarioDocs =
+                                    if (scenarioSnapshot.connectionState ==
+                                            ConnectionState.waiting &&
+                                        !scenarioSnapshot.hasData) {
+                                      return DropdownButtonFormField<String>(
+                                        value: null,
+                                        isExpanded: true,
+                                        dropdownColor: const Color(0xFF171E2A),
+                                        decoration: const InputDecoration(
+                                          labelText:
+                                              'Choisir le scénario verrouillé',
+                                          helperText:
+                                              'Chargement du dernier scénario verrouillé...',
+                                        ),
+                                        items: const [],
+                                        onChanged: null,
+                                      );
+                                    }
+
+                                    final rawScenarioDocs =
                                         scenarioSnapshot.data?.docs ?? [];
 
-                                    final scenarioItems = scenarioDocs
+                                    final scenarioDocs = [...rawScenarioDocs]
+                                      ..sort((a, b) {
+                                        final aDate = _parseScenarioDate(
+                                          a.data()['lockedAt'],
+                                        );
+                                        final bDate = _parseScenarioDate(
+                                          b.data()['lockedAt'],
+                                        );
+                                        return bDate.compareTo(aDate);
+                                      });
+
+                                    final latestScenarioDocs = scenarioDocs.isEmpty
+                                        ? <QueryDocumentSnapshot<Map<String, dynamic>>>[]
+                                        : [scenarioDocs.first];
+
+                                    _syncSelectedScenarioWithLatest(
+                                      latestScenarioDocs,
+                                    );
+
+                                    final scenarioItems = latestScenarioDocs
                                         .map(
                                           (doc) => DropdownMenuItem<String>(
                                             value: doc.id,
                                             child: Text(
-                                              '${(doc.data()['title'] ?? doc.id).toString()}'
-                                              ' • ${doc.id}',
+                                              _readScenarioTitle(
+                                                doc.data(),
+                                                doc.id,
+                                              ),
+                                              maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
                                             ),
                                           ),
                                         )
                                         .toList();
 
+                                    if (latestScenarioDocs.isEmpty) {
+                                      return DropdownButtonFormField<String>(
+                                        value: null,
+                                        isExpanded: true,
+                                        dropdownColor: const Color(0xFF171E2A),
+                                        decoration: const InputDecoration(
+                                          labelText:
+                                              'Choisir le scénario verrouillé',
+                                          helperText:
+                                              'Aucun scénario verrouillé disponible.',
+                                        ),
+                                        items: const [],
+                                        onChanged: null,
+                                      );
+                                    }
+
                                     return DropdownButtonFormField<String>(
-                                      value: scenarioDocs.any(
+                                      value: latestScenarioDocs.any(
                                         (d) => d.id == _selectedScenarioId,
                                       )
                                           ? _selectedScenarioId
-                                          : null,
+                                          : latestScenarioDocs.first.id,
+                                      isExpanded: true,
                                       dropdownColor: const Color(0xFF171E2A),
                                       decoration: const InputDecoration(
                                         labelText:
                                             'Choisir le scénario verrouillé',
+                                        helperText:
+                                            'Dernière version verrouillée proposée automatiquement.',
                                       ),
                                       items: scenarioItems,
                                       onChanged: (value) {

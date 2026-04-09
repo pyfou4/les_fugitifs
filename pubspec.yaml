@@ -16,7 +16,7 @@ dependencies:
   shared_preferences: ^2.2.2
   speech_to_text: ^7.3.0
   url_launcher: ^6.3.2
-  http: ^1.2.2
+  http: ^1.6.0
   video_player: ^2.9.2
 
   flutter_map: any
@@ -28,6 +28,9 @@ dependencies:
   path_provider: ^2.1.5
   device_info_plus: ^10.1.0
   google_fonts: ^6.2.1
+  cloud_functions: ^6.1.0
+  firebase_app_check: ^0.4.2
+  firebase_auth: ^6.3.0
 
 dev_dependencies:
   flutter_test:
