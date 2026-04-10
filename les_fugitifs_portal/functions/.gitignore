@@ -27,3 +27,6 @@ build/
 # OS
 .DS_Store
 Thumbs.db
+
+export-fugitifs/package-lock.json
+export-fugitifs/node_modules/

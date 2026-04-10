@@ -2,10 +2,11 @@
 node_modules/
 **/node_modules/
 
+# Export portal
+les_fugitifs_portal/export-fugitifs/node_modules/
+les_fugitifs_portal/export-fugitifs/package-lock.json
+
 # Env
 .env
 **/.env
-
-# Firebase
-functions/node_modules/
 functions/.env
