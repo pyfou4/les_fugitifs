@@ -1,13 +1,25 @@
-# 🔒 Firebase Admin (TRÈS IMPORTANT)
+# 🔒 Firebase Admin / secrets
 functions/serviceAccountKey.json
-
-# 🔒 fichiers sensibles éventuels
 functions/.env
+.env
 
-# Flutter / build
+# Node / Firebase Functions
+functions/node_modules/
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Flutter / Dart
 build/
 .dart_tool/
 .packages
+.pub/
+.pub-cache/
+
+# IDE
+.vscode/
+.idea/
 
 # Logs
 *.log
