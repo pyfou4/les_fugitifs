@@ -1,2 +1,11 @@
+# Node
 node_modules/
-*.local
+**/node_modules/
+
+# Env
+.env
+**/.env
+
+# Firebase
+functions/node_modules/
+functions/.env
