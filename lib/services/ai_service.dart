@@ -43,6 +43,32 @@ class AiHelpPlaceContext {
   }
 }
 
+class AiHelpCallContext {
+  final bool active;
+  final String phase;
+  final int helpAttemptsDuringCall;
+  final String callId;
+  final String sourceEvent;
+
+  const AiHelpCallContext({
+    required this.active,
+    required this.phase,
+    this.helpAttemptsDuringCall = 0,
+    this.callId = '',
+    this.sourceEvent = '',
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'active': active,
+      'phase': phase,
+      'helpAttemptsDuringCall': helpAttemptsDuringCall,
+      'callId': callId,
+      'sourceEvent': sourceEvent,
+    };
+  }
+}
+
 class AiHelpResponse {
   final String message;
   final String hintLevel;
@@ -100,6 +126,7 @@ class AiService {
     required List<String> visitedPlaces,
     required List<String> blockedPrerequisites,
     AiHelpPlaceContext? place,
+    AiHelpCallContext? callContext,
     String playerQuestion = '',
   }) async {
     final payload = <String, dynamic>{
@@ -113,6 +140,7 @@ class AiService {
       'blockedPrerequisites': blockedPrerequisites,
       'playerQuestion': playerQuestion,
       if (place != null) 'place': place.toJson(),
+      if (callContext != null) 'callContext': callContext.toJson(),
     };
 
     final response = await _client.post(

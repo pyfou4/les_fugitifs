@@ -87,6 +87,8 @@ class _SOSSreenState extends State<SOSSreen> {
           const ['blockedPrerequisites', 'missingPrerequisites'],
         );
 
+    final callContext = _incrementCallContext(_readCallContext(sessionData));
+
     try {
       final response = await _aiService.getStructuredHelp(
         sessionId: widget.sessionId,
@@ -98,6 +100,7 @@ class _SOSSreenState extends State<SOSSreen> {
         visitedPlaces: visitedPlaces,
         blockedPrerequisites: blockedPrerequisites,
         place: widget.placeContext,
+        callContext: callContext,
         playerQuestion: playerQuestion,
       );
 
@@ -119,6 +122,8 @@ class _SOSSreenState extends State<SOSSreen> {
           'lastAiHelpNextAction': response.nextAction,
           'lastAiHelpConfidence': response.confidence,
           'lastAiHelpAt': FieldValue.serverTimestamp(),
+          if (callContext != null && callContext.active)
+            'callContext.helpAttemptsDuringCall': callContext.helpAttemptsDuringCall,
         },
         SetOptions(merge: true),
       );
@@ -169,6 +174,48 @@ class _SOSSreenState extends State<SOSSreen> {
       }
     }
     return const <String>[];
+  }
+
+
+  AiHelpCallContext? _readCallContext(Map<String, dynamic> data) {
+    final raw = data['callContext'];
+    if (raw is! Map) return null;
+
+    final map = Map<String, dynamic>.from(raw as Map);
+    final active = map['active'] == true;
+    final phase = (map['phase'] ?? '').toString().trim();
+    final callId = (map['callId'] ?? '').toString().trim();
+    final sourceEvent = (map['sourceEvent'] ?? '').toString().trim();
+
+    final attemptsRaw = map['helpAttemptsDuringCall'];
+    final attempts = attemptsRaw is int
+        ? attemptsRaw
+        : attemptsRaw is num
+            ? attemptsRaw.toInt()
+            : int.tryParse(attemptsRaw?.toString() ?? '') ?? 0;
+
+    if (!active && phase.isEmpty && callId.isEmpty && sourceEvent.isEmpty) {
+      return null;
+    }
+
+    return AiHelpCallContext(
+      active: active,
+      phase: phase.isEmpty ? 'resolved' : phase,
+      helpAttemptsDuringCall: attempts,
+      callId: callId,
+      sourceEvent: sourceEvent,
+    );
+  }
+
+  AiHelpCallContext? _incrementCallContext(AiHelpCallContext? context) {
+    if (context == null || !context.active) return context;
+    return AiHelpCallContext(
+      active: context.active,
+      phase: context.phase,
+      helpAttemptsDuringCall: context.helpAttemptsDuringCall + 1,
+      callId: context.callId,
+      sourceEvent: context.sourceEvent,
+    );
   }
 
   Color _hintColor(String hintLevel) {

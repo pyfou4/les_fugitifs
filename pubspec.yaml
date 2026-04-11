@@ -18,6 +18,7 @@ dependencies:
   url_launcher: ^6.3.2
   http: ^1.6.0
   video_player: ^2.9.2
+  audioplayers: ^5.2.1
 
   flutter_map: any
   latlong2: any

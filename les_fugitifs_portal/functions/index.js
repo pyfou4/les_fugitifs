@@ -105,7 +105,7 @@ function normalizeHintLevel(value, fallback = "low") {
 
 function normalizeResponseMode(value, fallback = "reframe") {
   const normalized = sanitizeString(value, fallback).toLowerCase();
-  return ["reframe", "guide", "unstick", "escalate"].includes(normalized)
+  return ["reframe", "guide", "unstick", "escalate", "interrupt"].includes(normalized)
     ? normalized
     : fallback;
 }
@@ -120,9 +120,39 @@ function normalizeReasonTag(value, fallback = "unknown") {
     "movement_issue",
     "briefing_lock",
     "human_relay",
+    "critical_call_ringing",
+    "critical_call_voice_playing",
+    "critical_call_awaiting_confirmation",
     "unknown",
   ];
   return allowed.includes(normalized) ? normalized : fallback;
+}
+
+function normalizeCallPhase(value, fallback = "none") {
+  const normalized = sanitizeString(value, fallback).toLowerCase();
+  const allowed = [
+    "none",
+    "ringing",
+    "voice_playing",
+    "awaiting_confirmation",
+    "resolved",
+  ];
+  return allowed.includes(normalized) ? normalized : fallback;
+}
+
+function buildCallContext(data) {
+  const raw = data.callContext && typeof data.callContext === "object" ? data.callContext : {};
+
+  const phase = normalizeCallPhase(raw.phase, "none");
+  const active = sanitizeBoolean(raw.active, phase !== "none" && phase !== "resolved");
+
+  return {
+    active,
+    phase: active ? phase : "resolved",
+    helpAttemptsDuringCall: Math.max(0, sanitizeNumber(raw.helpAttemptsDuringCall, 0)),
+    callId: sanitizeString(raw.callId, "final_call"),
+    sourceEvent: sanitizeString(raw.sourceEvent),
+  };
 }
 
 function buildUserPayload(data) {
@@ -139,6 +169,7 @@ function buildUserPayload(data) {
     blockedPrerequisites: sanitizeStringArray(data.blockedPrerequisites, 20),
     playerQuestion: sanitizeString(data.playerQuestion),
     gamePhase: sanitizeString(data.gamePhase, "unknown"),
+    callContext: buildCallContext(data),
     place: {
       id: sanitizeString(place.id),
       name: sanitizeString(place.name),
@@ -172,6 +203,7 @@ async function fetchRecentAiContext(sessionId, limit = 3) {
         responseMode: sanitizeString(data.response?.responseMode),
         reasonTag: sanitizeString(data.response?.reasonTag),
         placeId: sanitizeString(data.request?.place?.id),
+        callPhase: sanitizeString(data.request?.callContext?.phase),
       };
     });
   } catch (error) {
@@ -181,6 +213,10 @@ async function fetchRecentAiContext(sessionId, limit = 3) {
 }
 
 function computeResponseMode(payload) {
+  if (payload.callContext?.active === true) {
+    return "interrupt";
+  }
+
   const blockage = sanitizeString(payload.currentBlockageLevel, "unknown").toLowerCase();
 
   if (blockage === "high" && payload.aiHelpCount >= 3) {
@@ -225,7 +261,70 @@ function buildEscalationGate(payload) {
   return `Encore ${remaining} analyses avant l’ouverture du relais humain.`;
 }
 
+function buildCriticalCallInterruptionResponse(payload) {
+  const attempts = Math.max(0, sanitizeNumber(payload.callContext?.helpAttemptsDuringCall, 0));
+  const phase = normalizeCallPhase(payload.callContext?.phase, "none");
+
+  if (phase === "voice_playing") {
+    return {
+      message:
+        attempts >= 2
+          ? "La transmission est en cours. Écoute."
+          : "Le message a commencé. Écoute d’abord.",
+      hintLevel: "high",
+      nextAction: "Attends la fin de la transmission avant toute autre demande.",
+      confidence: 0.96,
+      responseMode: "interrupt",
+      shouldEscalate: false,
+      reasonTag: "critical_call_voice_playing",
+    };
+  }
+
+  if (phase === "awaiting_confirmation") {
+    return {
+      message:
+        attempts >= 2
+          ? "Le seuil final est devant vous. Cesse de tourner autour."
+          : "La transmission est terminée. Votre équipe doit maintenant se positionner.",
+      hintLevel: "high",
+      nextAction: "Décidez si vous êtes prêts à entrer dans la phase finale.",
+      confidence: 0.95,
+      responseMode: "interrupt",
+      shouldEscalate: false,
+      reasonTag: "critical_call_awaiting_confirmation",
+    };
+  }
+
+  const ringingMessages = [
+    "Votre téléphone insiste.",
+    "Un signal prioritaire cherche à vous joindre. Répondez.",
+    "Cet appel ne doit pas être ignoré.",
+    "La Grid suspend l’analyse tant que cet appel reste en attente.",
+  ];
+  const ringingActions = [
+    "Répondez avant de poursuivre.",
+    "Acceptez l’appel avant toute autre action.",
+    "Traitez d’abord l’appel entrant.",
+    "Impossible d’aller plus loin tant que l’appel n’est pas traité.",
+  ];
+  const index = Math.min(attempts, ringingMessages.length - 1);
+
+  return {
+    message: ringingMessages[index],
+    hintLevel: attempts >= 2 ? "high" : "medium",
+    nextAction: ringingActions[index],
+    confidence: 0.94,
+    responseMode: "interrupt",
+    shouldEscalate: false,
+    reasonTag: "critical_call_ringing",
+  };
+}
+
 function fallbackHelp(payload, recentLogs = []) {
+  if (payload.callContext?.active === true) {
+    return buildCriticalCallInterruptionResponse(payload);
+  }
+
   const question = payload.playerQuestion.toLowerCase();
   const placeLabel = buildPlaceLabel(payload);
   const responseMode = computeResponseMode(payload);
@@ -440,13 +539,52 @@ exports.getStructuredAiHelp = onRequest(
       }
 
       const recentLogs = await fetchRecentAiContext(payload.sessionId, 3);
-      const openai = new OpenAI({ apiKey });
       const desiredMode = computeResponseMode(payload);
+
+      if (payload.callContext?.active === true) {
+        const structured = buildCriticalCallInterruptionResponse(payload);
+
+        const logDoc = {
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          source: "ai_function",
+          model: "call_context_interceptor",
+          sessionId: payload.sessionId,
+          request: payload,
+          response: structured,
+        };
+
+        await firestore
+          .collection("gameSessions")
+          .doc(payload.sessionId)
+          .collection("aiHelpLogs")
+          .add(logDoc);
+
+        await firestore
+          .collection("gameSessions")
+          .doc(payload.sessionId)
+          .collection("timeline")
+          .add({
+            type: "player_ai_help_interrupted_by_call",
+            createdAt: new Date().toISOString(),
+            label: `Aide Grid redirigée (${payload.callContext.phase})`,
+            source: "ai",
+            placeId: payload.place.id || null,
+            placeName: payload.place.name || null,
+            reasonTag: structured.reasonTag,
+          });
+
+        return res.status(200).json({
+          ok: true,
+          data: structured,
+        });
+      }
+
+      const openai = new OpenAI({ apiKey });
       const escalationGate = buildEscalationGate(payload);
       const recentSummary = recentLogs.length
         ? recentLogs
             .map((item, index) =>
-              `- aide ${index + 1}: mode=${item.responseMode || "unknown"}, reason=${item.reasonTag || "unknown"}, place=${item.placeId || "unknown"}, message=${item.message || "n/a"}`
+              `- aide ${index + 1}: mode=${item.responseMode || "unknown"}, reason=${item.reasonTag || "unknown"}, place=${item.placeId || "unknown"}, callPhase=${item.callPhase || "none"}, message=${item.message || "n/a"}`
             )
             .join("\n")
         : "- aucune aide récente";
@@ -499,7 +637,9 @@ exports.getStructuredAiHelp = onRequest(
         "- 3 = déblocage fort",
         "- 4 = possible escalade",
         "",
-        `Mode attendu : ${desiredMode}`,
+        "Contexte critique :",
+        `- escalationGate: ${escalationGate}`,
+        `- mode attendu : ${desiredMode}`,
         "",
         "Retour JSON strict :",
         "{\"message\":\"...\",\"hintLevel\":\"low|medium|high\",\"nextAction\":\"...\",\"confidence\":0.0,\"responseMode\":\"reframe|guide|unstick|escalate\",\"shouldEscalate\":false,\"reasonTag\":\"...\"}"

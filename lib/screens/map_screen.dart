@@ -12,6 +12,8 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../models/place_node.dart';
+import 'incoming_call_screen.dart';
+import 'final_quiz_test_screen.dart';
 
 class MapScreen extends StatefulWidget {
   final VoidCallback onBack;
@@ -73,6 +75,7 @@ class _MapScreenState extends State<MapScreen> {
   String? _currentSiteId;
   Map<String, int> _placeOccupancy = const <String, int>{};
   Timer? _heardBannerTimer;
+  Timer? _incomingCallRecallTimer;
 
   static const CameraPosition _fallbackCamera = CameraPosition(
     target: LatLng(10.3910, -75.4794),
@@ -375,9 +378,9 @@ class _MapScreenState extends State<MapScreen> {
   bool get _shouldShowImmersiveBanner =>
       _selectedPlace != null || (_currentRoute != null && _showRouteBanner);
 
-
   void _scheduleHeardBannerAutoHide() {
     _heardBannerTimer?.cancel();
+    _incomingCallRecallTimer?.cancel();
     if (!_showHeardBanner) {
       return;
     }
@@ -665,6 +668,52 @@ class _MapScreenState extends State<MapScreen> {
         unawaited(_refreshPlaceOccupancy());
       }
     }
+  }
+
+  Future<void> _openIncomingCallFlow() async {
+    _incomingCallRecallTimer?.cancel();
+    await _ensureSessionContextLoaded();
+
+    final sessionId = (_currentSessionId ?? '').trim();
+    if (sessionId.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Session introuvable pour l’appel entrant.'),
+        ),
+      );
+      return;
+    }
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => IncomingCallScreen(
+          sessionId: sessionId,
+          onAccepted: () {
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const FinalQuizTestScreen(),
+              ),
+            );
+          },
+          onRejected: _scheduleIncomingCallRecall,
+        ),
+      ),
+    );
+  }
+
+  void _scheduleIncomingCallRecall() {
+    _incomingCallRecallTimer?.cancel();
+    _incomingCallRecallTimer = Timer(const Duration(seconds: 30), () {
+      if (!mounted) return;
+      _openIncomingCallFlow();
+    });
+  }
+
+  Future<void> _launchIncomingCallTest() async {
+    await _openIncomingCallFlow();
   }
 
   Future<void> _recenterOnUser() async {
@@ -1342,4 +1391,3 @@ class _MapActionButton extends StatelessWidget {
     );
   }
 }
-

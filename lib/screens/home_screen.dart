@@ -434,6 +434,59 @@ class _HomeScreenState extends State<HomeScreen> {
     return missing;
   }
 
+
+  Future<AiHelpCallContext?> _loadIncrementedCallContextForSession(String sessionId) async {
+    try {
+      final snap = await _firestore.collection('gameSessions').doc(sessionId).get();
+      final data = snap.data();
+      if (data == null) return null;
+      return _incrementCallContext(_readCallContext(data));
+    } catch (_) {
+      return null;
+    }
+  }
+
+  AiHelpCallContext? _readCallContext(Map<String, dynamic> data) {
+    final raw = data['callContext'];
+    if (raw is! Map) return null;
+
+    final map = Map<String, dynamic>.from(raw as Map);
+    final active = map['active'] == true;
+    final phase = (map['phase'] ?? '').toString().trim();
+    final callId = (map['callId'] ?? '').toString().trim();
+    final sourceEvent = (map['sourceEvent'] ?? '').toString().trim();
+
+    final attemptsRaw = map['helpAttemptsDuringCall'];
+    final attempts = attemptsRaw is int
+        ? attemptsRaw
+        : attemptsRaw is num
+            ? attemptsRaw.toInt()
+            : int.tryParse(attemptsRaw?.toString() ?? '') ?? 0;
+
+    if (!active && phase.isEmpty && callId.isEmpty && sourceEvent.isEmpty) {
+      return null;
+    }
+
+    return AiHelpCallContext(
+      active: active,
+      phase: phase.isEmpty ? 'resolved' : phase,
+      helpAttemptsDuringCall: attempts,
+      callId: callId,
+      sourceEvent: sourceEvent,
+    );
+  }
+
+  AiHelpCallContext? _incrementCallContext(AiHelpCallContext? context) {
+    if (context == null || !context.active) return context;
+    return AiHelpCallContext(
+      active: context.active,
+      phase: context.phase,
+      helpAttemptsDuringCall: context.helpAttemptsDuringCall + 1,
+      callId: context.callId,
+      sourceEvent: context.sourceEvent,
+    );
+  }
+
   String _hintLevelLabel(String hintLevel) {
     switch (hintLevel.trim().toLowerCase()) {
       case 'high':
@@ -882,6 +935,9 @@ class _HomeScreenState extends State<HomeScreen> {
               });
 
               try {
+                final callContext =
+                    await _loadIncrementedCallContextForSession(current.id);
+
                 final response = await _aiService.getStructuredHelp(
                   sessionId: current.id,
                   scenarioTitle: 'Les Fugitifs',
@@ -908,6 +964,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           revealMotive: helpPlace.revealMotive,
                           mediaCount: helpPlace.media.length,
                         ),
+                  callContext: callContext,
                   playerQuestion: playerQuestion,
                 );
 
@@ -948,6 +1005,21 @@ class _HomeScreenState extends State<HomeScreen> {
                         ? 'Aide IA générée (${_hintLevelLabel(response.hintLevel)})'
                         : 'Aide IA générée sur ${helpPlace.name} (${_hintLevelLabel(response.hintLevel)})',
                   );
+
+                  if (callContext != null && callContext.active) {
+                    await _firestore.collection('gameSessions').doc(current.id).set(
+                      {
+                        'callContext': {
+                          'active': callContext.active,
+                          'phase': callContext.phase,
+                          'helpAttemptsDuringCall': callContext.helpAttemptsDuringCall,
+                          'callId': callContext.callId,
+                          'sourceEvent': callContext.sourceEvent,
+                        },
+                      },
+                      SetOptions(merge: true),
+                    );
+                  }
                 } catch (e) {
                   remoteSyncFailed = true;
                   remoteSyncError = e.toString();

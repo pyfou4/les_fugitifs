@@ -6,7 +6,7 @@ import 'package:firebase_app_check/firebase_app_check.dart';
 
 import 'firebase_options.dart';
 import 'constants/app_constants.dart';
-import 'screens/final_quiz_test_screen.dart';
+import 'screens/home_screen.dart'; // 🔥 IMPORTANT
 import 'screens/activation_screen.dart';
 import 'services/session_service.dart';
 
@@ -67,13 +67,13 @@ class _MyAppState extends State<MyApp> {
       theme: ThemeData(useMaterial3: true),
       home: _isLoading
           ? const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            )
+        body: Center(child: CircularProgressIndicator()),
+      )
           : _hasValidSession
-              ? const FinalQuizTestScreen()
-              : ActivationScreen(
-                  nextScreen: const FinalQuizTestScreen(),
-                ),
+          ? const HomeScreen() // ✅ RETOUR AU JEU NORMAL
+          : ActivationScreen(
+        nextScreen: const HomeScreen(), // ✅ idem ici
+      ),
     );
   }
 }
