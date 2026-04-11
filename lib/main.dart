@@ -6,8 +6,9 @@ import 'package:firebase_app_check/firebase_app_check.dart';
 
 import 'firebase_options.dart';
 import 'constants/app_constants.dart';
-import 'screens/scenarios_screen.dart';
-import 'tools/publish_locked_version.dart';
+import 'screens/final_quiz_test_screen.dart';
+import 'screens/activation_screen.dart';
+import 'services/session_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,8 +33,31 @@ void main() async {
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  bool _isLoading = true;
+  bool _hasValidSession = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkSession();
+  }
+
+  Future<void> _checkSession() async {
+    final isValid = await SessionService.isSessionValid();
+
+    setState(() {
+      _hasValidSession = isValid;
+      _isLoading = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +65,15 @@ class MyApp extends StatelessWidget {
       title: kScenarioName,
       debugShowCheckedModeBanner: false,
       theme: ThemeData(useMaterial3: true),
-      home: const ScenariosScreen(),
+      home: _isLoading
+          ? const Scaffold(
+              body: Center(child: CircularProgressIndicator()),
+            )
+          : _hasValidSession
+              ? const FinalQuizTestScreen()
+              : ActivationScreen(
+                  nextScreen: const FinalQuizTestScreen(),
+                ),
     );
   }
 }
