@@ -4,10 +4,10 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../constants/firebase_media.dart';
 import '../widgets/beacon_dot.dart';
 import '../widgets/desk_hotspot.dart';
-import '../widgets/hourglass_overlay.dart';
+import '../widgets/hourglass_expanded_dialog.dart';
 
 class ScenarioScreen extends StatefulWidget {
-  final int progress;
+  final double progress;
   final bool canExit;
   final VoidCallback? onOpenMap;
   final VoidCallback? onOpenArchives;
@@ -104,16 +104,28 @@ class _ScenarioScreenState extends State<ScenarioScreen> {
     );
   }
 
+  Future<void> _openHourglassDialog(double progress) async {
+    await showDialog<void>(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.86),
+      builder: (_) => HourglassExpandedDialog(progress: progress),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final clampedProgress = widget.progress.clamp(0, 9);
+    final clampedProgress = widget.progress.clamp(0.0, 1.0);
     final topInset = MediaQuery.of(context).padding.top;
 
     return Scaffold(
       body: LayoutBuilder(
         builder: (context, constraints) {
-          final w = constraints.maxWidth;
-          final h = constraints.maxHeight;
+          final screenWidth = constraints.maxWidth;
+          final screenHeight = constraints.maxHeight;
+          final isTablet = screenWidth >= 900;
+          final layout = isTablet
+              ? ScenarioLayouts.tablet
+              : ScenarioLayouts.phone;
 
           return Stack(
             children: [
@@ -140,8 +152,8 @@ class _ScenarioScreenState extends State<ScenarioScreen> {
                 ),
               ),
               Positioned(
-                left: 24,
-                top: topInset + 16,
+                left: layout.titleLeft,
+                top: topInset + layout.titleTopOffset,
                 child: const Text(
                   'Scénario',
                   style: TextStyle(
@@ -151,22 +163,18 @@ class _ScenarioScreenState extends State<ScenarioScreen> {
                   ),
                 ),
               ),
-
-              Positioned(
-                left: w * 0.58,
-                top: h * 0.20,
-                child: const BeaconDot(
-                  color: Color(0xFF9FD3FF),
-                  size: 14,
-                ),
+              _buildBeacon(
+                zone: layout.archivesDot,
+                screenWidth: screenWidth,
+                screenHeight: screenHeight,
+                color: const Color(0xFF9FD3FF),
+                size: 14,
               ),
-              DeskHotspot(
-                left: w * 0.58,
-                top: h * 0.08,
-                width: w * 0.18,
-                height: h * 0.35,
+              _buildHotspot(
+                screenWidth: screenWidth,
+                screenHeight: screenHeight,
+                zone: layout.archivesHotspot,
                 label: 'Archives',
-                debug: widget.debugHotspots,
                 glowColor: const Color(0x883B82F6),
                 onTap: widget.onOpenArchives ??
                     () {
@@ -175,22 +183,18 @@ class _ScenarioScreenState extends State<ScenarioScreen> {
                       );
                     },
               ),
-
-              Positioned(
-                left: w * 0.38,
-                top: h * 0.84,
-                child: const BeaconDot(
-                  color: Color(0xFFFFD36B),
-                  size: 14,
-                ),
+              _buildBeacon(
+                zone: layout.investigationDot,
+                screenWidth: screenWidth,
+                screenHeight: screenHeight,
+                color: const Color(0xFFFFD36B),
+                size: 14,
               ),
-              DeskHotspot(
-                left: w * 0.28,
-                top: h * 0.76,
-                width: w * 0.23,
-                height: h * 0.19,
+              _buildHotspot(
+                screenWidth: screenWidth,
+                screenHeight: screenHeight,
+                zone: layout.investigationHotspot,
                 label: 'Enquête',
-                debug: widget.debugHotspots,
                 glowColor: const Color(0x88D8B36A),
                 onTap: widget.onOpenInvestigation ??
                     () {
@@ -199,22 +203,18 @@ class _ScenarioScreenState extends State<ScenarioScreen> {
                       );
                     },
               ),
-
-              Positioned(
-                left: w * 0.65,
-                top: h * 0.74,
-                child: const BeaconDot(
-                  color: Color(0xFFFFD89A),
-                  size: 16,
-                ),
+              _buildBeacon(
+                zone: layout.microDot,
+                screenWidth: screenWidth,
+                screenHeight: screenHeight,
+                color: const Color(0xFFFFD89A),
+                size: 16,
               ),
-              DeskHotspot(
-                left: w * 0.58,
-                top: h * 0.60,
-                width: w * 0.22,
-                height: h * 0.25,
+              _buildHotspot(
+                screenWidth: screenWidth,
+                screenHeight: screenHeight,
+                zone: layout.microHotspot,
                 label: 'Micro',
-                debug: widget.debugHotspots,
                 glowColor: const Color(0x99D8B36A),
                 onTap: widget.onOpenMicro ??
                     () {
@@ -223,42 +223,34 @@ class _ScenarioScreenState extends State<ScenarioScreen> {
                       );
                     },
               ),
-
-              Positioned(
-                left: w * 0.83,
-                top: h * 0.63,
-                child: const BeaconDot(
-                  color: Color(0xFFFFFF80),
-                  size: 16,
-                ),
+              _buildBeacon(
+                zone: layout.sosDot,
+                screenWidth: screenWidth,
+                screenHeight: screenHeight,
+                color: const Color(0xFFFFFF80),
+                size: 16,
               ),
-              DeskHotspot(
-                left: w * 0.82,
-                top: h * 0.45,
-                width: w * 0.12,
-                height: h * 0.20,
+              _buildHotspot(
+                screenWidth: screenWidth,
+                screenHeight: screenHeight,
+                zone: layout.sosHotspot,
                 label: 'SOS',
-                debug: widget.debugHotspots,
                 glowColor: const Color(0xAAFFE066),
                 onTap: _openSosFlow,
               ),
-
               if (widget.canExit)
-                Positioned(
-                  left: w * 0.78,
-                  top: h * 0.34,
-                  child: const BeaconDot(
-                    color: Color(0xFFFFE0A3),
-                    size: 15,
-                  ),
+                _buildBeacon(
+                  zone: layout.exitDot,
+                  screenWidth: screenWidth,
+                  screenHeight: screenHeight,
+                  color: const Color(0xFFFFE0A3),
+                  size: 15,
                 ),
-              DeskHotspot(
-                left: w * 0.70,
-                top: h * 0.02,
-                width: w * 0.25,
-                height: h * 0.48,
+              _buildHotspot(
+                screenWidth: screenWidth,
+                screenHeight: screenHeight,
+                zone: layout.exitHotspot,
                 label: 'Sortie',
-                debug: widget.debugHotspots,
                 glowColor: widget.canExit
                     ? const Color(0x99E9D4A0)
                     : const Color(0x33FFFFFF),
@@ -269,22 +261,18 @@ class _ScenarioScreenState extends State<ScenarioScreen> {
                       );
                     },
               ),
-
-              Positioned(
-                left: w * 0.32,
-                top: h * 0.22,
-                child: const BeaconDot(
-                  color: Color(0xFFFFFFFF),
-                  size: 14,
-                ),
+              _buildBeacon(
+                zone: layout.mapDot,
+                screenWidth: screenWidth,
+                screenHeight: screenHeight,
+                color: const Color(0xFFFFFFFF),
+                size: 14,
               ),
-              DeskHotspot(
-                left: w * 0.02,
-                top: h * 0.08,
-                width: w * 0.50,
-                height: h * 0.35,
+              _buildHotspot(
+                screenWidth: screenWidth,
+                screenHeight: screenHeight,
+                zone: layout.mapHotspot,
                 label: 'Carte',
-                debug: widget.debugHotspots,
                 glowColor: Colors.white.withOpacity(0.12),
                 onTap: widget.onOpenMap ??
                     () {
@@ -293,51 +281,25 @@ class _ScenarioScreenState extends State<ScenarioScreen> {
                       );
                     },
               ),
-
-              Positioned(
-                left: w * 0.56,
-                top: h * 0.45,
-                width: w * 0.09,
-                height: h * 0.24,
-                child: IgnorePointer(
-                  child: HourglassOverlay(
-                    progress: clampedProgress / 9,
-                  ),
-                ),
+              _buildBeacon(
+                zone: layout.hourglassDot,
+                screenWidth: screenWidth,
+                screenHeight: screenHeight,
+                color: const Color(0xFF7B5630),
+                size: 14,
               ),
-
-              Positioned(
-                left: w * 0.50,
-                top: h * 0.02,
-                width: w * 0.13,
-                height: h * 0.10,
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onLongPress: _showMasterResetDialog,
-                  onDoubleTap: _showMasterResetDialog,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: widget.debugMasterReset
-                          ? Colors.red.withOpacity(0.28)
-                          : Colors.transparent,
-                      border: widget.debugMasterReset
-                          ? Border.all(color: Colors.red, width: 2)
-                          : null,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: widget.debugMasterReset
-                        ? const Center(
-                            child: Text(
-                              'RESET',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          )
-                        : null,
-                  ),
-                ),
+              _buildHotspot(
+                screenWidth: screenWidth,
+                screenHeight: screenHeight,
+                zone: layout.hourglass,
+                label: 'Sablier',
+                glowColor: const Color(0x665B4326),
+                onTap: () => _openHourglassDialog(clampedProgress),
+              ),
+              _buildMasterReset(
+                screenWidth: screenWidth,
+                screenHeight: screenHeight,
+                zone: layout.masterReset,
               ),
             ],
           );
@@ -345,6 +307,179 @@ class _ScenarioScreenState extends State<ScenarioScreen> {
       ),
     );
   }
+
+  Widget _buildBeacon({
+    required RelativeZone zone,
+    required double screenWidth,
+    required double screenHeight,
+    required Color color,
+    required double size,
+  }) {
+    return Positioned(
+      left: screenWidth * zone.left,
+      top: screenHeight * zone.top,
+      child: BeaconDot(
+        color: color,
+        size: size,
+      ),
+    );
+  }
+
+  Widget _buildHotspot({
+    required double screenWidth,
+    required double screenHeight,
+    required RelativeZone zone,
+    required String label,
+    required Color glowColor,
+    required VoidCallback onTap,
+  }) {
+    return DeskHotspot(
+      left: screenWidth * zone.left,
+      top: screenHeight * zone.top,
+      width: screenWidth * zone.width,
+      height: screenHeight * zone.height,
+      label: label,
+      debug: widget.debugHotspots,
+      glowColor: glowColor,
+      onTap: onTap,
+    );
+  }
+
+  Widget _buildMasterReset({
+    required double screenWidth,
+    required double screenHeight,
+    required RelativeZone zone,
+  }) {
+    return Positioned(
+      left: screenWidth * zone.left,
+      top: screenHeight * zone.top,
+      width: screenWidth * zone.width,
+      height: screenHeight * zone.height,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onLongPress: _showMasterResetDialog,
+        onDoubleTap: _showMasterResetDialog,
+        child: Container(
+          decoration: BoxDecoration(
+            color: widget.debugMasterReset
+                ? Colors.red.withOpacity(0.28)
+                : Colors.transparent,
+            border: widget.debugMasterReset
+                ? Border.all(color: Colors.red, width: 2)
+                : null,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: widget.debugMasterReset
+              ? const Center(
+                  child: Text(
+                    'RESET',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                )
+              : null,
+        ),
+      ),
+    );
+  }
+}
+
+class RelativeZone {
+  final double left;
+  final double top;
+  final double width;
+  final double height;
+
+  const RelativeZone({
+    required this.left,
+    required this.top,
+    this.width = 0,
+    this.height = 0,
+  });
+}
+
+class ScenarioLayoutSet {
+  final double titleLeft;
+  final double titleTopOffset;
+  final RelativeZone archivesDot;
+  final RelativeZone archivesHotspot;
+  final RelativeZone investigationDot;
+  final RelativeZone investigationHotspot;
+  final RelativeZone microDot;
+  final RelativeZone microHotspot;
+  final RelativeZone sosDot;
+  final RelativeZone sosHotspot;
+  final RelativeZone exitDot;
+  final RelativeZone exitHotspot;
+  final RelativeZone mapDot;
+  final RelativeZone mapHotspot;
+  final RelativeZone hourglass;
+  final RelativeZone hourglassDot;
+  final RelativeZone masterReset;
+
+  const ScenarioLayoutSet({
+    required this.titleLeft,
+    required this.titleTopOffset,
+    required this.archivesDot,
+    required this.archivesHotspot,
+    required this.investigationDot,
+    required this.investigationHotspot,
+    required this.microDot,
+    required this.microHotspot,
+    required this.sosDot,
+    required this.sosHotspot,
+    required this.exitDot,
+    required this.exitHotspot,
+    required this.mapDot,
+    required this.mapHotspot,
+    required this.hourglass,
+    required this.hourglassDot,
+    required this.masterReset,
+  });
+}
+
+class ScenarioLayouts {
+  static const phone = ScenarioLayoutSet(
+    titleLeft: 24,
+    titleTopOffset: 16,
+    archivesDot: RelativeZone(left: 0.58, top: 0.20),
+    archivesHotspot: RelativeZone(left: 0.58, top: 0.08, width: 0.18, height: 0.35),
+    investigationDot: RelativeZone(left: 0.38, top: 0.84),
+    investigationHotspot: RelativeZone(left: 0.28, top: 0.76, width: 0.23, height: 0.19),
+    microDot: RelativeZone(left: 0.65, top: 0.74),
+    microHotspot: RelativeZone(left: 0.60, top: 0.68, width: 0.16, height: 0.17),
+    sosDot: RelativeZone(left: 0.83, top: 0.63),
+    sosHotspot: RelativeZone(left: 0.82, top: 0.45, width: 0.12, height: 0.20),
+    exitDot: RelativeZone(left: 0.78, top: 0.34),
+    exitHotspot: RelativeZone(left: 0.70, top: 0.02, width: 0.25, height: 0.48),
+    mapDot: RelativeZone(left: 0.32, top: 0.22),
+    mapHotspot: RelativeZone(left: 0.02, top: 0.08, width: 0.50, height: 0.35),
+    hourglass: RelativeZone(left: 0.56, top: 0.47, width: 0.09, height: 0.24),
+    hourglassDot: RelativeZone(left: 0.585, top: 0.58),
+    masterReset: RelativeZone(left: 0.50, top: 0.02, width: 0.13, height: 0.10),
+  );
+
+  static const tablet = ScenarioLayoutSet(
+    titleLeft: 48,
+    titleTopOffset: 18,
+    archivesDot: RelativeZone(left: 0.58, top: 0.26),
+    archivesHotspot: RelativeZone(left: 0.58, top: 0.14, width: 0.18, height: 0.35),
+    investigationDot: RelativeZone(left: 0.38, top: 0.84),
+    investigationHotspot: RelativeZone(left: 0.28, top: 0.76, width: 0.23, height: 0.19),
+    microDot: RelativeZone(left: 0.65, top: 0.74),
+    microHotspot: RelativeZone(left: 0.60, top: 0.68, width: 0.16, height: 0.17),
+    sosDot: RelativeZone(left: 0.83, top: 0.63),
+    sosHotspot: RelativeZone(left: 0.82, top: 0.45, width: 0.12, height: 0.20),
+    exitDot: RelativeZone(left: 0.78, top: 0.34),
+    exitHotspot: RelativeZone(left: 0.70, top: 0.02, width: 0.25, height: 0.48),
+    mapDot: RelativeZone(left: 0.32, top: 0.22),
+    mapHotspot: RelativeZone(left: 0.02, top: 0.08, width: 0.50, height: 0.35),
+    hourglass: RelativeZone(left: 0.56, top: 0.50, width: 0.09, height: 0.24),
+    hourglassDot: RelativeZone(left: 0.585, top: 0.61),
+    masterReset: RelativeZone(left: 0.50, top: 0.02, width: 0.13, height: 0.10),
+  );
 }
 
 class _ScenarioHelpDialog extends StatefulWidget {

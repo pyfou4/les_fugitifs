@@ -69,7 +69,56 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  int get progress => _places.where((p) => p.isVisited).length.clamp(0, 9);
+  int get progress => _places.where((p) => p.isVisited).length.clamp(0, 19);
+
+  static const Map<String, int> _weightedProgressByPlaceId = {
+    'A0': 18,
+    'B0': 18,
+    'C0': 18,
+    'D0': 18,
+    'A1': 6,
+    'A2': 6,
+    'B1': 5,
+    'B2': 5,
+    'C1': 6,
+  };
+
+  static const List<String> _requiredMainPlaceIds = [
+    'A0',
+    'B0',
+    'C0',
+    'D0',
+  ];
+
+  Set<String> get _visitedPlaceIds =>
+      _places.where((p) => p.isVisited).map((p) => p.id).toSet();
+
+  int get narrativeProgressScore {
+    int score = 0;
+    final visitedIds = _visitedPlaceIds;
+
+    for (final entry in _weightedProgressByPlaceId.entries) {
+      if (visitedIds.contains(entry.key)) {
+        score += entry.value;
+      }
+    }
+
+    return score.clamp(0, 100);
+  }
+
+  double get progressRatio {
+    return (narrativeProgressScore / 100).clamp(0.0, 1.0);
+  }
+
+  bool get canExitNarrative {
+    final visitedIds = _visitedPlaceIds;
+    return _requiredMainPlaceIds.every(visitedIds.contains);
+  }
+
+  List<String> get missingMainPlaceIds {
+    final visitedIds = _visitedPlaceIds;
+    return _requiredMainPlaceIds.where((id) => !visitedIds.contains(id)).toList();
+  }
 
   Future<void> _loadGameData() async {
     if (!mounted) return;
@@ -573,12 +622,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _tryExitGame() {
-    if (progress < 9) {
-      final remaining = 9 - progress;
+    if (!canExitNarrative) {
+      final missing = missingMainPlaceIds;
+      final missingLabel = missing.isEmpty ? 'aucun' : missing.join(', ');
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            'La porte reste fermée. Il te manque encore $remaining lieu${remaining > 1 ? 'x' : ''}.',
+            'La porte reste fermée. Il manque encore les jalons majeurs : $missingLabel.',
           ),
         ),
       );
@@ -1569,8 +1620,8 @@ class _HomeScreenState extends State<HomeScreen> {
         index: currentIndex,
         children: [
           ScenarioScreen(
-            progress: progress,
-            canExit: progress >= 9,
+            progress: progressRatio,
+            canExit: canExitNarrative,
             onOpenMap: () => setState(() => currentIndex = 1),
             onOpenArchives: () => setState(() => currentIndex = 2),
             onOpenInvestigation: () => setState(() => currentIndex = 3),
