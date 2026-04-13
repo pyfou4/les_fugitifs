@@ -53,6 +53,12 @@ class _MapScreenState extends State<MapScreen> {
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  BitmapDescriptor? _playerMarkerIcon;
+  BitmapDescriptor? _revealedPlaceMarkerIcon;
+  BitmapDescriptor? _pivotPlaceMarkerIcon;
+  BitmapDescriptor? _targetPlaceMarkerIcon;
+  BitmapDescriptor? _visitedPlaceMarkerIcon;
+  BitmapDescriptor? _saturatedPlaceMarkerIcon;
   StreamSubscription<Position>? _positionSubscription;
   Marker? _userMarker;
 
@@ -74,6 +80,7 @@ class _MapScreenState extends State<MapScreen> {
   String? _currentSessionId;
   String? _currentSiteId;
   Map<String, int> _placeOccupancy = const <String, int>{};
+  final Set<String> _invokedPlaceIds = <String>{};
   Timer? _heardBannerTimer;
   Timer? _incomingCallRecallTimer;
 
@@ -85,7 +92,51 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void initState() {
     super.initState();
+    _initCustomMarkers();
     _bootstrapMapState();
+  }
+
+  Future<BitmapDescriptor?> _loadBitmapDescriptor(String assetPath) async {
+    try {
+      final byteData = await rootBundle.load(assetPath);
+      final bytes = byteData.buffer.asUint8List();
+      return BitmapDescriptor.fromBytes(bytes);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<void> _initCustomMarkers() async {
+    final playerIcon =
+        await _loadBitmapDescriptor('assets/images/marker_player.png');
+    final revealedIcon =
+        await _loadBitmapDescriptor('assets/images/marker_revealed.png');
+    final pivotIcon =
+        await _loadBitmapDescriptor('assets/images/marker_pivot.png');
+    final targetIcon =
+        await _loadBitmapDescriptor('assets/images/marker_target.png');
+    final visitedIcon =
+        await _loadBitmapDescriptor('assets/images/marker_visited.png');
+    final saturatedIcon =
+        await _loadBitmapDescriptor('assets/images/marker_saturated.png');
+
+    _playerMarkerIcon = playerIcon;
+    _revealedPlaceMarkerIcon = revealedIcon;
+    _pivotPlaceMarkerIcon = pivotIcon;
+    _targetPlaceMarkerIcon = targetIcon;
+    _visitedPlaceMarkerIcon = visitedIcon;
+    _saturatedPlaceMarkerIcon = saturatedIcon;
+
+    if (!mounted) return;
+
+    setState(() {
+      if (_userMarker != null) {
+        _userMarker = _userMarker!.copyWith(
+          iconParam: _playerMarkerIcon,
+          anchorParam: const Offset(0.5, 1.0),
+        );
+      }
+    });
   }
 
   Future<void> _bootstrapMapState() async {
@@ -209,6 +260,33 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
+  bool _isLatentPivotVisible(PlaceNode place) {
+    final id = place.id.trim().toUpperCase();
+
+    switch (id) {
+      case 'B0':
+        return widget.places.any(
+          (candidate) =>
+              RegExp(r'^A[1-9]$').hasMatch(candidate.id.trim().toUpperCase()) &&
+              candidate.isVisited,
+        );
+      case 'C0':
+        return widget.places.any(
+          (candidate) =>
+              RegExp(r'^B[1-9]$').hasMatch(candidate.id.trim().toUpperCase()) &&
+              candidate.isVisited,
+        );
+      case 'D0':
+        return widget.places.any(
+          (candidate) =>
+              RegExp(r'^C[1-9]$').hasMatch(candidate.id.trim().toUpperCase()) &&
+              candidate.isVisited,
+        );
+      default:
+        return false;
+    }
+  }
+
   bool _hasVisited(String placeId) {
     return widget.places.any((place) => place.id == placeId && place.isVisited);
   }
@@ -220,6 +298,34 @@ class _MapScreenState extends State<MapScreen> {
       }
     }
     return true;
+  }
+
+  int _countVisitedMatching(RegExp pattern) {
+    return widget.places.where((place) => place.isVisited && pattern.hasMatch(place.id.trim().toUpperCase())).length;
+  }
+
+  bool _isPivotPartiallyUnlocked(PlaceNode place) {
+    final id = place.id.trim().toUpperCase();
+
+    if (id == 'B0') {
+      return _countVisitedMatching(RegExp(r'^A[1-9]$')) >= 1;
+    }
+
+    if (id == 'C0') {
+      return _countVisitedMatching(RegExp(r'^B[1-9]$')) >= 1;
+    }
+
+    if (id == 'D0') {
+      return _countVisitedMatching(RegExp(r'^C[1-9]$')) >= 1;
+    }
+
+    return false;
+  }
+
+  bool _isLockedVisiblePivot(PlaceNode place) {
+    return _isPivot(place) &&
+        _isPivotPartiallyUnlocked(place) &&
+        !_isPlaceAccessible(place);
   }
 
   bool _isPlaceAccessible(PlaceNode place) {
@@ -236,7 +342,7 @@ class _MapScreenState extends State<MapScreen> {
     }
 
     if (id == 'B0') {
-      if (!_allVisited(const <String>['A1', 'A2', 'A3', 'A4', 'A5', 'A6'])) {
+      if (_countVisitedMatching(RegExp(r'^A[1-9]$')) < 2) {
         return false;
       }
     }
@@ -248,7 +354,7 @@ class _MapScreenState extends State<MapScreen> {
     }
 
     if (id == 'C0') {
-      if (!_allVisited(const <String>['B1', 'B2', 'B3', 'B4', 'B5'])) {
+      if (_countVisitedMatching(RegExp(r'^B[1-9]$')) < 2) {
         return false;
       }
     }
@@ -260,7 +366,7 @@ class _MapScreenState extends State<MapScreen> {
     }
 
     if (id == 'D0') {
-      if (!_allVisited(const <String>['C1', 'C2', 'C3', 'C4'])) {
+      if (_countVisitedMatching(RegExp(r'^C[1-9]$')) < 2) {
         return false;
       }
     }
@@ -277,6 +383,42 @@ class _MapScreenState extends State<MapScreen> {
     }
 
     return true;
+  }
+
+  bool _isPlaceInvoked(PlaceNode place) {
+    return _invokedPlaceIds.contains(place.id);
+  }
+
+  bool _isPlaceVisibleOnMap(PlaceNode place) {
+    if (place.isVisited) {
+      return true;
+    }
+
+    if (_isLatentPivotVisible(place)) {
+      return true;
+    }
+
+    return _isPlaceAccessible(place) && _isPlaceInvoked(place);
+  }
+
+  void _revealPlace(PlaceNode place) {
+    if (_invokedPlaceIds.contains(place.id)) {
+      return;
+    }
+    setState(() {
+      _invokedPlaceIds.add(place.id);
+    });
+  }
+
+  void _pruneInvisibleInvokedPlaces() {
+    _invokedPlaceIds.removeWhere((placeId) {
+      final index = widget.places.indexWhere((candidate) => candidate.id == placeId);
+      if (index == -1) {
+        return true;
+      }
+      final place = widget.places[index];
+      return !place.isVisited && !_isPlaceAccessible(place);
+    });
   }
 
   bool _hasUnsaturatedAlternative() {
@@ -355,7 +497,7 @@ class _MapScreenState extends State<MapScreen> {
     }
 
     if (_currentRoute != null) {
-      return 'Dirige-toi vers la zone. Un détail du dossier semble mener ici.';
+      return 'La piste se resserre ici. Quelque chose t’attend.';
     }
 
     return 'Une piste mérite d’être vérifiée ici.';
@@ -559,9 +701,10 @@ class _MapScreenState extends State<MapScreen> {
         markerId: const MarkerId('user_marker'),
         position: userLatLng,
         infoWindow: const InfoWindow(title: 'Ma position'),
-        icon: BitmapDescriptor.defaultMarkerWithHue(
+        icon: _playerMarkerIcon ?? BitmapDescriptor.defaultMarkerWithHue(
           BitmapDescriptor.hueAzure,
         ),
+        anchor: const Offset(0.5, 1.0),
       );
     });
 
@@ -664,6 +807,7 @@ class _MapScreenState extends State<MapScreen> {
           _showHeardBanner = false;
           _showRouteBanner = false;
         });
+        _pruneInvisibleInvokedPlaces();
         unawaited(_updateMapTargetPlace(null));
         unawaited(_refreshPlaceOccupancy());
       }
@@ -753,8 +897,13 @@ class _MapScreenState extends State<MapScreen> {
         setState(() {
           _isListening = false;
         });
+
+        final message = error.errorMsg.toLowerCase() == 'error_no_match'
+            ? 'Je n’ai pas compris… recommence.'
+            : 'Erreur vocale: $error';
+
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Erreur vocale: $error')),
+          SnackBar(content: Text(message)),
         );
       },
     );
@@ -801,11 +950,14 @@ class _MapScreenState extends State<MapScreen> {
 
     if (normalized.isEmpty) return;
 
+    _pruneInvisibleInvokedPlaces();
     await _refreshPlaceOccupancy();
 
     PlaceNode? matchedPlace;
 
-    for (final place in widget.places.where(_isPlaceAccessible)) {
+    for (final place in widget.places.where(
+      (place) => _isPlaceAccessible(place) || _isPivotPartiallyUnlocked(place),
+    )) {
       for (final keyword in place.keywords) {
         final cleanKeyword = _normalize(keyword);
 
@@ -820,10 +972,16 @@ class _MapScreenState extends State<MapScreen> {
     if (matchedPlace == null) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Aucun lieu reconnu dans : "$spokenText"')),
+        const SnackBar(
+          content: Text(
+            'Rien ne correspond… réessaie.',
+          ),
+        ),
       );
       return;
     }
+
+    _revealPlace(matchedPlace);
 
     if (_isPlaceSaturated(matchedPlace)) {
       _showTemporarilyClosedMessage();
@@ -840,9 +998,20 @@ class _MapScreenState extends State<MapScreen> {
     });
     _scheduleHeardBannerAutoHide();
 
-    await _moveCameraTo(matchedPlace.latLng, zoom: 17);
+    await _moveCameraTo(matchedPlace.latLng, zoom: 17.5);
 
     if (!mounted) return;
+
+    if (_isLockedVisiblePivot(matchedPlace)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${matchedPlace.name} est repéré, mais la piste est encore incomplète.',
+          ),
+        ),
+      );
+      return;
+    }
 
     final wantsRoute = await showDialog<bool>(
       context: context,
@@ -895,6 +1064,7 @@ class _MapScreenState extends State<MapScreen> {
       return;
     }
 
+    _revealPlace(place);
     _setSelectedPlace(place);
 
     setState(() {
@@ -1012,35 +1182,100 @@ class _MapScreenState extends State<MapScreen> {
       markers.add(_userMarker!);
     }
 
-    for (final place in widget.places.where((p) => p.isVisited)) {
+    for (final place in widget.places) {
+      if (!_isPlaceVisibleOnMap(place)) {
+        continue;
+      }
+
+      final isSelected = _selectedPlace?.id == place.id;
+      final isVisited = place.isVisited;
+      final isSaturated = !isVisited && _isPlaceSaturated(place);
+      final isPivot = _isPivot(place);
+      final isLatentPivot = isPivot && !_isPlaceAccessible(place);
+
+      String snippet = 'Piste révélée';
+      BitmapDescriptor icon =
+          _revealedPlaceMarkerIcon ??
+          BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
+
+      if (isVisited) {
+        snippet = 'Visité';
+        icon =
+            _visitedPlaceMarkerIcon ??
+            BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen);
+      } else if (isSaturated) {
+        snippet = 'Temporairement indisponible';
+        icon =
+            _saturatedPlaceMarkerIcon ??
+            BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueOrange);
+      } else if (isSelected) {
+        snippet = 'Piste active';
+        icon =
+            _targetPlaceMarkerIcon ??
+            BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
+      } else if (isLatentPivot) {
+        snippet = 'Repéré, mais pas encore exploitable';
+        icon =
+            _pivotPlaceMarkerIcon ??
+            BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRose);
+      } else if (isPivot) {
+        snippet = 'Pivot narratif';
+        icon =
+            _pivotPlaceMarkerIcon ??
+            BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRose);
+      }
+
+      final int zIndexInt;
+      if (isSelected) {
+        zIndexInt = 5;
+      } else if (isPivot) {
+        zIndexInt = 4;
+      } else if (isSaturated) {
+        zIndexInt = 3;
+      } else if (isVisited) {
+        zIndexInt = 2;
+      } else {
+        zIndexInt = 1;
+      }
+
       markers.add(
         Marker(
           markerId: MarkerId(place.id),
           position: place.latLng,
+          zIndexInt: zIndexInt,
+          anchor: const Offset(0.5, 1.0),
           infoWindow: InfoWindow(
             title: place.name,
-            snippet: 'Visité',
+            snippet: snippet,
           ),
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            BitmapDescriptor.hueGreen,
-          ),
+          icon: icon,
           onTap: () {
-            _setSelectedPlace(place);
-            widget.onOpenPlaceMedia(place);
-          },
-        ),
-      );
-    }
+            if (isVisited) {
+              _setSelectedPlace(place);
+              widget.onOpenPlaceMedia(place);
+              return;
+            }
 
-    if (_selectedPlace != null) {
-      markers.add(
-        Marker(
-          markerId: const MarkerId('selected_place_marker'),
-          position: _selectedPlace!.latLng,
-          infoWindow: InfoWindow(title: _selectedPlace!.name),
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            BitmapDescriptor.hueViolet,
-          ),
+            if (isSaturated) {
+              _showTemporarilyClosedMessage();
+              return;
+            }
+
+            if (isLatentPivot) {
+              unawaited(HapticFeedback.vibrate());
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text(
+                    'Pas encore. Il te manque encore une pièce du puzzle.',
+                  ),
+                ),
+              );
+              return;
+            }
+
+            _setSelectedPlace(place);
+          },
         ),
       );
     }
@@ -1096,6 +1331,7 @@ class _MapScreenState extends State<MapScreen> {
 
   @override
   Widget build(BuildContext context) {
+    _pruneInvisibleInvokedPlaces();
     final safePadding = MediaQuery.of(context).padding;
 
     return Scaffold(

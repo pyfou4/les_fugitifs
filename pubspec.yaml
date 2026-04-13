@@ -47,3 +47,9 @@ flutter:
     - assets/images/logo illuvinatis.png
     - assets/images/logo in tenebris.png
     - assets/images/team_setup_portal.png
+    - assets/images/marker_player.png
+    - assets/images/marker_revealed.png
+    - assets/images/marker_pivot.png
+    - assets/images/marker_target.png
+    - assets/images/marker_visited.png
+    - assets/images/marker_saturated.png

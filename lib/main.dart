@@ -44,7 +44,7 @@ class _MyAppState extends State<MyApp> {
   // Temporaire pendant stabilisation du nouveau tunnel d'entrée :
   // activation -> team setup -> briefing -> home
   // Ne supprime pas la logique de session existante, la contourne juste pour les tests.
-  static const bool _forceActivationFlow = true;
+  static const bool _forceActivationFlow = false;
 
   bool _isLoading = true;
   bool _hasValidSession = false;
@@ -57,6 +57,8 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _checkSession() async {
     final isValid = await SessionService.isSessionValid();
+
+    if (!mounted) return;
 
     setState(() {
       _hasValidSession = isValid;
