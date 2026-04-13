@@ -5,6 +5,9 @@ import 'package:google_fonts/google_fonts.dart';
 import '../constants/firebase_media.dart';
 import '../services/session_service.dart';
 
+import 'briefing_screen.dart';
+import 'team_setup_screen.dart';
+
 class ActivationScreen extends StatefulWidget {
   final Widget nextScreen;
 
@@ -49,10 +52,25 @@ class _ActivationScreenState extends State<ActivationScreen> {
     });
 
     if (success) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => widget.nextScreen),
+      final TeamSetupResult? teamSetupResult = await Navigator.of(context).push<TeamSetupResult>(
+        MaterialPageRoute(
+          builder: (_) => const TeamSetupScreen(),
+        ),
       );
+
+      if (!mounted) return;
+
+      if (teamSetupResult != null) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(
+            builder: (_) => const BriefingScreen(),
+          ),
+        );
+      } else {
+        setState(() {
+          _error = "Enregistrement de l'équipe annulé";
+        });
+      }
     } else {
       setState(() {
         _error = "Accès refusé — code invalide, expiré ou session introuvable";

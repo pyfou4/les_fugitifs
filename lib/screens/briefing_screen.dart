@@ -43,19 +43,26 @@ class _BriefingScreenState extends State<BriefingScreen> {
     final dir = await getTemporaryDirectory();
     final file = File('${dir.path}/$filename');
 
+    // Évite de réutiliser un ancien fichier temporaire potentiellement corrompu.
     if (await file.exists()) {
-      return file;
+      try {
+        await file.delete();
+      } catch (_) {}
     }
 
     final response = await http
         .get(Uri.parse(url))
-        .timeout(const Duration(seconds: 30));
+        .timeout(const Duration(seconds: 60));
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception('Téléchargement impossible (${response.statusCode})');
     }
 
-    await file.writeAsBytes(response.bodyBytes);
+    if (response.bodyBytes.isEmpty) {
+      throw Exception('Téléchargement impossible (fichier vide)');
+    }
+
+    await file.writeAsBytes(response.bodyBytes, flush: true);
     return file;
   }
 
@@ -101,6 +108,10 @@ class _BriefingScreenState extends State<BriefingScreen> {
         }
       });
     } catch (e) {
+      debugPrint(
+        'ERREUR VIDEO (${isRules ? "rules" : "briefing"}) : $e',
+      );
+
       if (!mounted) return;
       setState(() {
         if (isRules) {
@@ -194,8 +205,15 @@ class _BriefingScreenState extends State<BriefingScreen> {
           final w = constraints.maxWidth;
           final h = constraints.maxHeight;
           final compact = h < 720;
+          final isTablet = w >= 900;
 
-          final overlayWidth = w * 0.25;
+          final double cardWidth = isTablet ? w * 0.26 : w * 0.30;
+          final double cardHeight = isTablet ? h * 0.40 : h * 0.44;
+          final double centerGap = isTablet ? w * 0.04 : w * 0.05;
+          final double leftCardLeft = (w / 2) - cardWidth - (centerGap / 2);
+          final double rightCardLeft = (w / 2) + (centerGap / 2);
+          final double cardsTop = isTablet ? h * 0.30 : h * 0.32;
+          final double titleTop = cardsTop + cardHeight + (isTablet ? 12 : 10);
 
           return Stack(
             children: [
@@ -260,16 +278,17 @@ class _BriefingScreenState extends State<BriefingScreen> {
 
               Positioned(
                 left: compact ? 18 : 24,
-                top: h * 0.22,
+                top: isTablet ? h * 0.16 : h * 0.18,
                 child: _TopLogo(compact: compact),
               ),
 
               Positioned(
-                left: w * 0.21,
-                top: h * 0.18,
-                width: overlayWidth,
+                left: leftCardLeft,
+                top: cardsTop,
+                width: cardWidth,
+                height: cardHeight,
                 child: Transform.rotate(
-                  angle: -0.045,
+                  angle: -0.035,
                   child: _PolaroidOverlay(
                     compact: compact,
                     progress: rulesProgress,
@@ -290,11 +309,12 @@ class _BriefingScreenState extends State<BriefingScreen> {
               ),
 
               Positioned(
-                left: w * 0.53,
-                top: h * 0.17,
-                width: overlayWidth,
+                left: rightCardLeft,
+                top: cardsTop,
+                width: cardWidth,
+                height: cardHeight,
                 child: Transform.rotate(
-                  angle: 0.038,
+                  angle: 0.035,
                   child: _PolaroidOverlay(
                     compact: compact,
                     progress: briefingProgress,
@@ -315,6 +335,48 @@ class _BriefingScreenState extends State<BriefingScreen> {
               ),
 
               Positioned(
+                left: leftCardLeft,
+                top: titleTop,
+                width: cardWidth,
+                child: Text(
+                  'Règles du jeu',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.90),
+                    fontSize: isTablet ? 20 : 18,
+                    fontWeight: FontWeight.w800,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black.withOpacity(0.55),
+                        blurRadius: 8,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              Positioned(
+                left: rightCardLeft,
+                top: titleTop,
+                width: cardWidth,
+                child: Text(
+                  'Briefing',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.90),
+                    fontSize: isTablet ? 20 : 18,
+                    fontWeight: FontWeight.w800,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black.withOpacity(0.55),
+                        blurRadius: 8,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              Positioned(
                 right: compact ? 18 : 24,
                 bottom: 0,
                 child: SafeArea(
@@ -324,31 +386,33 @@ class _BriefingScreenState extends State<BriefingScreen> {
                   child: ElevatedButton(
                     onPressed: _canEnter
                         ? () {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                          builder: (_) => const HomeScreen(),
-                        ),
-                      );
-                    }
+                            Navigator.of(context).pushReplacement(
+                              MaterialPageRoute(
+                                builder: (_) => const HomeScreen(),
+                              ),
+                            );
+                          }
                         : null,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFE3B560),
+                      elevation: 8,
+                      shadowColor: Colors.black.withOpacity(0.6),
+                      backgroundColor: const Color(0xFFC69A5A),
                       foregroundColor: Colors.black,
                       disabledBackgroundColor: Colors.white.withOpacity(0.18),
                       disabledForegroundColor: Colors.white54,
                       padding: EdgeInsets.symmetric(
-                        horizontal: compact ? 22 : 30,
-                        vertical: compact ? 14 : 18,
+                        horizontal: compact ? 18 : 22,
+                        vertical: compact ? 11 : 13,
                       ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
                       textStyle: TextStyle(
-                        fontSize: compact ? 18 : 22,
+                        fontSize: compact ? 15 : 17,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
-                    child: const Text('Entrez !'),
+                    child: const Text('Ouvrir le dossier'),
                   ),
                 ),
               ),
@@ -369,7 +433,7 @@ class _TopLogo extends StatelessWidget {
   Widget build(BuildContext context) {
     return Image.asset(
       'assets/images/logo.png',
-      height: compact ? 110 : 140,
+      height: compact ? 88 : 118,
       fit: BoxFit.contain,
       errorBuilder: (_, __, ___) {
         return Text(
@@ -407,32 +471,15 @@ class _PolaroidOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 218,
-      child: Center(
-        child: SizedBox(
-          width: 252,
-          height: 218,
-          child: Stack(
-            clipBehavior: Clip.none,
-            children: [
-              Positioned(
-                left: -6,
-                right: -6,
-                top: -6,
-                bottom: -6,
-                child: _PhotoSurface(
-                  isDone: isDone,
-                  isReady: isReady,
-                  errorText: errorText,
-                  controller: controller,
-                  progress: progress,
-                  onTap: onTap,
-                ),
-              ),
-            ],
-          ),
-        ),
+    return Padding(
+      padding: EdgeInsets.all(compact ? 4 : 6),
+      child: _PhotoSurface(
+        isDone: isDone,
+        isReady: isReady,
+        errorText: errorText,
+        controller: controller,
+        progress: progress,
+        onTap: onTap,
       ),
     );
   }
@@ -462,28 +509,49 @@ class _PhotoSurface extends StatelessWidget {
         controller != null &&
         controller!.value.isInitialized;
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(18),
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          if (hasVideo)
-            Transform.scale(
-              scale: 1.12,
-              child: FittedBox(
-                fit: BoxFit.cover,
-                child: SizedBox(
-                  width: controller!.value.size.width,
-                  height: controller!.value.size.height,
-                  child: VideoPlayer(controller!),
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.18),
+            blurRadius: 10,
+            spreadRadius: -3,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            if (hasVideo)
+              ColorFiltered(
+                colorFilter: ColorFilter.mode(
+                  Colors.black.withOpacity(0.10),
+                  BlendMode.darken,
+                ),
+                child: FittedBox(
+                  fit: BoxFit.cover,
+                  child: SizedBox(
+                    width: controller!.value.size.width,
+                    height: controller!.value.size.height,
+                    child: VideoPlayer(controller!),
+                  ),
+                ),
+              )
+            else
+              ColorFiltered(
+                colorFilter: ColorFilter.mode(
+                  Colors.black.withOpacity(0.10),
+                  BlendMode.darken,
+                ),
+                child: CachedNetworkImage(
+                  imageUrl: FirebaseMedia.bgBriefing,
+                  fit: BoxFit.cover,
                 ),
               ),
-            )
-          else
-            CachedNetworkImage(
-              imageUrl: FirebaseMedia.bgBriefing,
-              fit: BoxFit.cover,
-            ),
 
           Container(
             decoration: BoxDecoration(
@@ -499,10 +567,10 @@ class _PhotoSurface extends StatelessWidget {
 
           Container(
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(18),
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(
-                color: Colors.white.withOpacity(0.10),
-                width: 1.2,
+                color: Colors.white.withOpacity(0.08),
+                width: 1.0,
               ),
             ),
           ),
@@ -526,6 +594,7 @@ class _PhotoSurface extends StatelessWidget {
             onTap: onTap,
           ),
         ],
+      ),
       ),
     );
   }
@@ -560,8 +629,8 @@ class _PhotoOverlayUI extends StatelessWidget {
           child: GestureDetector(
             onTap: errorText != null ? null : onTap,
             child: Container(
-              width: 74,
-              height: 74,
+              width: 66,
+              height: 66,
               decoration: BoxDecoration(
                 color: Colors.black.withOpacity(0.22),
                 shape: BoxShape.circle,
@@ -576,7 +645,7 @@ class _PhotoOverlayUI extends StatelessWidget {
                     ? Icons.check_circle
                     : Icons.play_arrow,
                 color: Colors.white,
-                size: 42,
+                size: 36,
               ),
             ),
           ),
@@ -590,7 +659,7 @@ class _PhotoOverlayUI extends StatelessWidget {
             children: [
               LinearProgressIndicator(
                 value: isReady ? progress : null,
-                minHeight: 5,
+                minHeight: 4,
                 backgroundColor: Colors.white.withOpacity(0.18),
                 valueColor: const AlwaysStoppedAnimation<Color>(
                   Color(0xFFE3B560),

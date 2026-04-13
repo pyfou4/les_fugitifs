@@ -3,7 +3,7 @@ class FirebaseMedia {
       'https://firebasestorage.googleapis.com/v0/b/les-fugitifs.firebasestorage.app/o/images%2Farchives_screen_1080x1920.png?alt=media&token=f6f4b198-2df6-4206-9938-a88032efa2a8';
 
   static const bgBriefing =
-      'https://firebasestorage.googleapis.com/v0/b/les-fugitifs.firebasestorage.app/o/images%2Fbg_briefing.png?alt=media&token=34bcfc5e-e8b6-40fa-8d99-d7d6173d762b';
+      'https://firebasestorage.googleapis.com/v0/b/les-fugitifs.firebasestorage.app/o/images%2Fbg_briefing.png?alt=media&token=1496a754-d71e-4e89-84e6-afaa5533366b';
 
   static const bgScenarios =
       'https://firebasestorage.googleapis.com/v0/b/les-fugitifs.firebasestorage.app/o/images%2Fbg_scenarios.png?alt=media&token=5dc03680-d4ac-46cd-a314-af59dfef3c95';

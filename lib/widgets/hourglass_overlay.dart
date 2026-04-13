@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 
 class HourglassOverlay extends StatelessWidget {
@@ -12,7 +14,8 @@ class HourglassOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final p = progress.clamp(0.0, 1.0);
+    final raw = progress.clamp(0.0, 1.0);
+    final p = pow(raw, 1.8).toDouble();
 
     return TweenAnimationBuilder<double>(
       tween: Tween<double>(begin: 0, end: p),
