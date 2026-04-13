@@ -43,7 +43,7 @@ class _TeamSetupScreenState extends State<TeamSetupScreen>
   static const int _maxNameLength = 24;
 
   static const List<int> _playerOptions = <int>[1, 2, 3, 4];
-  int _selectedPlayerCount = 2;
+  int? _selectedPlayerCount;
 
   bool _isSubmitting = false;
   String? _errorMessage;
@@ -138,6 +138,13 @@ class _TeamSetupScreenState extends State<TeamSetupScreen>
       return;
     }
 
+    if (_selectedPlayerCount == null) {
+      setState(() {
+        _errorMessage = 'Veuillez sélectionner le nombre de joueurs.';
+      });
+      return;
+    }
+
     setState(() {
       _isSubmitting = true;
       _errorMessage = null;
@@ -146,10 +153,10 @@ class _TeamSetupScreenState extends State<TeamSetupScreen>
         offset: cleanedName.length,
       );
     });
-
+    
     final TeamSetupResult result = TeamSetupResult(
       teamName: cleanedName,
-      playerCount: _selectedPlayerCount,
+      playerCount: _selectedPlayerCount!,
       createdAt: DateTime.now(),
     );
 
@@ -494,7 +501,7 @@ class _SetupPanel extends StatelessWidget {
   final bool keyboardVisible;
   final TextEditingController teamNameController;
   final FocusNode teamNameFocusNode;
-  final int selectedPlayerCount;
+  final int? selectedPlayerCount;
   final List<int> playerOptions;
   final bool isSubmitting;
   final String? errorMessage;
@@ -605,7 +612,11 @@ class _SetupPanel extends StatelessWidget {
                       fontSize: fieldFontSize,
                     ),
                     cursorColor: Colors.white,
-                    onSubmitted: (_) => onSubmit(),
+                    onSubmitted: (_) {
+                      if (selectedPlayerCount != null) {
+                        onSubmit();
+                      }
+                    },
                     buildCounter: (
                       BuildContext context, {
                       required int currentLength,
@@ -707,7 +718,9 @@ class _SetupPanel extends StatelessWidget {
                   SizedBox(
                     width: double.infinity,
                     child: FilledButton(
-                      onPressed: isSubmitting ? null : onSubmit,
+                      onPressed: (isSubmitting || selectedPlayerCount == null)
+                          ? null
+                          : onSubmit,
                       style: FilledButton.styleFrom(
                         backgroundColor: Colors.white,
                         foregroundColor: const Color(0xFF09101C),

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:speech_to_text/speech_to_text.dart' as stt;
 
 import '../services/ai_service.dart';
 
@@ -32,18 +33,155 @@ class SOSSreen extends StatefulWidget {
   State<SOSSreen> createState() => _SOSSreenState();
 }
 
-class _SOSSreenState extends State<SOSSreen> {
+class _SOSSreenState extends State<SOSSreen>
+    with SingleTickerProviderStateMixin {
+  static const String _backgroundUrl =
+      'https://firebasestorage.googleapis.com/v0/b/les-fugitifs.firebasestorage.app/o/images%2Fdetective_desk.png?alt=media&token=c5d76809-743b-4d78-8102-6fd89f171fc9';
+
   final AiService _aiService = AiService();
   final TextEditingController _questionController = TextEditingController();
+  final stt.SpeechToText _speechToText = stt.SpeechToText();
 
   bool _isSending = false;
+  bool _showTextInput = false;
+  bool _isListening = false;
+  bool _speechAvailable = true;
+  String _heardPreview = '';
   String? _errorMessage;
   AiHelpResponse? _lastResponse;
+
+  late final AnimationController _pulseController;
+  late final Animation<double> _pulseScale;
+  late final Animation<double> _pulseGlow;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1800),
+    )..repeat(reverse: true);
+
+    _pulseScale = Tween<double>(
+      begin: 0.985,
+      end: 1.03,
+    ).animate(
+      CurvedAnimation(
+        parent: _pulseController,
+        curve: Curves.easeInOut,
+      ),
+    );
+
+    _pulseGlow = Tween<double>(
+      begin: 0.14,
+      end: 0.24,
+    ).animate(
+      CurvedAnimation(
+        parent: _pulseController,
+        curve: Curves.easeInOut,
+      ),
+    );
+  }
 
   @override
   void dispose() {
     _questionController.dispose();
+    _speechToText.stop();
+    _pulseController.dispose();
     super.dispose();
+  }
+
+  Future<void> _stopListening() async {
+    if (_speechToText.isListening) {
+      await _speechToText.stop();
+    }
+    if (!mounted) return;
+    setState(() {
+      _isListening = false;
+    });
+  }
+
+  Future<void> _startListening() async {
+    if (_isSending) return;
+
+    final available = await _speechToText.initialize(
+      onStatus: (status) {
+        if (!mounted) return;
+        if (status == 'done' || status == 'notListening') {
+          setState(() {
+            _isListening = false;
+          });
+        }
+      },
+      onError: (_) {
+        if (!mounted) return;
+        setState(() {
+          _isListening = false;
+          _speechAvailable = false;
+          _showTextInput = true;
+          _errorMessage =
+              'La saisie vocale est indisponible. Utilisez le champ texte.';
+        });
+      },
+    );
+
+    if (!available) {
+      if (!mounted) return;
+      setState(() {
+        _speechAvailable = false;
+        _showTextInput = true;
+        _isListening = false;
+        _errorMessage =
+            'La saisie vocale est indisponible. Utilisez le champ texte.';
+      });
+      return;
+    }
+
+    setState(() {
+      _speechAvailable = true;
+      _heardPreview = '';
+      _isListening = true;
+      _errorMessage = null;
+      _showTextInput = false;
+    });
+
+    await _speechToText.listen(
+      localeId: 'fr_FR',
+      listenMode: stt.ListenMode.confirmation,
+      onResult: (result) async {
+        if (!mounted) return;
+        final words = result.recognizedWords.trim();
+        setState(() {
+          _heardPreview = words;
+          if (words.isNotEmpty) {
+            _questionController.text = words;
+            _questionController.selection = TextSelection.collapsed(
+              offset: words.length,
+            );
+          }
+        });
+
+        if (result.finalResult) {
+          await _speechToText.stop();
+          if (!mounted) return;
+          setState(() {
+            _isListening = false;
+            if (_heardPreview.isEmpty || _heardPreview.length < 6) {
+              _showTextInput = true;
+            }
+          });
+        }
+      },
+    );
+  }
+
+  Future<void> _toggleListening() async {
+    if (_isListening) {
+      await _stopListening();
+    } else {
+      await _startListening();
+    }
   }
 
   Future<void> _requestAiHelp(Map<String, dynamic> sessionData) async {
@@ -51,10 +189,14 @@ class _SOSSreenState extends State<SOSSreen> {
 
     if (playerQuestion.isEmpty) {
       setState(() {
-        _errorMessage = "Décris brièvement ton blocage avant d'envoyer la demande.";
+        _errorMessage =
+            "Décris brièvement ton blocage avant d'envoyer la demande.";
+        _showTextInput = true;
       });
       return;
     }
+
+    await _stopListening();
 
     setState(() {
       _isSending = true;
@@ -62,24 +204,35 @@ class _SOSSreenState extends State<SOSSreen> {
     });
 
     final scenarioTitle = widget.scenarioTitle ??
-        _readString(sessionData, const ['scenarioTitle', 'scenarioName', 'title']) ??
+        _readString(
+              sessionData,
+              const ['scenarioTitle', 'scenarioName', 'title'],
+            ) ??
         'Session Les Fugitifs';
 
     final progress =
-        widget.progress ?? _readInt(sessionData, const ['progress', 'gameProgress']) ?? 0;
+        widget.progress ??
+            _readInt(sessionData, const ['progress', 'gameProgress']) ??
+            0;
 
     final aiHelpCount =
         widget.aiHelpCount ?? _readInt(sessionData, const ['aiHelpCount']) ?? 0;
 
     final currentBlockageLevel = widget.currentBlockageLevel ??
-        _readString(sessionData, const ['currentBlockageLevel', 'blockageLevel']) ??
+        _readString(
+              sessionData,
+              const ['currentBlockageLevel', 'blockageLevel'],
+            ) ??
         'low';
 
-    final humanHelpEnabled = widget.humanHelpEnabledOverride ??
-        sessionData['humanHelpEnabled'] == true;
+    final humanHelpEnabled =
+        widget.humanHelpEnabledOverride ?? sessionData['humanHelpEnabled'] == true;
 
     final visitedPlaces = widget.visitedPlaces ??
-        _readStringList(sessionData, const ['visitedPlaces', 'visitedPlaceIds', 'placesVisited']);
+        _readStringList(
+          sessionData,
+          const ['visitedPlaces', 'visitedPlaceIds', 'placesVisited'],
+        );
 
     final blockedPrerequisites = widget.blockedPrerequisites ??
         _readStringList(
@@ -123,7 +276,8 @@ class _SOSSreenState extends State<SOSSreen> {
           'lastAiHelpConfidence': response.confidence,
           'lastAiHelpAt': FieldValue.serverTimestamp(),
           if (callContext != null && callContext.active)
-            'callContext.helpAttemptsDuringCall': callContext.helpAttemptsDuringCall,
+            'callContext.helpAttemptsDuringCall':
+                callContext.helpAttemptsDuringCall,
         },
         SetOptions(merge: true),
       );
@@ -176,7 +330,6 @@ class _SOSSreenState extends State<SOSSreen> {
     return const <String>[];
   }
 
-
   AiHelpCallContext? _readCallContext(Map<String, dynamic> data) {
     final raw = data['callContext'];
     if (raw is! Map) return null;
@@ -222,12 +375,12 @@ class _SOSSreenState extends State<SOSSreen> {
     switch (hintLevel.toLowerCase()) {
       case 'high':
       case 'strong':
-        return const Color(0xFFFFB347);
+        return const Color(0xFFE6A35C);
       case 'medium':
-        return const Color(0xFF6EDB8F);
+        return const Color(0xFF87B9D8);
       case 'low':
       default:
-        return const Color(0xFF8ED1FC);
+        return const Color(0xFFBFD2E0);
     }
   }
 
@@ -235,23 +388,30 @@ class _SOSSreenState extends State<SOSSreen> {
     switch (hintLevel.toLowerCase()) {
       case 'high':
       case 'strong':
-        return 'AIDE RENFORCÉE';
+        return 'Transmission appuyée';
       case 'medium':
-        return 'AIDE GUIDÉE';
+        return 'Transmission guidée';
       case 'low':
       default:
-        return 'AIDE LÉGÈRE';
+        return 'Transmission légère';
     }
+  }
+
+  String _buildTransmissionText(AiHelpResponse response) {
+    return '[Signal reçu…]\n\n${response.message}\n\n[fin transmission]';
+  }
+
+  String _buildNextActionText(AiHelpResponse response) {
+    if (response.nextAction.trim().isEmpty) {
+      return 'Aucune consigne supplémentaire transmise.';
+    }
+    return response.nextAction.trim();
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF060708),
-      appBar: AppBar(
-        title: const Text('Assistance'),
-        backgroundColor: const Color(0xFF0B0C0E),
-      ),
+      backgroundColor: const Color(0xFF050607),
       body: StreamBuilder<DocumentSnapshot>(
         stream: FirebaseFirestore.instance
             .collection('gameSessions')
@@ -276,230 +436,173 @@ class _SOSSreenState extends State<SOSSreen> {
           final humanHelpEnabled =
               widget.humanHelpEnabledOverride ?? data['humanHelpEnabled'] == true;
 
-          final aiHelpCount =
-              widget.aiHelpCount ?? _readInt(data, const ['aiHelpCount']) ?? 0;
+          final media = MediaQuery.of(context);
+          final isTablet = media.size.shortestSide >= 700;
+          final panelWidth = isTablet ? 340.0 : media.size.width * 0.82;
+          final outerPadding = isTablet ? 20.0 : 14.0;
 
-          return Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  Color(0xFF08090A),
-                  Color(0xFF12161A),
-                  Color(0xFF0A0B0C),
-                ],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
-            child: SafeArea(
-              child: GestureDetector(
-                onTap: () => FocusScope.of(context).unfocus(),
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      _TerminalPanel(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const _SectionTitle(
-                              icon: Icons.memory,
-                              title: 'NŒUD D’ASSISTANCE HENIGMA',
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              const _DeskBackdrop(),
+              const _DeskOverlay(),
+              SafeArea(
+                child: Center(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: outerPadding,
+                      vertical: 16,
+                    ),
+                    child: ConstrainedBox(
+                      constraints: BoxConstraints(maxWidth: panelWidth),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(22),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF08111B).withOpacity(0.80),
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(
+                              color: const Color(0xFF7A8FB7).withOpacity(0.24),
                             ),
-                            const SizedBox(height: 12),
-                            Text(
-                              'Décris ton blocage. L’assistance IA répond sans révéler directement la solution.',
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.78),
-                                height: 1.45,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.36),
+                                blurRadius: 22,
+                                spreadRadius: 1,
+                                offset: const Offset(0, 10),
                               ),
+                            ],
+                          ),
+                          child: Padding(
+                            padding: EdgeInsets.fromLTRB(
+                              isTablet ? 14 : 9,
+                              isTablet ? 12 : 8,
+                              isTablet ? 14 : 9,
+                              isTablet ? 12 : 9,
                             ),
-                            const SizedBox(height: 14),
-                            _StatusRow(
-                              label: 'Session',
-                              value: widget.sessionId,
-                            ),
-                            const SizedBox(height: 8),
-                            _StatusRow(
-                              label: 'Aides IA déjà demandées',
-                              value: aiHelpCount.toString(),
-                            ),
-                            const SizedBox(height: 8),
-                            _StatusRow(
-                              label: 'Aide humaine',
-                              value: humanHelpEnabled ? 'DISPONIBLE' : 'DÉSACTIVÉE',
-                              valueColor: humanHelpEnabled
-                                  ? const Color(0xFF6EDB8F)
-                                  : const Color(0xFFFF7A7A),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      _TerminalPanel(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const _SectionTitle(
-                              icon: Icons.edit_note,
-                              title: 'DEMANDE JOUEUR',
-                            ),
-                            const SizedBox(height: 12),
-                            TextField(
-                              controller: _questionController,
-                              minLines: 4,
-                              maxLines: 6,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                height: 1.4,
-                              ),
-                              decoration: InputDecoration(
-                                hintText:
-                                    "Ex. Nous avons visité plusieurs lieux mais nous ne savons plus quelle piste poursuivre.",
-                                hintStyle: TextStyle(
-                                  color: Colors.white.withOpacity(0.32),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                _CompactHeader(
+                                  humanHelpEnabled: humanHelpEnabled,
+                                  onClose: () => Navigator.of(context).pop(),
+                                  compact: !isTablet,
                                 ),
-                                filled: true,
-                                fillColor: const Color(0xFF0F1316),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                  borderSide: BorderSide(
-                                    color: const Color(0xFFFFB347).withOpacity(0.22),
-                                  ),
+                                SizedBox(height: isTablet ? 8 : 6),
+                                _MainSignalPanel(
+                                  isTablet: isTablet,
+                                  isSending: _isSending,
+                                  isListening: _isListening,
+                                  speechAvailable: _speechAvailable,
+                                  heardPreview: _heardPreview,
+                                  pulseController: _pulseController,
+                                  pulseScale: _pulseScale,
+                                  pulseGlow: _pulseGlow,
+                                  showTextInput: _showTextInput,
+                                  questionController: _questionController,
+                                  errorMessage: _errorMessage,
+                                  response: _lastResponse,
+                                  onToggleTextInput: () {
+                                    setState(() {
+                                      _showTextInput = !_showTextInput;
+                                    });
+                                  },
+                                  onMicTap: _toggleListening,
+                                  hintLabelBuilder: _hintLabel,
+                                  hintColorBuilder: _hintColor,
+                                  transmissionBuilder: _buildTransmissionText,
+                                  nextActionBuilder: _buildNextActionText,
+                                  compact: !isTablet,
                                 ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                  borderSide: BorderSide(
-                                    color: const Color(0xFFFFB347).withOpacity(0.22),
-                                  ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(14),
-                                  borderSide: const BorderSide(
-                                    color: Color(0xFFFFB347),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 14),
-                            SizedBox(
-                              width: double.infinity,
-                              child: ElevatedButton.icon(
-                                onPressed: _isSending ? null : () => _requestAiHelp(data),
-                                icon: _isSending
-                                    ? const SizedBox(
-                                        width: 18,
-                                        height: 18,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: Colors.white,
+                                SizedBox(height: isTablet ? 8 : 6),
+                                Row(
+                                  children: [
+                                    Expanded(
+                                      child: OutlinedButton(
+                                        onPressed: _isSending
+                                            ? null
+                                            : () => Navigator.of(context).pop(),
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: const Color(
+                                            0xFFE7DACA,
+                                          ),
+                                          side: BorderSide(
+                                            color: const Color(
+                                              0xFF7A8FB7,
+                                            ).withOpacity(0.24),
+                                          ),
+                                          padding: EdgeInsets.symmetric(
+                                            vertical: isTablet ? 13 : 11,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              14,
+                                            ),
+                                          ),
+                                          textStyle: TextStyle(
+                                            fontSize: isTablet ? 14 : 12.5,
+                                            fontWeight: FontWeight.w600,
+                                          ),
                                         ),
-                                      )
-                                    : const Icon(Icons.send),
-                                label: Text(_isSending
-                                    ? 'Analyse en cours...'
-                                    : 'INTERROGER L’ASSISTANCE'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFF29170C),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(vertical: 16),
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(14),
-                                    side: BorderSide(
-                                      color: const Color(0xFFFFB347).withOpacity(0.28),
+                                        child: const Text('Fermer'),
+                                      ),
                                     ),
-                                  ),
-                                ),
-                              ),
-                            ),
-                            if (_errorMessage != null) ...[
-                              const SizedBox(height: 12),
-                              Text(
-                                _errorMessage!,
-                                style: const TextStyle(
-                                  color: Color(0xFFFF7A7A),
-                                  height: 1.4,
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      _TerminalPanel(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const _SectionTitle(
-                              icon: Icons.assistant,
-                              title: 'RÉPONSE IA',
-                            ),
-                            const SizedBox(height: 12),
-                            if (_lastResponse == null)
-                              Text(
-                                "Aucune réponse pour l'instant. Décris votre blocage pour obtenir une orientation contextuelle.",
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.72),
-                                  height: 1.45,
-                                ),
-                              )
-                            else ...[
-                              Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
-                                children: [
-                                  _InfoBadge(
-                                    label: _hintLabel(_lastResponse!.hintLevel),
-                                    color: _hintColor(_lastResponse!.hintLevel),
-                                  ),
-                                  _InfoBadge(
-                                    label:
-                                        'CONFIANCE ${(100 * _lastResponse!.confidence).round()}%',
-                                    color: const Color(0xFF8ED1FC),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 14),
-                              _ResponseBlock(
-                                title: 'Message',
-                                text: _lastResponse!.message,
-                              ),
-                              if (_lastResponse!.nextAction.trim().isNotEmpty) ...[
-                                const SizedBox(height: 12),
-                                _ResponseBlock(
-                                  title: 'Prochaine action conseillée',
-                                  text: _lastResponse!.nextAction,
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      flex: 2,
+                                      child: ElevatedButton.icon(
+                                        onPressed: _isSending
+                                            ? null
+                                            : () => _requestAiHelp(data),
+                                        icon: _isSending
+                                            ? const SizedBox(
+                                                width: 16,
+                                                height: 16,
+                                                child:
+                                                    CircularProgressIndicator(
+                                                      strokeWidth: 2,
+                                                      color: Colors.white,
+                                                    ),
+                                              )
+                                            : const Icon(
+                                                Icons.send_rounded,
+                                                size: 16,
+                                              ),
+                                        label: Text(
+                                          _isSending ? 'Analyse…' : 'Analyser',
+                                        ),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: const Color(
+                                            0xFF7A57C6,
+                                          ),
+                                          foregroundColor: Colors.white,
+                                          padding: EdgeInsets.symmetric(
+                                            vertical: isTablet ? 13 : 11,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              14,
+                                            ),
+                                          ),
+                                          textStyle: TextStyle(
+                                            fontSize: isTablet ? 14 : 12.5,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ],
-                              if (humanHelpEnabled) ...[
-                                const SizedBox(height: 14),
-                                Text(
-                                  "Si votre équipe reste bloquée après cette réponse, le maître du jeu peut reprendre la main.",
-                                  style: TextStyle(
-                                    color: Colors.white.withOpacity(0.62),
-                                    height: 1.4,
-                                  ),
-                                ),
-                              ] else ...[
-                                const SizedBox(height: 14),
-                                Text(
-                                  "L’aide humaine est désactivée pour cette session. L’IA reste votre canal d’assistance principal.",
-                                  style: TextStyle(
-                                    color: Colors.white.withOpacity(0.62),
-                                    height: 1.4,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ],
+                            ),
+                          ),
                         ),
                       ),
-                    ],
+                    ),
                   ),
                 ),
               ),
-            ),
+            ],
           );
         },
       ),
@@ -507,101 +610,384 @@ class _SOSSreenState extends State<SOSSreen> {
   }
 }
 
-class _TerminalPanel extends StatelessWidget {
-  final Widget child;
+class _DeskBackdrop extends StatelessWidget {
+  const _DeskBackdrop();
 
-  const _TerminalPanel({
-    required this.child,
+  static const String _backgroundUrl =
+      'https://firebasestorage.googleapis.com/v0/b/les-fugitifs.firebasestorage.app/o/images%2Fdetective_desk.png?alt=media&token=c5d76809-743b-4d78-8102-6fd89f171fc9';
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        color: Color(0xFF040608),
+        image: DecorationImage(
+          image: NetworkImage(_backgroundUrl),
+          fit: BoxFit.cover,
+          alignment: Alignment.center,
+        ),
+      ),
+    );
+  }
+}
+
+class _DeskOverlay extends StatelessWidget {
+  const _DeskOverlay();
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.black.withOpacity(0.68),
+              Colors.black.withOpacity(0.42),
+              Colors.black.withOpacity(0.58),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CompactHeader extends StatelessWidget {
+  final bool humanHelpEnabled;
+  final VoidCallback onClose;
+  final bool compact;
+
+  const _CompactHeader({
+    required this.humanHelpEnabled,
+    required this.onClose,
+    required this.compact,
   });
 
   @override
   Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: compact ? 30 : 34,
+          height: compact ? 30 : 34,
+          decoration: BoxDecoration(
+            color: const Color(0xFF2E1A0B).withOpacity(0.92),
+            borderRadius: BorderRadius.circular(compact ? 9 : 10),
+            border: Border.all(
+              color: const Color(0xFFB9824B).withOpacity(0.34),
+            ),
+          ),
+          child: Icon(
+            Icons.graphic_eq,
+            color: const Color(0xFFFFDDBB),
+            size: compact ? 16 : 18,
+          ),
+        ),
+        const SizedBox(width: 9),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Ligne d’urgence',
+                style: TextStyle(
+                  color: const Color(0xFFF4E5D2),
+                  fontSize: compact ? 13.5 : 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              Text(
+                humanHelpEnabled
+                    ? 'Canal de supervision ouvert'
+                    : 'Canal de supervision fermé',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.50),
+                  fontSize: compact ? 9.5 : 10.5,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+        IconButton(
+          onPressed: onClose,
+          iconSize: compact ? 20 : 24,
+          visualDensity: const VisualDensity(
+            horizontal: -2,
+            vertical: -2,
+          ),
+          icon: const Icon(
+            Icons.close,
+            color: Color(0xFFE8D7C5),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MainSignalPanel extends StatelessWidget {
+  final bool isTablet;
+  final bool isSending;
+  final bool isListening;
+  final bool speechAvailable;
+  final String heardPreview;
+  final AnimationController pulseController;
+  final Animation<double> pulseScale;
+  final Animation<double> pulseGlow;
+  final bool showTextInput;
+  final TextEditingController questionController;
+  final String? errorMessage;
+  final AiHelpResponse? response;
+  final VoidCallback onToggleTextInput;
+  final VoidCallback onMicTap;
+  final String Function(String hintLevel) hintLabelBuilder;
+  final Color Function(String hintLevel) hintColorBuilder;
+  final String Function(AiHelpResponse response) transmissionBuilder;
+  final String Function(AiHelpResponse response) nextActionBuilder;
+  final bool compact;
+
+  const _MainSignalPanel({
+    required this.isTablet,
+    required this.isSending,
+    required this.isListening,
+    required this.speechAvailable,
+    required this.heardPreview,
+    required this.pulseController,
+    required this.pulseScale,
+    required this.pulseGlow,
+    required this.showTextInput,
+    required this.questionController,
+    required this.errorMessage,
+    required this.response,
+    required this.onToggleTextInput,
+    required this.onMicTap,
+    required this.hintLabelBuilder,
+    required this.hintColorBuilder,
+    required this.transmissionBuilder,
+    required this.nextActionBuilder,
+    required this.compact,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final panelHeight = compact ? 206.0 : 300.0;
+    final micSize = compact ? 58.0 : 84.0;
+    final micIconSize = compact ? 22.0 : 30.0;
+
     return Container(
-      padding: const EdgeInsets.all(16),
+      constraints: BoxConstraints(minHeight: panelHeight),
+      padding: EdgeInsets.fromLTRB(
+        compact ? 9 : 14,
+        compact ? 10 : 16,
+        compact ? 9 : 14,
+        compact ? 9 : 14,
+      ),
       decoration: BoxDecoration(
-        color: const Color(0xAA0A0D0F),
+        color: const Color(0xFF081425).withOpacity(0.86),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: const Color(0xFFFFB347).withOpacity(0.18),
+          color: const Color(0xFF7A8FB7).withOpacity(0.24),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.35),
-            blurRadius: 20,
-            spreadRadius: 2,
-          ),
-        ],
       ),
-      child: child,
-    );
-  }
-}
-
-class _SectionTitle extends StatelessWidget {
-  final IconData icon;
-  final String title;
-
-  const _SectionTitle({
-    required this.icon,
-    required this.title,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Icon(icon, color: const Color(0xFFFFB347)),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            title,
-            style: const TextStyle(
-              color: Color(0xFFFFD6A0),
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.1,
+      child: response == null
+          ? Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Signal vocal',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: const Color(0xFFE8E1D9),
+                    fontSize: compact ? 10 : 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                SizedBox(height: compact ? 10 : 18),
+                AnimatedBuilder(
+                  animation: pulseController,
+                  builder: (context, child) {
+                    return Center(
+                      child: Transform.scale(
+                        scale:
+                            (isSending || isListening) ? pulseScale.value : 1.0,
+                        child: GestureDetector(
+                          onTap: isSending ? null : onMicTap,
+                          child: Container(
+                            width: micSize,
+                            height: micSize,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: RadialGradient(
+                                colors: [
+                                  const Color(0xFFFFA146),
+                                  isListening
+                                      ? const Color(0xFFF06E1D)
+                                      : const Color(0xFFD96A07),
+                                ],
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: const Color(0xFFE2882D).withOpacity(
+                                    (isSending || isListening)
+                                        ? pulseGlow.value
+                                        : 0.16,
+                                  ),
+                                  blurRadius: compact ? 18 : 24,
+                                  spreadRadius: 1,
+                                ),
+                              ],
+                            ),
+                            child: Icon(
+                              isListening ? Icons.stop_rounded : Icons.mic,
+                              color: Colors.white,
+                              size: micIconSize,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                SizedBox(height: compact ? 10 : 18),
+                Text(
+                  isListening
+                      ? 'Écoute en cours…'
+                      : (speechAvailable
+                            ? 'Touchez pour parler'
+                            : 'Saisie texte'),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.82),
+                    fontSize: compact ? 10.2 : 11.5,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                if (heardPreview.isNotEmpty) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    heardPreview,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: const Color(0xFFBFD2E0).withOpacity(0.90),
+                      fontSize: compact ? 10.0 : 11.0,
+                    ),
+                  ),
+                ],
+                TextButton(
+                  onPressed: onToggleTextInput,
+                  style: TextButton.styleFrom(
+                    visualDensity: const VisualDensity(
+                      horizontal: -4,
+                      vertical: -4,
+                    ),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(
+                    showTextInput ? 'Masquer' : 'Écrire',
+                    style: TextStyle(fontSize: compact ? 9.5 : 10.5),
+                  ),
+                ),
+                if (showTextInput) ...[
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: questionController,
+                    minLines: 2,
+                    maxLines: 2,
+                    style: TextStyle(
+                      color: const Color(0xFFF2E7D7),
+                      height: 1.35,
+                      fontSize: compact ? 12 : 13,
+                    ),
+                    decoration: InputDecoration(
+                      hintText:
+                          "Ex. Nous tournons en rond entre deux lieux.",
+                      hintStyle: TextStyle(
+                        color: Colors.white.withOpacity(0.32),
+                        fontSize: compact ? 10.5 : 12,
+                      ),
+                      filled: true,
+                      fillColor: const Color(0xFF0C1722).withOpacity(0.90),
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: compact ? 8 : 12,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                        borderSide: BorderSide(
+                          color: const Color(0xFF7A8FB7).withOpacity(0.18),
+                        ),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(15),
+                        borderSide: BorderSide(
+                          color: const Color(0xFF7A8FB7).withOpacity(0.18),
+                        ),
+                      ),
+                      focusedBorder: const OutlineInputBorder(
+                        borderRadius: BorderRadius.all(Radius.circular(15)),
+                        borderSide: BorderSide(color: Color(0xFFE29A52)),
+                      ),
+                    ),
+                  ),
+                ],
+                if (errorMessage != null) ...[
+                  const SizedBox(height: 10),
+                  Text(
+                    errorMessage!,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: const Color(0xFFFFA8A0),
+                      height: 1.3,
+                      fontSize: compact ? 10.0 : 11.5,
+                    ),
+                  ),
+                ],
+              ],
+            )
+          : SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      _InfoBadge(
+                        label: hintLabelBuilder(response!.hintLevel),
+                        color: hintColorBuilder(response!.hintLevel),
+                        compact: compact,
+                      ),
+                      _InfoBadge(
+                        label:
+                            'Confiance ${(100 * response!.confidence).round()}%',
+                        color: const Color(0xFFBFD2E0),
+                        compact: compact,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _ResponseBlock(
+                    title: 'Transmission',
+                    text: transmissionBuilder(response!),
+                    compact: compact,
+                  ),
+                  const SizedBox(height: 8),
+                  _ResponseBlock(
+                    title: 'Action conseillée',
+                    text: nextActionBuilder(response!),
+                    compact: compact,
+                  ),
+                ],
+              ),
             ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _StatusRow extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color? valueColor;
-
-  const _StatusRow({
-    required this.label,
-    required this.value,
-    this.valueColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            label,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.65),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Flexible(
-          child: Text(
-            value,
-            textAlign: TextAlign.right,
-            style: TextStyle(
-              color: valueColor ?? Colors.white,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
     );
   }
 }
@@ -609,30 +995,33 @@ class _StatusRow extends StatelessWidget {
 class _InfoBadge extends StatelessWidget {
   final String label;
   final Color color;
+  final bool compact;
 
   const _InfoBadge({
     required this.label,
     required this.color,
+    required this.compact,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      padding: EdgeInsets.symmetric(
+        horizontal: compact ? 8 : 10,
+        vertical: compact ? 6 : 7,
+      ),
       decoration: BoxDecoration(
         color: color.withOpacity(0.12),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(
-          color: color.withOpacity(0.34),
-        ),
+        border: Border.all(color: color.withOpacity(0.28)),
       ),
       child: Text(
         label,
         style: TextStyle(
           color: color,
-          fontSize: 12,
+          fontSize: compact ? 10.8 : 12,
           fontWeight: FontWeight.w700,
-          letterSpacing: 0.5,
+          letterSpacing: 0.1,
         ),
       ),
     );
@@ -642,42 +1031,45 @@ class _InfoBadge extends StatelessWidget {
 class _ResponseBlock extends StatelessWidget {
   final String title;
   final String text;
+  final bool compact;
 
   const _ResponseBlock({
     required this.title,
     required this.text,
+    required this.compact,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: EdgeInsets.all(compact ? 11 : 14),
       decoration: BoxDecoration(
-        color: const Color(0xFF0E1215),
-        borderRadius: BorderRadius.circular(14),
+        color: const Color(0xFF0E1822).withOpacity(0.86),
+        borderRadius: BorderRadius.circular(15),
         border: Border.all(
-          color: const Color(0xFFFFB347).withOpacity(0.14),
+          color: const Color(0xFFB9824B).withOpacity(0.14),
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            title.toUpperCase(),
-            style: const TextStyle(
-              color: Color(0xFFFFD6A0),
-              fontSize: 12,
+            title,
+            style: TextStyle(
+              color: const Color(0xFFE9C89E),
+              fontSize: compact ? 10.8 : 12,
               fontWeight: FontWeight.w700,
-              letterSpacing: 0.8,
+              letterSpacing: 0.28,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             text,
-            style: const TextStyle(
-              color: Colors.white,
-              height: 1.5,
+            style: TextStyle(
+              color: const Color(0xFFF2E7D7),
+              height: 1.45,
+              fontSize: compact ? 11.5 : 13,
             ),
           ),
         ],
