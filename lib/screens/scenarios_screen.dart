@@ -1,15 +1,17 @@
-import 'dart:ui';
+import 'dart:math' as math;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
-import '../constants/firebase_media.dart';
 import '../services/session_service.dart';
 import 'activation_screen.dart';
 import 'briefing_screen.dart';
 
 class ScenariosScreen extends StatelessWidget {
   const ScenariosScreen({super.key});
+
+  static const String _backgroundUrl =
+      'https://firebasestorage.googleapis.com/v0/b/les-fugitifs.firebasestorage.app/o/images%2Fbg_scenarios.png?alt=media&token=f0370aa2-3565-47ea-be5e-cc7dfec77882';
 
   Future<void> _openLesFugitifs(BuildContext context) async {
     final hasValidSession = await SessionService.isSessionValid();
@@ -42,95 +44,129 @@ class ScenariosScreen extends StatelessWidget {
           final w = constraints.maxWidth;
           final h = constraints.maxHeight;
           final compact = h < 720;
+          final isTablet = w >= 900;
 
-          final portalSize = compact ? h * 0.49 : h * 0.49;
-          final portalTop = compact ? h * 0.25 : h * 0.42;
-          final left1 = w * 0.08;
-          final left2 = w * 0.39;
-          final left3 = w * 0.70;
+          final horizontalPadding = compact ? 14.0 : 24.0;
+          final topGap = compact ? 10.0 : 18.0;
+          final headerGap = compact ? 12.0 : 18.0;
+          final portalSpacing = compact ? 10.0 : 20.0;
 
           return Stack(
             children: [
-              const _ScenariosBackground(),
+              const _ScenariosBackground(imageUrl: _backgroundUrl),
               Positioned.fill(
                 child: Container(
                   color: Colors.black.withOpacity(0.18),
                 ),
               ),
-              Positioned(
-                left: compact ? 16 : 24,
-                top: compact ? 14 : 18,
-                right: compact ? 16 : 24,
-                child: _TopBanner(compact: compact),
-              ),
-              Positioned(
-                right: compact ? 16 : 24,
-                top: compact ? 16 : 20,
-                child: Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: compact ? 12 : 16,
-                    vertical: compact ? 7 : 9,
+              SafeArea(
+                child: Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    topGap,
+                    horizontalPadding,
+                    compact ? 12.0 : 20.0,
                   ),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.26),
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(
-                      color: Colors.white.withOpacity(0.14),
-                    ),
+                  child: Column(
+                    children: [
+                      _HeaderBar(
+                        compact: compact,
+                        badgeText: 'Portes temporelles',
+                      ),
+                      SizedBox(height: headerGap),
+                      Expanded(
+                        child: LayoutBuilder(
+                          builder: (context, portalConstraints) {
+                            const labelBlockHeightPhone = 86.0;
+                            const labelBlockHeightTablet = 96.0;
+                            final labelBlockHeight =
+                                compact ? labelBlockHeightPhone : labelBlockHeightTablet;
+
+                            final availableWidth = portalConstraints.maxWidth;
+                            final availableHeight = portalConstraints.maxHeight;
+
+                            final widthBasedDiameter =
+                                (availableWidth - (portalSpacing * 2)) / 3.0;
+                            final heightBasedDiameter =
+                                availableHeight - labelBlockHeight;
+
+                            final minDiameter = compact ? 92.0 : 150.0;
+                            final maxDiameter = compact ? 170.0 : 240.0;
+
+                            final portalDiameter = math.max(
+                              minDiameter,
+                              math.min(
+                                math.min(widthBasedDiameter, heightBasedDiameter),
+                                maxDiameter,
+                              ),
+                            );
+
+                            return Row(
+                              crossAxisAlignment: isTablet
+                                  ? CrossAxisAlignment.center
+                                  : CrossAxisAlignment.end,
+                              children: [
+                                Expanded(
+                                  child: Align(
+                                    alignment: isTablet
+                                        ? Alignment.center
+                                        : Alignment.bottomCenter,
+                                    child: _ScenarioPortal(
+                                      compact: compact,
+                                      title: 'Les Fugitifs',
+                                      subtitle: 'Brèche stabilisée',
+                                      status: 'Disponible',
+                                      isLocked: false,
+                                      imagePath: 'assets/images/logo.png',
+                                      logoScale: 1.3,
+                                      portalDiameter: portalDiameter,
+                                      onTap: () => _openLesFugitifs(context),
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: portalSpacing),
+                                Expanded(
+                                  child: Align(
+                                    alignment: isTablet
+                                        ? Alignment.center
+                                        : Alignment.bottomCenter,
+                                    child: _ScenarioPortal(
+                                      compact: compact,
+                                      title: 'Les Illuvinatis',
+                                      subtitle: 'Connexion instable',
+                                      status: 'Bientôt disponible',
+                                      isLocked: true,
+                                      imagePath: 'assets/images/logo illuvinatis.png',
+                                      logoScale: 1.1,
+                                      portalDiameter: portalDiameter,
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: portalSpacing),
+                                Expanded(
+                                  child: Align(
+                                    alignment: isTablet
+                                        ? Alignment.center
+                                        : Alignment.bottomCenter,
+                                    child: _ScenarioPortal(
+                                      compact: compact,
+                                      title: 'In Tenebris',
+                                      subtitle: 'Accès restreint',
+                                      status: 'Bientôt disponible',
+                                      isLocked: true,
+                                      imagePath: 'assets/images/logo in tenebris.png',
+                                      logoScale: 1.15,
+                                      portalDiameter: portalDiameter,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   ),
-                  child: Text(
-                    'Portes temporelles',
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: compact ? 12 : 14,
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                left: left1,
-                top: portalTop,
-                width: portalSize,
-                child: _ScenarioPortal(
-                  compact: compact,
-                  title: 'Les Fugitifs',
-                  subtitle: 'Brèche stabilisée',
-                  status: 'Disponible',
-                  isLocked: false,
-                  imagePath: 'assets/images/logo.png',
-                  logoScale: 1.3,
-                  portalDiameter: portalSize,
-                  onTap: () => _openLesFugitifs(context),
-                ),
-              ),
-              Positioned(
-                left: left2,
-                top: portalTop,
-                width: portalSize,
-                child: _ScenarioPortal(
-                  compact: compact,
-                  title: 'Les Illuvinatis',
-                  subtitle: 'Connexion instable',
-                  status: 'Bientôt disponible',
-                  isLocked: true,
-                  imagePath: 'assets/images/logo illuvinatis.png',
-                  logoScale: 1.1,
-                  portalDiameter: portalSize,
-                ),
-              ),
-              Positioned(
-                left: left3,
-                top: portalTop,
-                width: portalSize,
-                child: _ScenarioPortal(
-                  compact: compact,
-                  title: 'In Tenebris',
-                  subtitle: 'Accès restreint',
-                  status: 'Bientôt disponible',
-                  isLocked: true,
-                  imagePath: 'assets/images/logo in tenebris.png',
-                  logoScale: 1.15,
-                  portalDiameter: portalSize,
                 ),
               ),
             ],
@@ -141,24 +177,33 @@ class ScenariosScreen extends StatelessWidget {
   }
 }
 
-class _TopBanner extends StatelessWidget {
+class _HeaderBar extends StatelessWidget {
   final bool compact;
+  final String badgeText;
 
-  const _TopBanner({required this.compact});
+  const _HeaderBar({
+    required this.compact,
+    required this.badgeText,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final logoHeight = compact ? 46.0 : 72.0;
+    final titleSize = compact ? 24.0 : 34.0;
+    final subtitleSize = compact ? 12.5 : 16.0;
+    final badgeFontSize = compact ? 11.0 : 14.0;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Image.asset(
           'assets/images/logo grid complet.png',
-          height: compact ? 56 : 72,
+          height: logoHeight,
           fit: BoxFit.contain,
           errorBuilder: (_, __, ___) {
             return Container(
-              width: compact ? 70 : 90,
-              height: compact ? 56 : 72,
+              width: compact ? 58 : 90,
+              height: logoHeight,
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: Colors.black.withOpacity(0.28),
@@ -178,38 +223,57 @@ class _TopBanner extends StatelessWidget {
             );
           },
         ),
-        SizedBox(width: compact ? 12 : 16),
+        SizedBox(width: compact ? 10 : 16),
         Expanded(
-          child: Padding(
-            padding: EdgeInsets.only(top: compact ? 2 : 4),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Choisissez une destination narrative',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: compact ? 26 : 34,
-                    fontWeight: FontWeight.w800,
-                    height: 1.02,
-                  ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Choisissez une destination narrative',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: titleSize,
+                  fontWeight: FontWeight.w800,
+                  height: 1.0,
                 ),
-                SizedBox(height: compact ? 6 : 8),
-                Text(
-                  'HENIGMA Grid ouvre plusieurs brèches. Certaines sont stables. D’autres attendent encore leur heure.',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.90),
-                    fontSize: compact ? 14 : 16,
-                    height: 1.28,
-                  ),
+              ),
+              SizedBox(height: compact ? 4 : 8),
+              Text(
+                'HENIGMA Grid ouvre plusieurs brèches. Certaines sont stables. D’autres attendent encore leur heure.',
+                maxLines: compact ? 2 : 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: Colors.white.withOpacity(0.90),
+                  fontSize: subtitleSize,
+                  height: 1.28,
                 ),
-              ],
+              ),
+            ],
+          ),
+        ),
+        SizedBox(width: compact ? 10 : 16),
+        Container(
+          padding: EdgeInsets.symmetric(
+            horizontal: compact ? 10 : 16,
+            vertical: compact ? 6 : 9,
+          ),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.26),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: Colors.white.withOpacity(0.14),
+            ),
+          ),
+          child: Text(
+            badgeText,
+            style: TextStyle(
+              color: Colors.white70,
+              fontSize: badgeFontSize,
             ),
           ),
         ),
-        SizedBox(width: compact ? 120 : 170),
       ],
     );
   }
@@ -240,52 +304,59 @@ class _ScenarioPortal extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final content = Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        SizedBox(
-          width: portalDiameter,
-          height: portalDiameter,
-          child: _buildPortalCircle(),
-        ),
-        SizedBox(height: compact ? 8 : 10),
-        Text(
-          status,
-          textAlign: TextAlign.center,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: isLocked ? Colors.white70 : const Color(0xFFFFD17A),
-            fontSize: compact ? 12 : 14,
-            fontWeight: FontWeight.w700,
+    final statusSize = compact ? 11.0 : 14.0;
+    final subtitleSize = compact ? 10.0 : 13.0;
+    final titleSize = compact ? 14.0 : 24.0;
+
+    final content = ConstrainedBox(
+      constraints: BoxConstraints(maxWidth: portalDiameter + 12),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: portalDiameter,
+            height: portalDiameter,
+            child: _buildPortalCircle(),
           ),
-        ),
-        SizedBox(height: compact ? 2 : 4),
-        Text(
-          subtitle,
-          textAlign: TextAlign.center,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.86),
-            fontSize: compact ? 11 : 13,
-            fontWeight: FontWeight.w600,
+          SizedBox(height: compact ? 6 : 10),
+          Text(
+            status,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: isLocked ? Colors.white70 : const Color(0xFFFFD17A),
+              fontSize: statusSize,
+              fontWeight: FontWeight.w700,
+            ),
           ),
-        ),
-        SizedBox(height: compact ? 3 : 5),
-        Text(
-          title,
-          textAlign: TextAlign.center,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: compact ? 18 : 24,
-            fontWeight: FontWeight.w800,
-            height: 1.0,
+          SizedBox(height: compact ? 2 : 4),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.86),
+              fontSize: subtitleSize,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-        ),
-      ],
+          SizedBox(height: compact ? 4 : 6),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            maxLines: compact ? 2 : 2,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: titleSize,
+              fontWeight: FontWeight.w800,
+              height: 1.0,
+            ),
+          ),
+        ],
+      ),
     );
 
     if (isLocked) {
@@ -328,7 +399,7 @@ class _ScenarioPortal extends StatelessWidget {
               color: const Color(0xFFD3AE68).withOpacity(
                 isLocked ? 0.60 : 0.88,
               ),
-              width: compact ? 5 : 6,
+              width: compact ? 4 : 6,
             ),
             gradient: RadialGradient(
               colors: [
@@ -349,7 +420,7 @@ class _ScenarioPortal extends StatelessWidget {
                   color: const Color(0xFFFFA84B).withOpacity(
                     isLocked ? 0.18 : 0.34,
                   ),
-                  width: compact ? 2 : 2.5,
+                  width: compact ? 1.8 : 2.5,
                 ),
               ),
               child: ClipOval(
@@ -409,13 +480,15 @@ class _ScenarioPortal extends StatelessWidget {
 }
 
 class _ScenariosBackground extends StatelessWidget {
-  const _ScenariosBackground();
+  final String imageUrl;
+
+  const _ScenariosBackground({required this.imageUrl});
 
   @override
   Widget build(BuildContext context) {
     return Positioned.fill(
       child: CachedNetworkImage(
-        imageUrl: FirebaseMedia.bgScenarios,
+        imageUrl: imageUrl,
         fit: BoxFit.cover,
         alignment: Alignment.center,
         placeholder: (_, __) => Container(

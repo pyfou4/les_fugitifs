@@ -6,8 +6,8 @@ import 'package:firebase_app_check/firebase_app_check.dart';
 
 import 'firebase_options.dart';
 import 'constants/app_constants.dart';
-import 'screens/home_screen.dart'; // 🔥 IMPORTANT
-import 'screens/activation_screen.dart';
+import 'screens/home_screen.dart';
+import 'screens/scenarios_screen.dart';
 import 'services/session_service.dart';
 
 void main() async {
@@ -41,11 +41,6 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  // Temporaire pendant stabilisation du nouveau tunnel d'entrée :
-  // activation -> team setup -> briefing -> home
-  // Ne supprime pas la logique de session existante, la contourne juste pour les tests.
-  static const bool _forceActivationFlow = false;
-
   bool _isLoading = true;
   bool _hasValidSession = false;
 
@@ -74,17 +69,11 @@ class _MyAppState extends State<MyApp> {
       theme: ThemeData(useMaterial3: true),
       home: _isLoading
           ? const Scaffold(
-              body: Center(child: CircularProgressIndicator()),
-            )
-          : _forceActivationFlow
-              ? ActivationScreen(
-                  nextScreen: const HomeScreen(),
-                )
-              : _hasValidSession
-                  ? const HomeScreen() // ✅ RETOUR AU JEU NORMAL
-                  : ActivationScreen(
-                      nextScreen: const HomeScreen(), // ✅ idem ici
-                    ),
+        body: Center(child: CircularProgressIndicator()),
+      )
+          : _hasValidSession
+          ? const HomeScreen()
+          : const ScenariosScreen(),
     );
   }
 }

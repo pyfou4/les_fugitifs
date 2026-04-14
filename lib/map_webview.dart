@@ -5,7 +5,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:geolocator/geolocator.dart';
 
 class MapWebView extends StatefulWidget {
-  const MapWebView({Key? key}) : super(key: key);
+  const MapWebView({super.key});
 
   @override
   State<MapWebView> createState() => _MapWebViewState();
@@ -24,7 +24,7 @@ class _MapWebViewState extends State<MapWebView> {
     });
 
     try {
-      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
       if (!serviceEnabled) {
         setState(() {
           _error = 'Service de localisation désactivé';
@@ -33,11 +33,13 @@ class _MapWebViewState extends State<MapWebView> {
         return;
       }
 
-      LocationPermission permission = await Geolocator.checkPermission();
+      var permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
-      if (permission == LocationPermission.deniedForever || permission == LocationPermission.denied) {
+
+      if (permission == LocationPermission.deniedForever ||
+          permission == LocationPermission.denied) {
         setState(() {
           _error = 'Permission de localisation refusée';
           _loading = false;
@@ -45,21 +47,24 @@ class _MapWebViewState extends State<MapWebView> {
         return;
       }
 
-      Position pos = await Geolocator.getCurrentPosition().timeout(const Duration(seconds: 10), onTimeout: () {
-        throw TimeoutException('La récupération a expiré');
-      });
+      final pos = await Geolocator.getCurrentPosition().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          throw TimeoutException('La récupération a expiré');
+        },
+      );
 
       final latlng = LatLng(pos.latitude, pos.longitude);
+
       setState(() {
         _current = latlng;
         _loading = false;
       });
 
-      // recentrer la carte
       _mapController.move(latlng, 15.0);
     } on TimeoutException {
       setState(() {
-        _error = 'Délai d\'attente dépassé pour obtenir la position';
+        _error = "Délai d'attente dépassé pour obtenir la position";
         _loading = false;
       });
     } catch (e) {
@@ -72,6 +77,8 @@ class _MapWebViewState extends State<MapWebView> {
 
   @override
   Widget build(BuildContext context) {
+    final fallbackCenter = _current ?? const LatLng(48.8566, 2.3522);
+
     return Scaffold(
       appBar: AppBar(title: const Text('Carte')),
       body: Stack(
@@ -81,11 +88,11 @@ class _MapWebViewState extends State<MapWebView> {
             child: FlutterMap(
               mapController: _mapController,
               options: MapOptions(
-                center: _current ?? const LatLng(48.8566, 2.3522), // fallback (Paris)
-                zoom: 5.0,
-                minZoom: 2,
+                initialCenter: fallbackCenter,
+                initialZoom: 5.0,
+                minZoom: 2.0,
               ),
-              layers: [ // Assurez-vous que 'layers' est bien défini ici
+              children: [
                 TileLayer(
                   urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
                   subdomains: const ['a', 'b', 'c'],
@@ -98,15 +105,18 @@ class _MapWebViewState extends State<MapWebView> {
                         point: _current!,
                         width: 48,
                         height: 48,
-                        builder: (ctx) => const Icon(Icons.my_location, color: Colors.blue, size: 36),
+                        child: const Icon(
+                          Icons.my_location,
+                          color: Colors.blue,
+                          size: 36,
+                        ),
                       ),
                     ],
                   ),
               ],
             ),
           ),
-          if (_loading)
-            const Center(child: CircularProgressIndicator()),
+          if (_loading) const Center(child: CircularProgressIndicator()),
           if (_error != null && !_loading)
             Positioned(
               left: 16,
