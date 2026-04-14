@@ -15,13 +15,18 @@ class FinalVideoScreen extends StatefulWidget {
 
 class _FinalVideoScreenState extends State<FinalVideoScreen> {
   late VideoPlayerController _controller;
+  bool _isReady = false;
 
   @override
   void initState() {
     super.initState();
+
     _controller = VideoPlayerController.network(widget.videoUrl)
       ..initialize().then((_) {
-        setState(() {});
+        setState(() {
+          _isReady = true;
+        });
+
         _controller.play();
       });
   }
@@ -36,13 +41,25 @@ class _FinalVideoScreenState extends State<FinalVideoScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Center(
-        child: _controller.value.isInitialized
-            ? AspectRatio(
-                aspectRatio: _controller.value.aspectRatio,
-                child: VideoPlayer(_controller),
-              )
-            : const CircularProgressIndicator(),
+      body: _isReady
+          ? GestureDetector(
+        onTap: () {
+          if (_controller.value.isPlaying) {
+            _controller.pause();
+          } else {
+            _controller.play();
+          }
+          setState(() {});
+        },
+        child: Center(
+          child: AspectRatio(
+            aspectRatio: _controller.value.aspectRatio,
+            child: VideoPlayer(_controller),
+          ),
+        ),
+      )
+          : const Center(
+        child: CircularProgressIndicator(),
       ),
     );
   }

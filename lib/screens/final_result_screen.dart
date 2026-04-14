@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 
 import '../services/final_score_service.dart';
+import 'final_video_screen.dart';
 
 class FinalResultScreen extends StatefulWidget {
   final FinalScoreResult result;
   final WidgetBuilder? finalVideoBuilder;
+  final String? finalVideoUrl;
 
   const FinalResultScreen({
     super.key,
     required this.result,
     this.finalVideoBuilder,
+    this.finalVideoUrl,
   });
 
   @override
@@ -30,37 +33,50 @@ class _FinalResultScreenState extends State<FinalResultScreen> {
 
     return Scaffold(
       backgroundColor: const Color(0xFF0B0D12),
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (BuildContext context, BoxConstraints constraints) {
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(20),
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight - 40),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: <Widget>[
-                    _buildHeroCard(theme, success),
-                    const SizedBox(height: 18),
-                    _buildScoreCard(theme),
-                    const SizedBox(height: 18),
-                    _buildPrimaryActions(context),
-                    const SizedBox(height: 14),
-                    _buildDetailsToggle(theme),
-                    AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 220),
-                      child: !_showDetails
-                          ? const SizedBox.shrink()
-                          : Padding(
-                              padding: const EdgeInsets.only(top: 14),
-                              child: _buildDetailsSection(theme),
-                            ),
-                    ),
-                  ],
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: <Color>[
+              Color(0xFF11151D),
+              Color(0xFF0B0D12),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: LayoutBuilder(
+            builder: (BuildContext context, BoxConstraints constraints) {
+              return SingleChildScrollView(
+                padding: const EdgeInsets.all(20),
+                child: ConstrainedBox(
+                  constraints:
+                      BoxConstraints(minHeight: constraints.maxHeight - 40),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      _buildHeroCard(theme, success),
+                      const SizedBox(height: 18),
+                      _buildScoreCard(theme),
+                      const SizedBox(height: 18),
+                      _buildPrimaryActions(context),
+                      const SizedBox(height: 14),
+                      _buildDetailsToggle(theme),
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 220),
+                        child: !_showDetails
+                            ? const SizedBox.shrink()
+                            : Padding(
+                                padding: const EdgeInsets.only(top: 14),
+                                child: _buildDetailsSection(theme),
+                              ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ),
     );
@@ -107,11 +123,31 @@ class _FinalResultScreenState extends State<FinalResultScreen> {
           const SizedBox(height: 12),
           Text(
             success
-                ? 'Votre équipe a percé le cœur de l’affaire.'
-                : 'Le dernier choix ne convainc pas l’histoire.',
+                ? 'Vous avez tenu jusqu’au bout. La vérité a cédé, et l’histoire vous laisse sortir debout.'
+                : 'Vous avez touché quelque chose de vrai, mais pas assez pour briser la mécanique. La chute est brutale. La fin, elle, reste intense.',
             style: theme.textTheme.titleMedium?.copyWith(
               color: Colors.white.withValues(alpha: 0.82),
               height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.05),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.08),
+              ),
+            ),
+            child: Text(
+              success
+                  ? 'Le dossier se referme sur une victoire nette. Votre équipe a imposé sa lecture de l’affaire.'
+                  : 'Le dossier se referme sur vous. Pas comme un écran de statistiques, mais comme une porte lourde qu’on entend claquer derrière soi.',
+              style: theme.textTheme.bodyLarge?.copyWith(
+                color: Colors.white.withValues(alpha: 0.78),
+                height: 1.45,
+              ),
             ),
           ),
         ],
@@ -134,7 +170,7 @@ class _FinalResultScreenState extends State<FinalResultScreen> {
         ),
       ),
       child: Text(
-        success ? 'VERDICT : LIBÉRATION' : 'VERDICT : ÉCHEC',
+        success ? 'VERDICT : LIBÉRATION' : 'VERDICT : RETOUR EN PRISON',
         style: TextStyle(
           color: success ? Colors.greenAccent : Colors.redAccent,
           fontWeight: FontWeight.w800,
@@ -145,6 +181,10 @@ class _FinalResultScreenState extends State<FinalResultScreen> {
   }
 
   Widget _buildScoreCard(ThemeData theme) {
+    final double progressValue = widget.result.maxScore <= 0
+        ? 0
+        : (widget.result.totalScore / widget.result.maxScore).clamp(0.0, 1.0);
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -182,9 +222,7 @@ class _FinalResultScreenState extends State<FinalResultScreen> {
             borderRadius: BorderRadius.circular(999),
             child: LinearProgressIndicator(
               minHeight: 12,
-              value: widget.result.maxScore <= 0
-                  ? 0
-                  : widget.result.totalScore / widget.result.maxScore,
+              value: progressValue,
             ),
           ),
           const SizedBox(height: 16),
@@ -202,23 +240,31 @@ class _FinalResultScreenState extends State<FinalResultScreen> {
   }
 
   String get _scoreCommentary {
+    if (widget.result.isNarrativeSuccess) {
+      if (_isHighScore) {
+        return 'Performance tranchante. Vous n’avez pas seulement survécu à l’affaire, vous l’avez dominée.';
+      }
+      if (_isMediumScore) {
+        return 'Victoire solide. Tout n’était pas parfait, mais vous avez gardé la main au moment décisif.';
+      }
+      return 'Vous passez, de justesse peut-être, mais l’histoire vous laisse sortir. Et parfois, c’est tout ce qui compte.';
+    }
+
     if (_isHighScore) {
-      return 'Performance nette. L’enquête a été menée avec précision.';
+      return 'L’échec n’efface pas la qualité de l’enquête. Vous étiez très proches, ce qui rend la chute encore plus violente.';
     }
     if (_isMediumScore) {
-      return 'Résultat solide. Quelques points se sont échappés en route.';
+      return 'Vous avez tenu une bonne partie du parcours. Puis le dernier verrou a résisté. C’est dur, mais ce n’était pas vide.';
     }
-    return 'La sortie vous échappe encore. Une nouvelle tentative peut changer le destin.';
+    return 'La sortie vous échappe, mais la tension, elle, était bien réelle. Vous n’avez pas traversé cette affaire pour rien.';
   }
 
   Widget _buildPrimaryActions(BuildContext context) {
-    final bool success = widget.result.isNarrativeSuccess;
-
     return Center(
       child: ElevatedButton.icon(
         onPressed: () => _handleTruthAction(context),
         icon: const Icon(Icons.play_arrow_rounded),
-        label: Text(success ? 'La vérité' : 'Découvrir la vérité'),
+        label: const Text('Découvrir la vérité'),
         style: ElevatedButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 16),
           textStyle: const TextStyle(
@@ -241,21 +287,30 @@ class _FinalResultScreenState extends State<FinalResultScreen> {
       return;
     }
 
+    if (widget.finalVideoUrl != null && widget.finalVideoUrl!.trim().isNotEmpty) {
+      await Navigator.of(context).pushReplacement(
+        MaterialPageRoute<void>(
+          builder: (_) => FinalVideoScreen(
+            videoUrl: widget.finalVideoUrl!,
+          ),
+        ),
+      );
+      return;
+    }
+
     if (!mounted) return;
 
     await showDialog<void>(
       context: context,
       builder: (BuildContext dialogContext) {
-        final bool success = widget.result.isNarrativeSuccess;
-
         return AlertDialog(
           backgroundColor: const Color(0xFF12161D),
-          title: Text(
-            success ? 'La vérité' : 'Découvrir la vérité',
-            style: const TextStyle(color: Colors.white),
+          title: const Text(
+            'Découvrir la vérité',
+            style: TextStyle(color: Colors.white),
           ),
           content: Text(
-            'Le bouton est maintenant actif, mais la vidéo finale n’est pas encore branchée sur cet écran.',
+            'Le bouton est actif, mais la vidéo finale n’est pas encore branchée sur cet écran.',
             style: TextStyle(color: Colors.white.withValues(alpha: 0.84)),
           ),
           actions: <Widget>[
@@ -320,15 +375,25 @@ class _FinalResultScreenState extends State<FinalResultScreen> {
                 ),
               ),
               const SizedBox(height: 18),
-              _buildScoreRow('Questions', '${widget.result.questionScore} / ${widget.result.maxQuestionScore}'),
+              _buildScoreRow(
+                'Questions',
+                '${widget.result.questionScore} / ${widget.result.maxQuestionScore}',
+              ),
               _buildScoreRow('Temps', '${widget.result.timeScore} / 500'),
               _buildScoreRow('Aides', '${widget.result.helpScore} / 250'),
               _buildScoreRow(
                 'Réponses correctes',
                 '${widget.result.correctAnswersCount} / ${widget.result.totalQuestionsCount}',
               ),
-              _buildScoreRow('Réponses envoyées', '${widget.result.answeredQuestionsCount}'),
-              _buildScoreRow('Durée', _formatDuration(widget.result.playDuration), isLast: true),
+              _buildScoreRow(
+                'Réponses envoyées',
+                '${widget.result.answeredQuestionsCount}',
+              ),
+              _buildScoreRow(
+                'Durée',
+                _formatDuration(widget.result.playDuration),
+                isLast: true,
+              ),
             ],
           ),
         ),
@@ -350,7 +415,8 @@ class _FinalResultScreenState extends State<FinalResultScreen> {
                     ? Icons.check_circle_outline
                     : Icons.highlight_off,
                 title: 'Coupable',
-                value: widget.result.isCorrectSuspect ? 'Correct' : 'Incorrect',
+                value:
+                    widget.result.isCorrectSuspect ? 'Correct' : 'Incorrect',
                 positive: widget.result.isCorrectSuspect,
               ),
               const SizedBox(height: 10),
@@ -368,7 +434,9 @@ class _FinalResultScreenState extends State<FinalResultScreen> {
                     ? Icons.lock_open_outlined
                     : Icons.gavel_outlined,
                 title: 'Conséquence',
-                value: widget.result.isNarrativeSuccess ? 'Libération' : 'Retour en prison',
+                value: widget.result.isNarrativeSuccess
+                    ? 'Libération'
+                    : 'Retour en prison',
                 positive: widget.result.isNarrativeSuccess,
               ),
             ],
