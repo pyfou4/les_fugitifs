@@ -188,17 +188,40 @@ class MediaAdminService {
     final input = html.FileUploadInputElement()
       ..accept =
           '.mp4,.mov,.webm,.m4v,.jpg,.jpeg,.png,.webp,.mp3,.wav,.m4a,.ogg,.pdf'
-      ..multiple = false;
+      ..multiple = false
+      ..style.display = 'none';
 
     final completer = Completer<_PickedMediaFile?>();
+    StreamSubscription<html.Event>? changeSubscription;
+    StreamSubscription<html.Event>? focusSubscription;
+    Timer? cancelTimer;
 
-    input.onChange.listen((_) async {
+    void cleanup() {
+      cancelTimer?.cancel();
+      changeSubscription?.cancel();
+      focusSubscription?.cancel();
+      input.remove();
+    }
+
+    void completeWith(_PickedMediaFile? value) {
+      if (completer.isCompleted) return;
+      cleanup();
+      completer.complete(value);
+    }
+
+    void completeWithError(Object error) {
+      if (completer.isCompleted) return;
+      cleanup();
+      completer.completeError(error);
+    }
+
+    html.document.body?.append(input);
+
+    changeSubscription = input.onChange.listen((_) async {
       try {
         final files = input.files;
         if (files == null || files.isEmpty) {
-          if (!completer.isCompleted) {
-            completer.complete(null);
-          }
+          completeWith(null);
           return;
         }
 
@@ -206,60 +229,58 @@ class MediaAdminService {
         final reader = html.FileReader();
 
         reader.onError.listen((_) {
-          if (!completer.isCompleted) {
-            completer.completeError(
-              Exception('Impossible de lire le fichier sélectionné.'),
-            );
-          }
+          completeWithError(
+            Exception('Impossible de lire le fichier sélectionné.'),
+          );
         });
 
         reader.onLoadEnd.listen((_) {
           try {
             final bytes = _bytesFromReaderResult(reader.result);
             if (bytes == null || bytes.isEmpty) {
-              if (!completer.isCompleted) {
-                completer.completeError(
-                  Exception('Le fichier sélectionné est vide ou illisible.'),
-                );
-              }
+              completeWithError(
+                Exception('Le fichier sélectionné est vide ou illisible.'),
+              );
               return;
             }
 
             final fileName = file.name.trim();
             if (fileName.isEmpty) {
-              if (!completer.isCompleted) {
-                completer.completeError(Exception('Nom de fichier invalide.'));
-              }
+              completeWithError(Exception('Nom de fichier invalide.'));
               return;
             }
 
-            if (!completer.isCompleted) {
-              completer.complete(
-                _PickedMediaFile(
-                  fileName: fileName,
-                  mimeType: _resolveMimeType(
-                    fileName: file.name,
-                    browserMimeType: file.type,
-                  ),
-                  bytes: bytes,
+            completeWith(
+              _PickedMediaFile(
+                fileName: fileName,
+                mimeType: _resolveMimeType(
+                  fileName: file.name,
+                  browserMimeType: file.type,
                 ),
-              );
-            }
+                bytes: bytes,
+              ),
+            );
           } catch (e) {
-            if (!completer.isCompleted) {
-              completer.completeError(
-                Exception('Lecture navigateur impossible : $e'),
-              );
-            }
+            completeWithError(
+              Exception('Lecture navigateur impossible : $e'),
+            );
           }
         });
 
         reader.readAsArrayBuffer(file);
       } catch (e) {
-        if (!completer.isCompleted) {
-          completer.completeError(e);
-        }
+        completeWithError(e);
       }
+    });
+
+    focusSubscription = html.window.onFocus.listen((_) {
+      cancelTimer?.cancel();
+      cancelTimer = Timer(const Duration(milliseconds: 250), () {
+        final files = input.files;
+        if (files == null || files.isEmpty) {
+          completeWith(null);
+        }
+      });
     });
 
     input.click();

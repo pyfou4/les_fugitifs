@@ -55,13 +55,6 @@ class CreatorMediaHeaderSection extends StatelessWidget {
                   color: Colors.white,
                 ),
               ),
-              Text(
-                selectedScenarioDoc.id,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: Color(0xFFAAB7C8),
-                ),
-              ),
               _Badge(
                 text: '$currentCount/$requiredCount requis',
                 textColor: isComplete

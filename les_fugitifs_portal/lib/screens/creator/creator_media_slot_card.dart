@@ -79,12 +79,6 @@ class CreatorMediaSlotCard extends StatelessWidget {
             runSpacing: 6,
             children: [
               _Pill(
-                text: slotId,
-                textColor: const Color(0xFFAED0FF),
-                borderColor: const Color(0xFF294C74),
-                backgroundColor: const Color(0xFF13233B),
-              ),
-              _Pill(
                 text: statusLabel,
                 textColor: statusColor,
                 borderColor: statusColor.withValues(alpha: 0.45),

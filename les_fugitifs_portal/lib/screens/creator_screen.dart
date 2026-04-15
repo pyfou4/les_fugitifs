@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import '../features/scenario_lock/scenario_lock_service.dart';
 import '../features/site_readiness/site_readiness_models.dart';
 import '../features/site_readiness/site_readiness_service.dart';
 import '../core/media/services/media_admin_service.dart';
+import '../core/media/services/media_structure_seed_service.dart';
 import 'creator/creator_image_picker.dart';
 import 'creator/creator_image_picker_model.dart';
 import 'creator/creator_media_tab.dart';
@@ -67,12 +69,15 @@ class _CreatorScreenState extends State<CreatorScreen>
     firestore: FirebaseFirestore.instance,
   );
   final MediaAdminService _mediaAdminService = MediaAdminService();
+  final ScenarioMediaStructureSeedService _mediaStructureSeedService =
+      ScenarioMediaStructureSeedService();
 
   late final TabController _tabController;
 
   String? _selectedSiteId;
   String? _selectedMediaScenarioId;
   bool _isMediaActionLoading = false;
+  bool _isMediaStructureSeeding = false;
 
   CollectionReference<Map<String, dynamic>> _sitePlacesRef(String siteId) =>
       FirebaseFirestore.instance
@@ -1180,6 +1185,31 @@ class _CreatorScreenState extends State<CreatorScreen>
           ),
         ),
         actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 12),
+            child: FilledButton.icon(
+              onPressed: _isMediaStructureSeeding ? null : _seedMediaStructure,
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFF294C74),
+                foregroundColor: Colors.white,
+              ),
+              icon: _isMediaStructureSeeding
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
+                  : const Icon(Icons.schema_outlined),
+              label: Text(
+                _isMediaStructureSeeding
+                    ? 'Initialisation...'
+                    : 'Init structure médias',
+              ),
+            ),
+          ),
           if (_isScenarioLocked && widget.profile.role == PortalUserRole.admin)
             Padding(
               padding: const EdgeInsets.only(right: 16),
@@ -1487,11 +1517,16 @@ class _CreatorScreenState extends State<CreatorScreen>
             final blockId =
                 (slotDefinitionData['blockId'] ?? '').toString().trim();
 
-            setState(() {
-              _isMediaActionLoading = true;
-            });
+            Timer? loaderTimer;
 
             try {
+              loaderTimer = Timer(const Duration(milliseconds: 180), () {
+                if (!mounted) return;
+                setState(() {
+                  _isMediaActionLoading = true;
+                });
+              });
+
               final result = await _mediaAdminService.uploadAndAssignMedia(
                 scenarioId: scenarioId,
                 slotId: slotId,
@@ -1500,6 +1535,8 @@ class _CreatorScreenState extends State<CreatorScreen>
                 blockId: blockId.isEmpty ? null : blockId,
                 actorLabel: 'creator_portal',
               );
+
+              loaderTimer.cancel();
 
               if (!mounted || result.cancelled) return;
 
@@ -1513,6 +1550,7 @@ class _CreatorScreenState extends State<CreatorScreen>
                 ),
               );
             } catch (e) {
+              loaderTimer?.cancel();
               if (!mounted) return;
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -1520,6 +1558,7 @@ class _CreatorScreenState extends State<CreatorScreen>
                 ),
               );
             } finally {
+              loaderTimer?.cancel();
               if (mounted) {
                 setState(() {
                   _isMediaActionLoading = false;
@@ -1674,6 +1713,59 @@ class _CreatorScreenState extends State<CreatorScreen>
         );
       },
     );
+  }
+
+  Future<void> _seedMediaStructure() async {
+    if (_isMediaStructureSeeding) return;
+
+    final scenarioId = (_selectedMediaScenarioId ?? '').trim();
+    if (scenarioId.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Choisis d’abord un scénario dans l’onglet Médias avant d’initialiser la structure.',
+          ),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isMediaStructureSeeding = true;
+    });
+
+    try {
+      final result = await _mediaStructureSeedService.seedScenario(
+        scenarioId: scenarioId,
+        actorLabel: 'creator_portal',
+      );
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Structure médias initialisée pour $scenarioId : '
+            '${result.blocksCreated} bloc(s), '
+            '${result.slotDefinitionsCreated} définition(s), '
+            '${result.slotsCreated} slot(s) créés.',
+          ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Erreur pendant l’initialisation de la structure médias : $e'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isMediaStructureSeeding = false;
+        });
+      }
+    }
   }
 
   String _scenarioLabel(DocumentSnapshot<Map<String, dynamic>> doc) {
