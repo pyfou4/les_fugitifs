@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'screens/portal_gate_screen.dart';
+// import 'screens/media_test_screen.dart'; // ← on laisse en commentaire pour debug si besoin
 
 class App extends StatelessWidget {
   const App({super.key});
@@ -81,6 +82,8 @@ class App extends StatelessWidget {
           }),
         ),
       ),
+
+      // ✅ POINT CRITIQUE CORRIGÉ
       home: const PortalGateScreen(),
     );
   }

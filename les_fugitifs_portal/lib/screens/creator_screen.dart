@@ -7,8 +7,10 @@ import '../features/scenario_lock/scenario_lock_models.dart';
 import '../features/scenario_lock/scenario_lock_service.dart';
 import '../features/site_readiness/site_readiness_models.dart';
 import '../features/site_readiness/site_readiness_service.dart';
+import '../core/media/services/media_admin_service.dart';
 import 'creator/creator_image_picker.dart';
 import 'creator/creator_image_picker_model.dart';
+import 'creator/creator_media_tab.dart';
 import 'creator/creator_questionnaire_tab.dart';
 import 'creator/creator_scenario_tab.dart';
 import 'creator/creator_sites_tab.dart';
@@ -36,6 +38,13 @@ class _CreatorScreenState extends State<CreatorScreen>
   static final CollectionReference<Map<String, dynamic>> _sitesRef =
       FirebaseFirestore.instance.collection('sites');
 
+  static final CollectionReference<Map<String, dynamic>> _scenariosRef =
+      FirebaseFirestore.instance.collection('scenarios');
+
+  static final CollectionReference<Map<String, dynamic>>
+      _scenarioMediaSlotDefinitionsRef =
+      FirebaseFirestore.instance.collection('scenario_media_slot_definitions');
+
   static final CollectionReference<Map<String, dynamic>> _suspectsRef =
       FirebaseFirestore.instance
           .collection('games')
@@ -57,16 +66,24 @@ class _CreatorScreenState extends State<CreatorScreen>
   final SiteReadinessService _siteReadinessService = SiteReadinessService(
     firestore: FirebaseFirestore.instance,
   );
+  final MediaAdminService _mediaAdminService = MediaAdminService();
 
   late final TabController _tabController;
 
   String? _selectedSiteId;
+  String? _selectedMediaScenarioId;
+  bool _isMediaActionLoading = false;
 
   CollectionReference<Map<String, dynamic>> _sitePlacesRef(String siteId) =>
       FirebaseFirestore.instance
           .collection('sites')
           .doc(siteId)
           .collection('places');
+
+  Query<Map<String, dynamic>> _scenarioMediaSlotsRef(String scenarioId) =>
+      FirebaseFirestore.instance
+          .collection('scenario_media_slots')
+          .where('scenarioId', isEqualTo: scenarioId);
 
   String? _selectedId;
   Map<String, dynamic>? _selectedData;
@@ -105,7 +122,7 @@ class _CreatorScreenState extends State<CreatorScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
+    _tabController = TabController(length: 5, vsync: this);
     _sideQuestionCtrls = List<TextEditingController>.generate(
       5,
       (_) => TextEditingController(),
@@ -1212,6 +1229,7 @@ class _CreatorScreenState extends State<CreatorScreen>
           tabs: const [
             Tab(text: 'Scénario'),
             Tab(text: 'Sites'),
+            Tab(text: 'Médias'),
             Tab(text: 'Suspects & Mobiles'),
             Tab(text: 'Questionnaire'),
           ],
@@ -1327,6 +1345,7 @@ class _CreatorScreenState extends State<CreatorScreen>
                     ),
                   ),
                   _buildSitesTab(docs),
+                  _buildMediaTab(),
                   _wrapCreatorTabLocked(locked: isScenarioLocked, child: _buildSuspectsMotivesTab()),
                   _wrapCreatorTabLocked(
                     locked: isScenarioLocked,
@@ -1399,6 +1418,281 @@ class _CreatorScreenState extends State<CreatorScreen>
         );
       },
     );
+  }
+
+
+  Widget _buildMediaTab() {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: _scenarioMediaSlotDefinitionsRef.snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting &&
+            !snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Text(
+                'Erreur Firestore (définitions médias) : ${snapshot.error}',
+                style: const TextStyle(
+                  color: Colors.redAccent,
+                  fontSize: 18,
+                ),
+              ),
+            ),
+          );
+        }
+
+        final slotDefinitionDocs =
+            List<QueryDocumentSnapshot<Map<String, dynamic>>>.from(
+          snapshot.data?.docs ??
+              const <QueryDocumentSnapshot<Map<String, dynamic>>>[],
+        );
+
+        final mediaTab = CreatorMediaTab(
+          slotDefinitionDocs: slotDefinitionDocs,
+          selectedScenarioId: _selectedMediaScenarioId,
+          isLoadingAction: _isMediaActionLoading,
+          isAdmin: widget.profile.role == PortalUserRole.admin,
+          scenariosStream: _scenariosRef.snapshots(),
+          scenarioMediaSlotsStreamBuilder: (scenarioId) =>
+              _scenarioMediaSlotsRef(scenarioId).snapshots(),
+          scenarioLabelBuilder: _scenarioLabel,
+          onSelectScenario: (value) {
+            setState(() {
+              _selectedMediaScenarioId = value;
+            });
+          },
+          onFreezeMedia: (scenarioId) async {
+            await _toggleMediaFreeze(scenarioId: scenarioId, frozen: true);
+          },
+          onUnfreezeMedia: (scenarioId) async {
+            await _toggleMediaFreeze(scenarioId: scenarioId, frozen: false);
+          },
+          onUploadOrReplaceMedia: ({
+            required String scenarioId,
+            required String slotId,
+            required Map<String, dynamic> slotDefinitionData,
+          }) async {
+            final acceptedTypes =
+                (slotDefinitionData['acceptedTypes'] as List<dynamic>? ?? const [])
+                    .map((e) => e.toString())
+                    .where((e) => e.trim().isNotEmpty)
+                    .toList();
+
+            final slotKey =
+                (slotDefinitionData['slotKey'] ?? slotId).toString().trim();
+            final blockId =
+                (slotDefinitionData['blockId'] ?? '').toString().trim();
+
+            setState(() {
+              _isMediaActionLoading = true;
+            });
+
+            try {
+              final result = await _mediaAdminService.uploadAndAssignMedia(
+                scenarioId: scenarioId,
+                slotId: slotId,
+                slotKey: slotKey,
+                acceptedTypes: acceptedTypes,
+                blockId: blockId.isEmpty ? null : blockId,
+                actorLabel: 'creator_portal',
+              );
+
+              if (!mounted || result.cancelled) return;
+
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    result.success
+                        ? 'Média téléversé : ${result.fileName ?? "fichier"}'
+                        : 'Téléversement annulé.',
+                  ),
+                ),
+              );
+            } catch (e) {
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Erreur pendant le téléversement média : $e'),
+                ),
+              );
+            } finally {
+              if (mounted) {
+                setState(() {
+                  _isMediaActionLoading = false;
+                });
+              }
+            }
+          },
+          onRemoveMedia: ({
+            required String scenarioId,
+            required String slotId,
+            required Map<String, dynamic> slotDefinitionData,
+          }) async {
+            final title = (slotDefinitionData['label'] ??
+                    slotDefinitionData['title'] ??
+                    slotDefinitionData['name'] ??
+                    slotId)
+                .toString()
+                .trim();
+
+            final confirmed = await showDialog<bool>(
+              context: context,
+              builder: (context) {
+                return AlertDialog(
+                  backgroundColor: const Color(0xFF151B25),
+                  title: const Text(
+                    'Retirer le média',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  content: Text(
+                    'Cette action retire le média actif du slot "$title" et supprime le fichier associé.',
+                    style: const TextStyle(
+                      color: Color(0xFFB8C3D6),
+                      height: 1.45,
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      child: const Text('Annuler'),
+                    ),
+                    FilledButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFB3261E),
+                        foregroundColor: Colors.white,
+                      ),
+                      child: const Text('Retirer'),
+                    ),
+                  ],
+                );
+              },
+            );
+
+            if (confirmed != true) return;
+
+            setState(() {
+              _isMediaActionLoading = true;
+            });
+
+            try {
+              await _mediaAdminService.removeActiveMediaFromSlot(
+                slotId: slotId,
+                actorLabel: 'creator_portal',
+              );
+
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Média retiré pour "$title".'),
+                ),
+              );
+            } catch (e) {
+              if (!mounted) return;
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Erreur pendant le retrait du média : $e'),
+                ),
+              );
+            } finally {
+              if (mounted) {
+                setState(() {
+                  _isMediaActionLoading = false;
+                });
+              }
+            }
+          },
+        );
+
+        return Stack(
+          children: [
+            mediaTab,
+            if (_isMediaActionLoading)
+              Positioned.fill(
+                child: Container(
+                  color: const Color(0xB307111F),
+                  alignment: Alignment.center,
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 360),
+                    margin: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 22,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF111D32),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(color: const Color(0xFF263854)),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x66000000),
+                          blurRadius: 24,
+                          offset: Offset(0, 12),
+                        ),
+                      ],
+                    ),
+                    child: const Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        SizedBox(
+                          width: 34,
+                          height: 34,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                            color: Color(0xFFD65A00),
+                          ),
+                        ),
+                        SizedBox(height: 16),
+                        Text(
+                          'Upload média en cours',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        SizedBox(height: 10),
+                        Text(
+                          'Le fichier est en train d’être envoyé et relié au slot. Merci de patienter quelques secondes.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: Color(0xFFB8C3D6),
+                            height: 1.45,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  String _scenarioLabel(DocumentSnapshot<Map<String, dynamic>> doc) {
+    final data = doc.data() ?? <String, dynamic>{};
+    final label =
+        (data['title'] ?? data['name'] ?? data['label'] ?? doc.id).toString().trim();
+    return label.isEmpty ? doc.id : label;
+  }
+
+  Future<void> _toggleMediaFreeze({
+    required String scenarioId,
+    required bool frozen,
+  }) async {
+    await _scenariosRef.doc(scenarioId).set({
+      'mediaFrozen': frozen,
+      'mediaFrozenAt': DateTime.now().toIso8601String(),
+      'mediaFrozenBy': 'admin_portal',
+      'updatedAt': DateTime.now().toIso8601String(),
+    }, SetOptions(merge: true));
   }
 
   String _normalizeEntityId(String raw) {
