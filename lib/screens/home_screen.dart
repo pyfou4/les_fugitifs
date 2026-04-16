@@ -473,7 +473,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
 
-  Future<AiHelpCallContext?> _loadIncrementedCallContextForSession(String sessionId) async {
+  Future<Map<String, dynamic>?> _loadIncrementedCallContextForSession(
+    String sessionId,
+  ) async {
     try {
       final snap = await _firestore.collection('gameSessions').doc(sessionId).get();
       final data = snap.data();
@@ -484,7 +486,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  AiHelpCallContext? _readCallContext(Map<String, dynamic> data) {
+  Map<String, dynamic>? _readCallContext(Map<String, dynamic> data) {
     final raw = data['callContext'];
     if (raw is! Map) return null;
 
@@ -493,6 +495,14 @@ class _HomeScreenState extends State<HomeScreen> {
     final phase = (map['phase'] ?? '').toString().trim();
     final callId = (map['callId'] ?? '').toString().trim();
     final sourceEvent = (map['sourceEvent'] ?? '').toString().trim();
+    final callType = (map['callType'] ?? '').toString().trim();
+    final displayName = (map['displayName'] ?? '').toString().trim();
+    final audioUrl = (map['audioUrl'] ?? '').toString().trim();
+    final backgroundImageUrl =
+        (map['backgroundImageUrl'] ?? '').toString().trim();
+    final retryPolicy = (map['retryPolicy'] ?? '').toString().trim();
+    final uiVariant = (map['uiVariant'] ?? '').toString().trim();
+    final ringtoneUrl = (map['ringtoneUrl'] ?? '').toString().trim();
 
     final attemptsRaw = map['helpAttemptsDuringCall'];
     final attempts = attemptsRaw is int
@@ -501,28 +511,53 @@ class _HomeScreenState extends State<HomeScreen> {
             ? attemptsRaw.toInt()
             : int.tryParse(attemptsRaw?.toString() ?? '') ?? 0;
 
-    if (!active && phase.isEmpty && callId.isEmpty && sourceEvent.isEmpty) {
+    final hasMinimalSignal =
+        active || phase.isNotEmpty || callId.isNotEmpty || sourceEvent.isNotEmpty;
+    final hasExtendedSignal =
+        callType.isNotEmpty ||
+        displayName.isNotEmpty ||
+        audioUrl.isNotEmpty ||
+        backgroundImageUrl.isNotEmpty ||
+        retryPolicy.isNotEmpty ||
+        uiVariant.isNotEmpty ||
+        ringtoneUrl.isNotEmpty;
+
+    if (!hasMinimalSignal && !hasExtendedSignal) {
       return null;
     }
 
-    return AiHelpCallContext(
-      active: active,
-      phase: phase.isEmpty ? 'resolved' : phase,
-      helpAttemptsDuringCall: attempts,
-      callId: callId,
-      sourceEvent: sourceEvent,
-    );
+    return {
+      ...map,
+      'active': active,
+      'phase': phase.isEmpty ? 'resolved' : phase,
+      'helpAttemptsDuringCall': attempts,
+      'callId': callId,
+      'sourceEvent': sourceEvent,
+      'callType': callType,
+      'displayName': displayName,
+      'audioUrl': audioUrl,
+      'backgroundImageUrl': backgroundImageUrl,
+      'retryPolicy': retryPolicy,
+      'uiVariant': uiVariant,
+      'ringtoneUrl': ringtoneUrl,
+    };
   }
 
-  AiHelpCallContext? _incrementCallContext(AiHelpCallContext? context) {
-    if (context == null || !context.active) return context;
-    return AiHelpCallContext(
-      active: context.active,
-      phase: context.phase,
-      helpAttemptsDuringCall: context.helpAttemptsDuringCall + 1,
-      callId: context.callId,
-      sourceEvent: context.sourceEvent,
-    );
+  Map<String, dynamic>? _incrementCallContext(Map<String, dynamic>? context) {
+    if (context == null || context['active'] != true) {
+      return context;
+    }
+
+    final updated = Map<String, dynamic>.from(context);
+    final attemptsRaw = updated['helpAttemptsDuringCall'];
+    final attempts = attemptsRaw is int
+        ? attemptsRaw
+        : attemptsRaw is num
+            ? attemptsRaw.toInt()
+            : int.tryParse(attemptsRaw?.toString() ?? '') ?? 0;
+
+    updated['helpAttemptsDuringCall'] = attempts + 1;
+    return updated;
   }
 
   String _hintLevelLabel(String hintLevel) {

@@ -1,4 +1,3 @@
-
 import 'dart:convert';
 import 'dart:io';
 
@@ -16,6 +15,10 @@ class MediaPreloadService {
   static const String scenarioId = 'les_fugitifs';
   static const String introRulesSlotKey = 'intro_regles';
   static const String introBriefingSlotKey = 'intro_briefing';
+  // Important: the media repository resolves logical slot keys (without scenario prefix).
+  static const String introCall1SlotKey = 'intro_call_1';
+  static const String introCall2SlotKey = 'intro_call_2';
+  static const String d0FinalCallSlotKey = 'd0_final_call';
 
   final MediaRepository _mediaRepository;
 
@@ -32,9 +35,8 @@ class MediaPreloadService {
     ]);
   }
 
-  Future<File> getCachedOrFetchVideo({
+  Future<String> getActiveMediaDownloadUrl({
     required String slotKey,
-    required String cacheBasename,
   }) async {
     final asset = await _mediaRepository.getActiveMediaForSlot(
       scenarioId: scenarioId,
@@ -45,9 +47,45 @@ class MediaPreloadService {
     if (downloadUrl.isEmpty) {
       throw Exception('Aucun média backend actif pour le slot $slotKey.');
     }
+    return downloadUrl;
+  }
 
+  Future<File> getCachedOrFetchVideo({
+    required String slotKey,
+    required String cacheBasename,
+  }) async {
+    final downloadUrl = await getActiveMediaDownloadUrl(slotKey: slotKey);
+    return _getCachedOrFetchBinary(
+      slotKey: slotKey,
+      cacheBasename: cacheBasename,
+      extension: 'mp4',
+      downloadUrl: downloadUrl,
+    );
+  }
+
+  Future<File> getCachedOrFetchAudio({
+    required String slotKey,
+    required String cacheBasename,
+  }) async {
+    final downloadUrl = await getActiveMediaDownloadUrl(slotKey: slotKey);
+    final extension = _guessAudioExtension(downloadUrl);
+    return _getCachedOrFetchBinary(
+      slotKey: slotKey,
+      cacheBasename: cacheBasename,
+      extension: extension,
+      downloadUrl: downloadUrl,
+    );
+  }
+
+  Future<File> _getCachedOrFetchBinary({
+    required String slotKey,
+    required String cacheBasename,
+    required String extension,
+    required String downloadUrl,
+  }) async {
     final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/$cacheBasename.mp4');
+    final safeExtension = extension.trim().isEmpty ? 'bin' : extension.trim();
+    final file = File('${dir.path}/$cacheBasename.$safeExtension');
     final metaFile = File('${dir.path}/$cacheBasename.meta.json');
 
     if (await file.exists() && await metaFile.exists()) {
@@ -92,5 +130,14 @@ class MediaPreloadService {
     );
 
     return file;
+  }
+
+  String _guessAudioExtension(String downloadUrl) {
+    final lower = downloadUrl.toLowerCase();
+    if (lower.contains('.wav')) return 'wav';
+    if (lower.contains('.m4a')) return 'm4a';
+    if (lower.contains('.aac')) return 'aac';
+    if (lower.contains('.ogg')) return 'ogg';
+    return 'mp3';
   }
 }

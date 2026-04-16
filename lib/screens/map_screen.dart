@@ -14,6 +14,10 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../models/place_node.dart';
 import 'incoming_call_screen.dart';
 import 'final_quiz_test_screen.dart';
+import '../services/runtime_call_context_service.dart';
+import '../services/media_preload_service.dart';
+import '../services/scheduled_calls_bootstrap_service.dart';
+import '../services/scheduled_calls_service.dart';
 
 class MapScreen extends StatefulWidget {
   final VoidCallback onBack;
@@ -52,6 +56,11 @@ class _MapScreenState extends State<MapScreen> {
   final stt.SpeechToText _speechToText = stt.SpeechToText();
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final RuntimeCallContextService _runtimeCallContextService =
+      RuntimeCallContextService();
+  final ScheduledCallsService _scheduledCallsService = ScheduledCallsService();
+  final ScheduledCallsBootstrapService _scheduledCallsBootstrapService =
+      ScheduledCallsBootstrapService();
 
   BitmapDescriptor? _playerMarkerIcon;
   BitmapDescriptor? _revealedPlaceMarkerIcon;
@@ -83,6 +92,10 @@ class _MapScreenState extends State<MapScreen> {
   final Set<String> _invokedPlaceIds = <String>{};
   Timer? _heardBannerTimer;
   Timer? _incomingCallRecallTimer;
+  Timer? _scheduledCallsEvaluationTimer;
+
+  bool _incomingCallScreenOpen = false;
+  bool _showingMissedCallPopup = false;
 
   static const CameraPosition _fallbackCamera = CameraPosition(
     target: LatLng(10.3910, -75.4794),
@@ -142,6 +155,9 @@ class _MapScreenState extends State<MapScreen> {
   Future<void> _bootstrapMapState() async {
     await _ensureSessionContextLoaded();
     await _refreshPlaceOccupancy();
+    await _ensureScheduledCallsInitializedIfConfigured();
+    _startScheduledCallsEvaluationLoop();
+    await _runScheduledCallsPass();
     await _initLocationTracking();
   }
 
@@ -814,7 +830,191 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
+
+  Future<void> _ensureScheduledCallsInitializedIfConfigured() async {
+    await _ensureSessionContextLoaded();
+
+    final sessionId = (_currentSessionId ?? '').trim();
+    if (sessionId.isEmpty) return;
+
+    try {
+      await _scheduledCallsBootstrapService.ensureInitializedFromSession(
+        sessionId: sessionId,
+      );
+    } catch (e) {
+      debugPrint('SCHEDULED_CALLS_INIT_SKIPPED: $e');
+    }
+  }
+
+  void _startScheduledCallsEvaluationLoop() {
+    _scheduledCallsEvaluationTimer?.cancel();
+    _scheduledCallsEvaluationTimer =
+        Timer.periodic(const Duration(seconds: 15), (_) {
+      unawaited(_runScheduledCallsPass());
+    });
+  }
+
+  Future<void> _runScheduledCallsPass() async {
+    if (!mounted || _incomingCallScreenOpen || _showingMissedCallPopup) return;
+
+    await _ensureSessionContextLoaded();
+    final sessionId = (_currentSessionId ?? '').trim();
+    if (sessionId.isEmpty) return;
+
+    try {
+      await _scheduledCallsService.evaluate(
+        sessionId: sessionId,
+        isOutOfLocatedPost: true,
+        isUiSafe: ModalRoute.of(context)?.isCurrent ?? true,
+      );
+    } catch (e) {
+      debugPrint('SCHEDULED_CALLS_EVALUATE_FAILED: $e');
+    }
+
+    final callContext = await _runtimeCallContextService.load(sessionId);
+    if (callContext != null &&
+        callContext.active &&
+        callContext.phase.trim() == 'ringing') {
+      await _openIncomingCallFlow();
+      return;
+    }
+
+    await _showPendingMissedCallPopupIfNeeded();
+  }
+
+  Future<void> _showPendingMissedCallPopupIfNeeded() async {
+    if (!mounted || _incomingCallScreenOpen || _showingMissedCallPopup) return;
+
+    final sessionId = (_currentSessionId ?? '').trim();
+    if (sessionId.isEmpty) return;
+
+    final pendingPopup =
+        await _scheduledCallsService.findPendingMissedPopup(sessionId);
+    if (pendingPopup == null) return;
+
+    _showingMissedCallPopup = true;
+
+    if (!mounted) {
+      _showingMissedCallPopup = false;
+      return;
+    }
+
+    await showGeneralDialog<void>(
+      context: context,
+      barrierLabel: 'Appel manqué',
+      barrierDismissible: true,
+      barrierColor: const Color(0xCC000000),
+      pageBuilder: (context, animation, secondaryAnimation) {
+        return Material(
+          type: MaterialType.transparency,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => Navigator.of(context).pop(),
+            child: Center(
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 28),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 22,
+                  vertical: 20,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xE6111111),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: const Color(0xFF3B3B3B)),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x55000000),
+                      blurRadius: 24,
+                      offset: Offset(0, 10),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.phone_missed_rounded,
+                      color: Colors.white,
+                      size: 38,
+                    ),
+                    const SizedBox(height: 14),
+                    const Text(
+                      'Appel manqué',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.2,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      pendingPopup.popupMessage.trim().isEmpty
+                          ? 'Quelqu’un a essayé de vous joindre.'
+                          : pendingPopup.popupMessage,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 15,
+                        height: 1.35,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Touchez l’écran pour fermer',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: Colors.white38,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    await _scheduledCallsService.dismissMissedPopup(
+      sessionId: sessionId,
+      callId: pendingPopup.id,
+    );
+
+    _showingMissedCallPopup = false;
+  }
+
+  Future<Map<String, dynamic>?> _loadActiveCallContextMap() async {
+    await _ensureSessionContextLoaded();
+
+    final sessionId = (_currentSessionId ?? '').trim();
+    if (sessionId.isEmpty) {
+      return null;
+    }
+
+    try {
+      final snap = await _firestore.collection('gameSessions').doc(sessionId).get();
+      final data = snap.data();
+      if (data == null) return null;
+
+      final raw = data['callContext'];
+      if (raw is! Map) return null;
+
+      final map = Map<String, dynamic>.from(raw as Map);
+      if (map['active'] != true) return null;
+      return map;
+    } catch (e) {
+      debugPrint('ACTIVE_CALL_CONTEXT_LOAD_FAILED: $e');
+      return null;
+    }
+  }
+
   Future<void> _openIncomingCallFlow() async {
+    if (_incomingCallScreenOpen) return;
+
     _incomingCallRecallTimer?.cancel();
     await _ensureSessionContextLoaded();
 
@@ -829,23 +1029,65 @@ class _MapScreenState extends State<MapScreen> {
       return;
     }
 
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => IncomingCallScreen(
-          sessionId: sessionId,
-          onAccepted: () {
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (_) => const FinalQuizTestScreen(),
-              ),
-            );
-          },
-          onRejected: _scheduleIncomingCallRecall,
+    final callContext = await _loadActiveCallContextMap();
+    if (callContext == null) return;
+
+    final retryPolicy =
+        (callContext['retryPolicy'] ?? 'until_answered').toString().trim();
+    final callType =
+        (callContext['callType'] ?? 'final_phase').toString().trim();
+    final callId = (callContext['callId'] ?? '').toString().trim();
+
+    _incomingCallScreenOpen = true;
+
+    try {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => IncomingCallScreen(
+            sessionId: sessionId,
+            onAccepted: () async {
+              if (callType == 'scheduled' && callId.isNotEmpty) {
+                await _scheduledCallsService.markAnswered(
+                  sessionId: sessionId,
+                  callId: callId,
+                );
+              }
+
+              if (callType == 'final_phase') {
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const FinalQuizTestScreen(),
+                  ),
+                );
+                return;
+              }
+
+              Navigator.pop(context);
+            },
+            onRejected: () async {
+              if (callType == 'scheduled' && callId.isNotEmpty) {
+                await _scheduledCallsService.markMissed(
+                  sessionId: sessionId,
+                  callId: callId,
+                  reason: 'rejected',
+                );
+              }
+
+              if (retryPolicy == 'until_answered') {
+                _scheduleIncomingCallRecall();
+              }
+            },
+          ),
         ),
-      ),
-    );
+      );
+    } finally {
+      _incomingCallScreenOpen = false;
+      if (mounted) {
+        unawaited(_runScheduledCallsPass());
+      }
+    }
   }
 
   void _scheduleIncomingCallRecall() {
@@ -854,10 +1096,6 @@ class _MapScreenState extends State<MapScreen> {
       if (!mounted) return;
       _openIncomingCallFlow();
     });
-  }
-
-  Future<void> _launchIncomingCallTest() async {
-    await _openIncomingCallFlow();
   }
 
   Future<void> _recenterOnUser() async {
@@ -1505,12 +1743,15 @@ class _MapScreenState extends State<MapScreen> {
   @override
   void dispose() {
     _heardBannerTimer?.cancel();
+    _incomingCallRecallTimer?.cancel();
+    _scheduledCallsEvaluationTimer?.cancel();
     unawaited(_updateMapTargetPlace(null));
     _positionSubscription?.cancel();
     _speechToText.stop();
     super.dispose();
   }
 }
+
 
 class _ImmersiveMapBanner extends StatelessWidget {
   final String title;
