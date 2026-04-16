@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:video_player/video_player.dart';
 
 import '../constants/firebase_media.dart';
+import '../services/media_preload_service.dart';
 import 'home_screen.dart';
 
 class BriefingScreen extends StatefulWidget {
@@ -18,6 +19,8 @@ class BriefingScreen extends StatefulWidget {
 }
 
 class _BriefingScreenState extends State<BriefingScreen> {
+  final MediaPreloadService _mediaPreloadService = MediaPreloadService();
+
   VideoPlayerController? _rulesController;
   VideoPlayerController? _briefingController;
 
@@ -39,40 +42,24 @@ class _BriefingScreenState extends State<BriefingScreen> {
     _initVideos();
   }
 
-  Future<File> _downloadVideo(String url, String filename) async {
-    final dir = await getTemporaryDirectory();
-    final file = File('${dir.path}/$filename');
-
-    // Évite de réutiliser un ancien fichier temporaire potentiellement corrompu.
-    if (await file.exists()) {
-      try {
-        await file.delete();
-      } catch (_) {}
-    }
-
-    final response = await http
-        .get(Uri.parse(url))
-        .timeout(const Duration(seconds: 60));
-
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw Exception('Téléchargement impossible (${response.statusCode})');
-    }
-
-    if (response.bodyBytes.isEmpty) {
-      throw Exception('Téléchargement impossible (fichier vide)');
-    }
-
-    await file.writeAsBytes(response.bodyBytes, flush: true);
-    return file;
+  Future<File> _resolveVideoFile({
+    required bool isRules,
+  }) async {
+    return _mediaPreloadService.getCachedOrFetchVideo(
+      slotKey: isRules
+          ? MediaPreloadService.introRulesSlotKey
+          : MediaPreloadService.introBriefingSlotKey,
+      cacheBasename: isRules
+          ? 'briefing_regles_backend'
+          : 'briefing_mission_backend',
+    );
   }
 
   Future<void> _initOneVideo({
-    required String url,
-    required String filename,
     required bool isRules,
   }) async {
     try {
-      final file = await _downloadVideo(url, filename);
+      final file = await _resolveVideoFile(isRules: isRules);
 
       final controller = VideoPlayerController.file(file);
       await controller.initialize().timeout(const Duration(seconds: 20));
@@ -102,22 +89,24 @@ class _BriefingScreenState extends State<BriefingScreen> {
         if (isRules) {
           _rulesController = controller;
           _rulesReady = true;
+          _rulesError = null;
         } else {
           _briefingController = controller;
           _briefingReady = true;
+          _briefingError = null;
         }
       });
     } catch (e) {
       debugPrint(
-        'ERREUR VIDEO (${isRules ? "rules" : "briefing"}) : $e',
+        'ERREUR VIDEO BACKEND (${isRules ? "rules" : "briefing"}) : $e',
       );
 
       if (!mounted) return;
       setState(() {
         if (isRules) {
-          _rulesError = 'Vidéo indisponible';
+          _rulesError = 'Vidéo backend indisponible';
         } else {
-          _briefingError = 'Vidéo indisponible';
+          _briefingError = 'Vidéo backend indisponible';
         }
       });
     }
@@ -125,16 +114,8 @@ class _BriefingScreenState extends State<BriefingScreen> {
 
   Future<void> _initVideos() async {
     await Future.wait([
-      _initOneVideo(
-        url: FirebaseMedia.briefingReglesVideo,
-        filename: 'briefing_regles.mp4',
-        isRules: true,
-      ),
-      _initOneVideo(
-        url: FirebaseMedia.briefingMissionVideo,
-        filename: 'briefing_mission.mp4',
-        isRules: false,
-      ),
+      _initOneVideo(isRules: true),
+      _initOneVideo(isRules: false),
     ]);
 
     if (!mounted) return;
@@ -244,7 +225,6 @@ class _BriefingScreenState extends State<BriefingScreen> {
                   color: Colors.black.withOpacity(0.05),
                 ),
               ),
-
               if (_isPreparing)
                 Positioned(
                   top: 24,
@@ -275,13 +255,11 @@ class _BriefingScreenState extends State<BriefingScreen> {
                     ),
                   ),
                 ),
-
               Positioned(
                 left: compact ? 18 : 24,
                 top: isTablet ? h * 0.16 : h * 0.18,
                 child: _TopLogo(compact: compact),
               ),
-
               Positioned(
                 left: leftCardLeft,
                 top: cardsTop,
@@ -307,7 +285,6 @@ class _BriefingScreenState extends State<BriefingScreen> {
                   ),
                 ),
               ),
-
               Positioned(
                 left: rightCardLeft,
                 top: cardsTop,
@@ -333,7 +310,6 @@ class _BriefingScreenState extends State<BriefingScreen> {
                   ),
                 ),
               ),
-
               Positioned(
                 left: leftCardLeft,
                 top: titleTop,
@@ -354,7 +330,6 @@ class _BriefingScreenState extends State<BriefingScreen> {
                   ),
                 ),
               ),
-
               Positioned(
                 left: rightCardLeft,
                 top: titleTop,
@@ -375,7 +350,6 @@ class _BriefingScreenState extends State<BriefingScreen> {
                   ),
                 ),
               ),
-
               Positioned(
                 right: compact ? 18 : 24,
                 bottom: 0,
@@ -552,49 +526,45 @@ class _PhotoSurface extends StatelessWidget {
                   fit: BoxFit.cover,
                 ),
               ),
-
-          Container(
-            decoration: BoxDecoration(
-              gradient: RadialGradient(
-                radius: 1.2,
-                colors: [
-                  Colors.transparent,
-                  Colors.black.withOpacity(0.30),
-                ],
-              ),
-            ),
-          ),
-
-          Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.08),
-                width: 1.0,
-              ),
-            ),
-          ),
-
-          Positioned.fill(
-            child: IgnorePointer(
-              child: Opacity(
-                opacity: 0.05,
-                child: CustomPaint(
-                  painter: _GrainPainter(),
+            Container(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  radius: 1.2,
+                  colors: [
+                    Colors.transparent,
+                    Colors.black.withOpacity(0.30),
+                  ],
                 ),
               ),
             ),
-          ),
-
-          _PhotoOverlayUI(
-            isDone: isDone,
-            isReady: isReady,
-            errorText: errorText,
-            progress: progress,
-            onTap: onTap,
-          ),
-        ],
-      ),
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.08),
+                  width: 1.0,
+                ),
+              ),
+            ),
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Opacity(
+                  opacity: 0.05,
+                  child: CustomPaint(
+                    painter: _GrainPainter(),
+                  ),
+                ),
+              ),
+            ),
+            _PhotoOverlayUI(
+              isDone: isDone,
+              isReady: isReady,
+              errorText: errorText,
+              progress: progress,
+              onTap: onTap,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -620,8 +590,8 @@ class _PhotoOverlayUI extends StatelessWidget {
     final label = errorText != null
         ? 'Erreur'
         : !isReady
-        ? 'Chargement...'
-        : '${(progress * 100).toInt()}%';
+            ? 'Chargement...'
+            : '${(progress * 100).toInt()}%';
 
     return Stack(
       children: [
@@ -642,8 +612,8 @@ class _PhotoOverlayUI extends StatelessWidget {
                 errorText != null
                     ? Icons.error_outline
                     : isDone
-                    ? Icons.check_circle
-                    : Icons.play_arrow,
+                        ? Icons.check_circle
+                        : Icons.play_arrow,
                 color: Colors.white,
                 size: 36,
               ),

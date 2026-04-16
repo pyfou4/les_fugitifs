@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../services/media_preload_service.dart';
+
 /// Team setup screen for Les Fugitifs.
 ///
 /// Purpose:
@@ -189,15 +191,22 @@ class _TeamSetupScreenState extends State<TeamSetupScreen>
       return;
     }
 
-    setState(() {
-      _isSubmitting = false;
-      if (!canContinue) {
+    if (!canContinue) {
+      setState(() {
+        _isSubmitting = false;
         _errorMessage =
             'Enregistrement impossible pour le moment. Veuillez réessayer.';
-      }
-    });
+      });
+      return;
+    }
 
-    if (!canContinue) {
+    try {
+      await MediaPreloadService().preloadIntroMedia();
+    } catch (_) {
+      // Le préchargement ne doit pas bloquer l'entrée dans le jeu.
+    }
+
+    if (!mounted) {
       return;
     }
 

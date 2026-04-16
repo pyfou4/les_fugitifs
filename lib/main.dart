@@ -9,6 +9,9 @@ import 'constants/app_constants.dart';
 import 'screens/home_screen.dart';
 import 'screens/scenarios_screen.dart';
 import 'services/session_service.dart';
+import 'tools/import_data.dart';
+
+const bool kRunImportMigrationOnce = false;
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,6 +26,10 @@ void main() async {
 
   if (FirebaseAuth.instance.currentUser == null) {
     await FirebaseAuth.instance.signInAnonymously();
+  }
+
+  if (kRunImportMigrationOnce) {
+    await ImportData.run();
   }
 
   await SystemChrome.setPreferredOrientations([
@@ -69,11 +76,11 @@ class _MyAppState extends State<MyApp> {
       theme: ThemeData(useMaterial3: true),
       home: _isLoading
           ? const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      )
+              body: Center(child: CircularProgressIndicator()),
+            )
           : _hasValidSession
-          ? const HomeScreen()
-          : const ScenariosScreen(),
+              ? const HomeScreen()
+              : const ScenariosScreen(),
     );
   }
 }

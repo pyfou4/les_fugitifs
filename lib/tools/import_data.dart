@@ -1,81 +1,68 @@
-import 'dart:convert';
-import 'package:flutter/services.dart' show rootBundle;
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ImportData {
   static Future<void> run() async {
     final firestore = FirebaseFirestore.instance;
 
-    const scenarioId = "test_scenario";
+    const sourceScenarioId = 'test_scenario';
+    const targetScenarioId = 'les_fugitifs';
 
-    print("🚀 Début import...");
+    print('🚀 Début migration scénario...');
+    print('📦 Source: $sourceScenarioId');
+    print('🎯 Cible: $targetScenarioId');
 
-    // =========================
-    // IMPORT PLACES
-    // =========================
-    final placesRaw =
-    await rootBundle.loadString('assets/data/places.json');
-    final placesData = jsonDecode(placesRaw);
+    final sourceRef = firestore.collection('scenarios').doc(sourceScenarioId);
+    final targetRef = firestore.collection('scenarios').doc(targetScenarioId);
 
-    for (var place in placesData['places']) {
-      final docId = place['id'];
-
-      final data = Map<String, dynamic>.from(place);
-
-      await firestore
-          .collection('scenarios')
-          .doc(scenarioId)
-          .collection('places')
-          .doc(docId)
-          .set(data);
-
-      print("✔ Place importée: $docId");
+    final sourceSnap = await sourceRef.get();
+    if (!sourceSnap.exists) {
+      throw Exception('Scenario source introuvable: $sourceScenarioId');
     }
 
-    // =========================
-    // IMPORT SUSPECTS
-    // =========================
-    final suspectsRaw =
-    await rootBundle.loadString('assets/data/suspects.json');
-    final suspectsData = jsonDecode(suspectsRaw);
+    final sourceData = Map<String, dynamic>.from(sourceSnap.data() ?? <String, dynamic>{});
+    sourceData['id'] = targetScenarioId;
+    sourceData['title'] = sourceData['title'] ?? 'Les Fugitifs';
+    sourceData['updatedAt'] = DateTime.now().toIso8601String();
 
-    for (var suspect in suspectsData['suspects']) {
-      final docId = suspect['id'];
+    await targetRef.set(sourceData, SetOptions(merge: true));
+    print('✔ Document scénario copié');
 
-      final data = Map<String, dynamic>.from(suspect);
+    await _copyCollection(
+      sourceRef.collection('places'),
+      targetRef.collection('places'),
+      label: 'place',
+    );
+    await _copyCollection(
+      sourceRef.collection('suspects'),
+      targetRef.collection('suspects'),
+      label: 'suspect',
+    );
+    await _copyCollection(
+      sourceRef.collection('motives'),
+      targetRef.collection('motives'),
+      label: 'motive',
+    );
 
-      await firestore
-          .collection('scenarios')
-          .doc(scenarioId)
-          .collection('suspects')
-          .doc(docId)
-          .set(data);
-
-      print("✔ Suspect importé: $docId");
+    final versionsSnap = await sourceRef.collection('versions').get();
+    for (final versionDoc in versionsSnap.docs) {
+      final versionData = Map<String, dynamic>.from(versionDoc.data());
+      await targetRef.collection('versions').doc(versionDoc.id).set(versionData, SetOptions(merge: true));
+      print('✔ Version copiée: ${versionDoc.id}');
     }
 
-    // =========================
-    // IMPORT MOTIVES
-    // =========================
-    final motivesRaw =
-    await rootBundle.loadString('assets/data/motives.json');
-    final motivesData = jsonDecode(motivesRaw);
+    print('🎉 Migration terminée');
+  }
 
-    for (var motive in motivesData['motives']) {
-      final docId = motive['id'];
-
-      final data = Map<String, dynamic>.from(motive);
-
-      await firestore
-          .collection('scenarios')
-          .doc(scenarioId)
-          .collection('motives')
-          .doc(docId)
-          .set(data);
-
-      print("✔ Motive importé: $docId");
+  static Future<void> _copyCollection(
+    CollectionReference<Map<String, dynamic>> source,
+    CollectionReference<Map<String, dynamic>> target, {
+    required String label,
+  }) async {
+    final snap = await source.get();
+    for (final doc in snap.docs) {
+      final data = Map<String, dynamic>.from(doc.data());
+      await target.doc(doc.id).set(data, SetOptions(merge: true));
+      print('✔ ${label} copié: ${doc.id}');
     }
-
-    print("🎉 Import terminé !");
   }
 }
