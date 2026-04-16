@@ -116,8 +116,11 @@ class _MasterGameScreenState extends State<MasterGameScreen> {
           final sessions = (sessionSnapshot.data?.docs ?? const [])
               .map(_GameSession.fromDoc)
               .toList(growable: false);
+          final activeSessions = sessions
+              .where((session) => session.isVisibleInMasterActiveView)
+              .toList(growable: false);
 
-          _ensureSelectedSession(sessions);
+          _ensureSelectedSession(activeSessions);
 
           return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
             stream: FirebaseFirestore.instance
@@ -142,8 +145,8 @@ class _MasterGameScreenState extends State<MasterGameScreen> {
                   doc.id: _PlaceTemplate.fromDoc(doc),
               };
 
-              final selectedSession = _selectedSession(sessions);
-              final sessionsByNode = _groupSessionsByNode(sessions);
+              final selectedSession = _selectedSession(activeSessions);
+              final sessionsByNode = _groupSessionsByNode(activeSessions);
 
               return LayoutBuilder(
                 builder: (context, constraints) {
@@ -155,7 +158,7 @@ class _MasterGameScreenState extends State<MasterGameScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _buildIntroCard(sessions),
+                        _buildIntroCard(activeSessions),
                         const SizedBox(height: 24),
                         if (isWide)
                           Row(
@@ -169,10 +172,10 @@ class _MasterGameScreenState extends State<MasterGameScreen> {
                                     _buildGlobalGraphCard(
                                       templates: templates,
                                       sessionsByNode: sessionsByNode,
-                                      sessions: sessions,
+                                      sessions: activeSessions,
                                     ),
                                     const SizedBox(height: 24),
-                                    _buildSessionsCard(sessions),
+                                    _buildSessionsCard(activeSessions),
                                   ],
                                 ),
                               ),
@@ -190,10 +193,10 @@ class _MasterGameScreenState extends State<MasterGameScreen> {
                               _buildGlobalGraphCard(
                                 templates: templates,
                                 sessionsByNode: sessionsByNode,
-                                sessions: sessions,
+                                sessions: activeSessions,
                               ),
                               const SizedBox(height: 24),
-                              _buildSessionsCard(sessions),
+                              _buildSessionsCard(activeSessions),
                               const SizedBox(height: 24),
                               _buildSidePanel(selectedSession),
                             ],
@@ -2777,6 +2780,34 @@ class _GameSession {
       completedNodeIds: _readStringList(data['completedNodeIds']),
       lastHelpContext: _readStringDynamicMap(data['lastHelpContext']),
     );
+  }
+
+  bool get isVisibleInMasterActiveView {
+    if (finishedAt != null) return false;
+
+    final normalizedStatus = status.trim().toLowerCase();
+    const terminalStatuses = {
+      'completed',
+      'finished',
+      'ended',
+      'terminated',
+      'closed',
+      'archived',
+      'cancelled',
+      'canceled',
+      'expired',
+      'resolved',
+    };
+
+    if (terminalStatuses.contains(normalizedStatus)) {
+      return false;
+    }
+
+    if (!active && normalizedStatus != 'paused') {
+      return false;
+    }
+
+    return true;
   }
 
   _AttentionLevel get attentionLevel {

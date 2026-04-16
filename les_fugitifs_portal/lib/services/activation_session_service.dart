@@ -199,7 +199,7 @@ class ActivationSessionService {
 
         return ActivationSessionResult(
           success: true,
-          message: 'Code attribué avec succès.',
+          message: 'Code émis avec succès.',
           code: selectedCodeId,
           gameSessionId: sessionRef.id,
           lockedScenarioId: lockedScenarioId,
@@ -208,6 +208,96 @@ class ActivationSessionService {
     );
 
     return result;
+  }
+
+
+
+  Future<void> markSessionCodeAsUsed({
+    required String gameSessionId,
+    required String activationCode,
+    String? usedBy,
+  }) async {
+    final sessionRef = _firestore.collection('gameSessions').doc(gameSessionId);
+
+    final codeQuery = await _firestore
+        .collectionGroup('codes')
+        .where(FieldPath.documentId, isEqualTo: activationCode)
+        .limit(1)
+        .get();
+
+    if (codeQuery.docs.isEmpty) {
+      throw Exception('Code d’activation introuvable.');
+    }
+
+    final codeRef = codeQuery.docs.first.reference;
+    final batchRef = codeRef.parent.parent;
+
+    if (batchRef == null) {
+      throw Exception('Batch parent introuvable pour ce code.');
+    }
+
+    await _firestore.runTransaction<void>((transaction) async {
+      final sessionSnapshot = await transaction.get(sessionRef);
+      final codeSnapshot = await transaction.get(codeRef);
+      final batchSnapshot = await transaction.get(batchRef);
+
+      if (!sessionSnapshot.exists) {
+        throw Exception('Session de jeu introuvable.');
+      }
+      if (!codeSnapshot.exists) {
+        throw Exception('Code d’activation introuvable.');
+      }
+      if (!batchSnapshot.exists) {
+        throw Exception('Batch introuvable.');
+      }
+
+      final sessionData = sessionSnapshot.data() ?? <String, dynamic>{};
+      final codeData = codeSnapshot.data() ?? <String, dynamic>{};
+      final batchData = batchSnapshot.data() ?? <String, dynamic>{};
+
+      final sessionActivationCode =
+          (sessionData['activationCode'] ?? '').toString().trim();
+      if (sessionActivationCode != activationCode) {
+        throw Exception('Le code ne correspond pas à la session.');
+      }
+
+      final linkedGameSessionId =
+          (codeData['gameSessionId'] ?? '').toString().trim();
+      if (linkedGameSessionId.isNotEmpty && linkedGameSessionId != gameSessionId) {
+        throw Exception('Le code est déjà lié à une autre session.');
+      }
+
+      final currentStatus = (codeData['status'] ?? '').toString().trim();
+      if (currentStatus == 'used') {
+        return;
+      }
+      if (currentStatus != 'reserved') {
+        throw Exception('Le code doit être émis avant de pouvoir être utilisé.');
+      }
+
+      final currentReserved = _readInt(batchData['countReserved']);
+      final currentUsed = _readInt(batchData['countUsed']);
+      final nowIso = DateTime.now().toIso8601String();
+
+      transaction.update(codeRef, {
+        'status': 'used',
+        'usedAt': nowIso,
+        'usedBy': (usedBy ?? '').trim(),
+        'gameSessionId': gameSessionId,
+      });
+
+      transaction.update(batchRef, {
+        'countReserved': currentReserved > 0 ? currentReserved - 1 : 0,
+        'countUsed': currentUsed + 1,
+      });
+
+      final sessionStatus = (sessionData['status'] ?? '').toString().trim();
+      if (sessionStatus.isEmpty || sessionStatus == 'reserved') {
+        transaction.update(sessionRef, {
+          'status': 'active',
+        });
+      }
+    });
   }
 
   static DateTime _parseCreatedAt(dynamic value) {

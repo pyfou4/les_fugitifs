@@ -107,7 +107,10 @@ class _CashierScreenState extends State<CashierScreen>
       });
     }
 
-    if (_siteLocked &&
+    final hasForcedDefaultSite =
+        _defaultSiteId != null && availableSiteIds.contains(_defaultSiteId);
+
+    if ((_siteLocked || hasForcedDefaultSite) &&
         _defaultSiteId != null &&
         _selectedSiteId != _defaultSiteId &&
         availableSiteIds.contains(_defaultSiteId)) {
@@ -241,6 +244,13 @@ class _CashierScreenState extends State<CashierScreen>
       _currentGameSessionId = null;
       _message = null;
     });
+  }
+
+  Future<void> _assignAnotherCode() async {
+    if (_loading) return;
+
+    _prepareNextCode();
+    await _getCode();
   }
 
   @override
@@ -554,6 +564,10 @@ class _CashierScreenState extends State<CashierScreen>
                                         : siteDocs.any(
                                             (d) => d.id == _defaultSiteId,
                                           );
+                                    final hasForcedDefaultSite =
+                                        _defaultSiteId != null && defaultExists;
+                                    final siteSelectionDisabled =
+                                        _siteLocked || hasForcedDefaultSite;
 
                                     if (siteDocs.isEmpty) {
                                       return DropdownButtonFormField<String>(
@@ -578,21 +592,17 @@ class _CashierScreenState extends State<CashierScreen>
                                       dropdownColor: const Color(0xFF171E2A),
                                       decoration: InputDecoration(
                                         labelText: 'Choisir le site',
-                                        helperText: _siteLocked
-                                            ? defaultExists
-                                                ? 'Site verrouillé sur ce poste'
+                                        helperText: siteSelectionDisabled
+                                            ? hasForcedDefaultSite
+                                                ? 'Site imposé pour ce poste'
                                                 : 'Site verrouillé, mais le site par défaut mémorisé n’est plus actif'
-                                            : _defaultSiteId != null
-                                                ? defaultExists
-                                                    ? 'Site prérempli pour ce poste'
-                                                    : 'Le site par défaut mémorisé n’est plus actif'
-                                                : null,
-                                        prefixIcon: _siteLocked
+                                            : null,
+                                        prefixIcon: siteSelectionDisabled
                                             ? const Icon(Icons.lock_outline)
                                             : null,
                                       ),
                                       items: siteItems,
-                                      onChanged: _siteLocked
+                                      onChanged: siteSelectionDisabled
                                           ? null
                                           : (value) {
                                               setState(() {
@@ -774,7 +784,7 @@ class _CashierScreenState extends State<CashierScreen>
                           const SizedBox(height: 28),
                           if (hasCode)
                             FilledButton.icon(
-                              onPressed: _prepareNextCode,
+                              onPressed: _assignAnotherCode,
                               style: FilledButton.styleFrom(
                                 backgroundColor: const Color(0xFFD65A00),
                                 foregroundColor: Colors.white,

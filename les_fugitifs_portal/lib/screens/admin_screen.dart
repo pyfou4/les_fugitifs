@@ -15,7 +15,6 @@ import 'admin/admin_employees_section.dart';
 import 'admin/admin_low_stock_alert_section.dart';
 import 'admin/admin_scenarios_breakdown_section.dart';
 import 'admin/admin_sites_breakdown_section.dart';
-import 'admin/admin_stats_section.dart';
 
 class AdminScreen extends StatefulWidget {
   final PortalAccessProfile profile;
@@ -397,6 +396,107 @@ class _AdminScreenState extends State<AdminScreen> {
     return '${_formatDate(_startDate)} → ${_formatDate(_endDate)}';
   }
 
+  Widget _buildStatsSection({
+    required int total,
+    required int unused,
+    required int attributedNonUsed,
+    required int used,
+    required bool lowStock,
+  }) {
+    final cards = [
+      _StatCardData(
+        label: 'Pool total',
+        value: total,
+      ),
+      _StatCardData(
+        label: 'Disponibles',
+        value: unused,
+        accent: lowStock ? const Color(0xFFF59E0B) : const Color(0xFF4ADE80),
+      ),
+      _StatCardData(
+        label: 'Attribués non utilisés',
+        value: attributedNonUsed,
+        accent: const Color(0xFFC084FC),
+      ),
+      _StatCardData(
+        label: 'Utilisés',
+        value: used,
+        accent: const Color(0xFF93C5FD),
+      ),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        int crossAxisCount = 4;
+        if (width < 700) {
+          crossAxisCount = 1;
+        } else if (width < 1100) {
+          crossAxisCount = 2;
+        }
+
+        final spacing = 16.0;
+        final itemWidth = (width - (spacing * (crossAxisCount - 1))) / crossAxisCount;
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: [
+            for (final card in cards)
+              SizedBox(
+                width: itemWidth,
+                child: _buildStatCard(card),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildStatCard(_StatCardData data) {
+    final accent = data.accent ?? const Color(0xFF9CA3AF);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(24),
+        color: const Color(0xFF111827),
+        border: Border.all(color: accent.withOpacity(0.22)),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            const Color(0xFF111827),
+            accent.withOpacity(0.14),
+          ],
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            data.label,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              color: Color(0xFF9CA3AF),
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            data.value.toString(),
+            style: TextStyle(
+              color: accent,
+              fontSize: 28,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -544,11 +644,11 @@ class _AdminScreenState extends State<AdminScreen> {
                               },
                             ),
                             const SizedBox(height: 24),
-                            AdminStatsSection(
+                            _buildStatsSection(
                               total: total,
                               unused: unused,
-                              reserved: reserved,
-                              emittedTotal: emittedTotal,
+                              attributedNonUsed: reserved,
+                              used: used,
                               lowStock: lowStock,
                             ),
                             const SizedBox(height: 20),
@@ -627,4 +727,16 @@ class _AdminScreenState extends State<AdminScreen> {
       ),
     );
   }
+}
+
+class _StatCardData {
+  final String label;
+  final int value;
+  final Color? accent;
+
+  const _StatCardData({
+    required this.label,
+    required this.value,
+    this.accent,
+  });
 }
