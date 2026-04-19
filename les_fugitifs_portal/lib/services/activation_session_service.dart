@@ -4,10 +4,10 @@ import '../features/site_readiness/site_readiness_service.dart';
 
 class ActivationSessionResult {
   final bool success;
-  final String message;
   final String? code;
   final String? gameSessionId;
   final String? lockedScenarioId;
+  final String message;
 
   const ActivationSessionResult({
     required this.success,
@@ -19,138 +19,134 @@ class ActivationSessionResult {
 }
 
 class ActivationSessionService {
-  final FirebaseFirestore _firestore;
-  final SiteReadinessService _siteReadinessService;
-
   ActivationSessionService({
     FirebaseFirestore? firestore,
     SiteReadinessService? siteReadinessService,
   })  : _firestore = firestore ?? FirebaseFirestore.instance,
         _siteReadinessService =
-            siteReadinessService ??
-                SiteReadinessService(firestore: firestore);
+            siteReadinessService ?? SiteReadinessService(firestore: firestore);
+
+  final FirebaseFirestore _firestore;
+  final SiteReadinessService _siteReadinessService;
 
   Future<ActivationSessionResult> assignCodeAndCreateSession({
     required String lockedScenarioId,
     required String siteId,
     required String cashierUserId,
   }) async {
-    final readiness = await _siteReadinessService.validateSite(siteId);
-    if (!readiness.isReady) {
+    final siteReadiness = await _siteReadinessService.validateSite(siteId);
+
+    if (!siteReadiness.isReady) {
       return ActivationSessionResult(
         success: false,
-        message: readiness.errors.isNotEmpty
-            ? readiness.errors.join('\n')
-            : 'Le site sélectionné n’est pas prêt.',
+        message:
+            'Le site sélectionné n’est pas prêt à jouer (${siteReadiness.errors.length} erreur(s)).',
       );
     }
 
-    final lockedScenarioRef = _firestore
-        .collection('lockedScenarios')
-        .doc(lockedScenarioId);
+    final lockedScenarioRef =
+        _firestore.collection('lockedScenarios').doc(lockedScenarioId);
     final lockedScenarioSnap = await lockedScenarioRef.get();
 
     if (!lockedScenarioSnap.exists) {
       return const ActivationSessionResult(
         success: false,
-        message: 'Scénario verrouillé introuvable.',
+        message: 'Le scénario verrouillé sélectionné est introuvable.',
       );
     }
 
-    final lockedData = lockedScenarioSnap.data() ?? <String, dynamic>{};
-    final lockedStatus = (lockedData['status'] ?? '').toString().trim();
-    if (lockedStatus != 'locked') {
+    final lockedScenarioData = lockedScenarioSnap.data() ?? <String, dynamic>{};
+    final lockedScenarioStatus =
+        (lockedScenarioData['status'] ?? '').toString().trim();
+
+    if (lockedScenarioStatus != 'locked') {
       return const ActivationSessionResult(
         success: false,
-        message: 'Le scénario sélectionné n’est pas verrouillé.',
+        message: 'Le scénario sélectionné n’est pas dans un état verrouillé.',
       );
     }
 
-    try {
-      final result = await _firestore.runTransaction((transaction) async {
-        QuerySnapshot<Map<String, dynamic>> batchQuery = await _firestore
-            .collection('activationBatches')
-            .where('status', isEqualTo: 'active')
-            .where('countUnused', isGreaterThan: 0)
-            .limit(20)
-            .get();
+    final batchSnap = await _firestore
+        .collection('activationBatches')
+        .where('status', isEqualTo: 'active')
+        .get();
 
-        if (batchQuery.docs.isEmpty) {
-          throw Exception('Aucun batch actif avec codes disponibles.');
-        }
+    if (batchSnap.docs.isEmpty) {
+      return const ActivationSessionResult(
+        success: false,
+        message: 'Aucun batch actif disponible.',
+      );
+    }
 
-        DocumentReference<Map<String, dynamic>>? selectedBatchRef;
-        QueryDocumentSnapshot<Map<String, dynamic>>? selectedBatchDoc;
-        QuerySnapshot<Map<String, dynamic>>? selectedCodesQuery;
+    final sortedBatchDocs = [...batchSnap.docs]
+      ..sort(
+        (a, b) => _parseCreatedAt(
+          b.data()['createdAt'],
+        ).compareTo(_parseCreatedAt(a.data()['createdAt'])),
+      );
 
-        for (final batchDoc in batchQuery.docs) {
-          final candidateBatchRef = batchDoc.reference;
-          final candidateCodesQuery = await candidateBatchRef
-              .collection('codes')
-              .where('status', isEqualTo: 'unused')
-              .limit(1)
-              .get();
+    DocumentReference<Map<String, dynamic>>? selectedBatchRef;
+    DocumentReference<Map<String, dynamic>>? selectedCodeRef;
+    String? selectedCodeId;
 
-          if (candidateCodesQuery.docs.isNotEmpty) {
-            selectedBatchRef = candidateBatchRef;
-            selectedBatchDoc = batchDoc;
-            selectedCodesQuery = candidateCodesQuery;
-            break;
-          }
-        }
+    for (final batchDoc in sortedBatchDocs) {
+      final batchRef = batchDoc.reference;
 
-        if (selectedBatchRef == null ||
-            selectedBatchDoc == null ||
-            selectedCodesQuery == null ||
-            selectedCodesQuery.docs.isEmpty) {
-          throw Exception('Aucun code inutilisé disponible.');
-        }
+      final codeQuery = await batchRef
+          .collection('codes')
+          .where('status', isEqualTo: 'unused')
+          .limit(1)
+          .get();
 
-        final selectedCodeDoc = selectedCodesQuery.docs.first;
-        final selectedCodeRef = selectedCodeDoc.reference;
-        final selectedCodeId = selectedCodeDoc.id;
+      if (codeQuery.docs.isNotEmpty) {
+        selectedBatchRef = batchRef;
+        selectedCodeRef = codeQuery.docs.first.reference;
+        selectedCodeId = codeQuery.docs.first.id;
+        break;
+      }
+    }
 
-        final codeSnapshot = await transaction.get(selectedCodeRef);
-        if (!codeSnapshot.exists) {
-          throw Exception('Code introuvable.');
-        }
+    if (selectedBatchRef == null ||
+        selectedCodeRef == null ||
+        selectedCodeId == null) {
+      return const ActivationSessionResult(
+        success: false,
+        message: 'Plus de codes disponibles dans le pool global.',
+      );
+    }
 
-        final codeData = codeSnapshot.data();
-        if (codeData == null) {
-          throw Exception('Données du code introuvables.');
-        }
+    final gameSessionsRef = _firestore.collection('gameSessions');
+    final sessionRef = gameSessionsRef.doc();
 
-        final codeStatus = (codeData['status'] ?? '').toString().trim();
-        if (codeStatus != 'unused') {
-          throw Exception('Le code n’est plus disponible.');
-        }
+    final result = await _firestore.runTransaction<ActivationSessionResult>(
+      (transaction) async {
+        final batchSnapshot = await transaction.get(selectedBatchRef!);
+        final codeSnapshot = await transaction.get(selectedCodeRef!);
+        final lockedSnapshot = await transaction.get(lockedScenarioRef);
 
-        final batchSnapshot = await transaction.get(selectedBatchRef);
         if (!batchSnapshot.exists) {
           throw Exception('Batch introuvable.');
         }
-
-        final batchData = batchSnapshot.data();
-        if (batchData == null) {
-          throw Exception('Données du batch introuvables.');
+        if (!codeSnapshot.exists) {
+          throw Exception('Code introuvable.');
         }
-
-        final lockedSnapshot = await transaction.get(lockedScenarioRef);
         if (!lockedSnapshot.exists) {
           throw Exception('Scénario verrouillé introuvable.');
         }
 
-        final lockedData = lockedSnapshot.data();
-        if (lockedData == null) {
-          throw Exception('Données du scénario verrouillé introuvables.');
+        final batchData = batchSnapshot.data() ?? <String, dynamic>{};
+        final codeData = codeSnapshot.data() ?? <String, dynamic>{};
+        final lockedData = lockedSnapshot.data() ?? <String, dynamic>{};
+
+        final currentStatus = (codeData['status'] ?? '').toString().trim();
+        if (currentStatus != 'unused') {
+          throw Exception('Code déjà attribué.');
         }
 
         final lockedStatus = (lockedData['status'] ?? '').toString().trim();
         if (lockedStatus != 'locked') {
-          throw Exception('Le scénario sélectionné n’est pas verrouillé.');
+          throw Exception('Scénario non verrouillé.');
         }
-
-        final sessionRef = _firestore.collection('gameSessions').doc();
 
         final currentUnused = _readInt(batchData['countUnused']);
         final currentReserved = _readInt(batchData['countReserved']);
@@ -169,7 +165,7 @@ class ActivationSessionService {
           'status': 'active',
           'active': true,
           'activationCode': selectedCodeId,
-          'activationBatchId': selectedBatchRef.id,
+          'activationBatchId': selectedBatchRef!.id,
           'lockedScenarioId': lockedScenarioId,
           'siteId': siteId,
           'gameId': (lockedData['gameId'] ?? 'les_fugitifs').toString(),
@@ -190,7 +186,7 @@ class ActivationSessionService {
           },
         });
 
-        transaction.update(selectedCodeRef, {
+        transaction.update(selectedCodeRef!, {
           'status': 'reserved',
           'reservedAt': nowIso,
           'reservedBy': cashierUserId,
@@ -201,7 +197,7 @@ class ActivationSessionService {
           'expiresAt': expiresAt,
         });
 
-        transaction.update(selectedBatchRef, {
+        transaction.update(selectedBatchRef!, {
           'countUnused': currentUnused - 1,
           'countReserved': currentReserved + 1,
         });
@@ -213,107 +209,114 @@ class ActivationSessionService {
           gameSessionId: sessionRef.id,
           lockedScenarioId: lockedScenarioId,
         );
+      },
+    );
+
+    return result;
+  }
+
+
+
+  Future<void> markSessionCodeAsUsed({
+    required String gameSessionId,
+    required String activationCode,
+    String? usedBy,
+  }) async {
+    final sessionRef = _firestore.collection('gameSessions').doc(gameSessionId);
+
+    final codeQuery = await _firestore
+        .collectionGroup('codes')
+        .where(FieldPath.documentId, isEqualTo: activationCode)
+        .limit(1)
+        .get();
+
+    if (codeQuery.docs.isEmpty) {
+      throw Exception('Code d’activation introuvable.');
+    }
+
+    final codeRef = codeQuery.docs.first.reference;
+    final batchRef = codeRef.parent.parent;
+
+    if (batchRef == null) {
+      throw Exception('Batch parent introuvable pour ce code.');
+    }
+
+    await _firestore.runTransaction<void>((transaction) async {
+      final sessionSnapshot = await transaction.get(sessionRef);
+      final codeSnapshot = await transaction.get(codeRef);
+      final batchSnapshot = await transaction.get(batchRef);
+
+      if (!sessionSnapshot.exists) {
+        throw Exception('Session de jeu introuvable.');
+      }
+      if (!codeSnapshot.exists) {
+        throw Exception('Code d’activation introuvable.');
+      }
+      if (!batchSnapshot.exists) {
+        throw Exception('Batch introuvable.');
+      }
+
+      final sessionData = sessionSnapshot.data() ?? <String, dynamic>{};
+      final codeData = codeSnapshot.data() ?? <String, dynamic>{};
+      final batchData = batchSnapshot.data() ?? <String, dynamic>{};
+
+      final sessionActivationCode =
+          (sessionData['activationCode'] ?? '').toString().trim();
+      if (sessionActivationCode != activationCode) {
+        throw Exception('Le code ne correspond pas à la session.');
+      }
+
+      final linkedGameSessionId =
+          (codeData['gameSessionId'] ?? '').toString().trim();
+      if (linkedGameSessionId.isNotEmpty && linkedGameSessionId != gameSessionId) {
+        throw Exception('Le code est déjà lié à une autre session.');
+      }
+
+      final currentStatus = (codeData['status'] ?? '').toString().trim();
+      if (currentStatus == 'used') {
+        return;
+      }
+      if (currentStatus != 'reserved') {
+        throw Exception('Le code doit être émis avant de pouvoir être utilisé.');
+      }
+
+      final currentReserved = _readInt(batchData['countReserved']);
+      final currentUsed = _readInt(batchData['countUsed']);
+      final nowIso = DateTime.now().toIso8601String();
+
+      transaction.update(codeRef, {
+        'status': 'used',
+        'usedAt': nowIso,
+        'usedBy': (usedBy ?? '').trim(),
+        'gameSessionId': gameSessionId,
       });
 
-      return result;
-    } catch (e) {
-      return ActivationSessionResult(
-        success: false,
-        message: e.toString().replaceFirst('Exception: ', ''),
-      );
+      transaction.update(batchRef, {
+        'countReserved': currentReserved > 0 ? currentReserved - 1 : 0,
+        'countUsed': currentUsed + 1,
+      });
+
+      final sessionStatus = (sessionData['status'] ?? '').toString().trim();
+      if (sessionStatus.isEmpty || sessionStatus == 'reserved') {
+        transaction.update(sessionRef, {
+          'status': 'active',
+          'active': true,
+        });
+      }
+    });
+  }
+
+  static DateTime _parseCreatedAt(dynamic value) {
+    if (value is Timestamp) return value.toDate();
+    if (value is String) {
+      return DateTime.tryParse(value) ?? DateTime.fromMillisecondsSinceEpoch(0);
     }
+    return DateTime.fromMillisecondsSinceEpoch(0);
   }
 
   static int _readInt(dynamic value) {
     if (value is int) return value;
     if (value is num) return value.toInt();
-    if (value is String) return int.tryParse(value) ?? 0;
     return 0;
-  }
-
-  Future<ActivationSessionResult> extendSessionDuration({
-    required String sessionId,
-    required int extraHours,
-    required String actorUserId,
-  }) async {
-    if (extraHours <= 0) {
-      return const ActivationSessionResult(
-        success: false,
-        message: 'La durée supplémentaire doit être positive.',
-      );
-    }
-
-    try {
-      await _firestore.runTransaction((transaction) async {
-        final sessionRef = _firestore.collection('gameSessions').doc(sessionId);
-        final sessionSnap = await transaction.get(sessionRef);
-
-        if (!sessionSnap.exists) {
-          throw Exception('Session introuvable.');
-        }
-
-        final data = sessionSnap.data() ?? <String, dynamic>{};
-
-        final baseDurationHours = _readInt(data['baseDurationHours']);
-        final currentExtraHours = _readInt(data['extraDurationHours']);
-        final startedAtRaw = (data['startedAt'] ?? '').toString().trim();
-
-        if (startedAtRaw.isEmpty) {
-          throw Exception('Heure de départ introuvable.');
-        }
-
-        final startedAt = DateTime.tryParse(startedAtRaw)?.toUtc();
-        if (startedAt == null) {
-          throw Exception('Heure de départ invalide.');
-        }
-
-        final newExtraHours = currentExtraHours + extraHours;
-        final effectiveEndsAt = startedAt
-            .add(Duration(hours: baseDurationHours + newExtraHours))
-            .toIso8601String();
-
-        transaction.update(sessionRef, {
-          'extraDurationHours': newExtraHours,
-          'effectiveEndsAt': effectiveEndsAt,
-          'expiresAt': effectiveEndsAt,
-          'updatedAt': DateTime.now().toUtc().toIso8601String(),
-          'updatedBy': actorUserId,
-        });
-      });
-
-      return const ActivationSessionResult(
-        success: true,
-        message: 'Durée de session prolongée avec succès.',
-      );
-    } catch (e) {
-      return ActivationSessionResult(
-        success: false,
-        message: e.toString().replaceFirst('Exception: ', ''),
-      );
-    }
-  }
-
-  Future<ActivationSessionResult> closeSession({
-    required String sessionId,
-    required String actorUserId,
-  }) async {
-    try {
-      await _firestore.collection('gameSessions').doc(sessionId).update({
-        'status': 'closed',
-        'active': false,
-        'closedAt': DateTime.now().toUtc().toIso8601String(),
-        'closedBy': actorUserId,
-      });
-
-      return const ActivationSessionResult(
-        success: true,
-        message: 'Session clôturée avec succès.',
-      );
-    } catch (e) {
-      return ActivationSessionResult(
-        success: false,
-        message: e.toString().replaceFirst('Exception: ', ''),
-      );
-    }
   }
 }

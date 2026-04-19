@@ -1,9 +1,9 @@
-import 'dart:async';
 
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/media_preload_service.dart';
@@ -127,6 +127,23 @@ class _TeamSetupScreenState extends State<TeamSetupScreen>
     await prefs.setInt('active_player_count', result.playerCount);
   }
 
+  Future<void> _markActivationCodeAsUsed() async {
+    final SharedPreferences prefs = await SharedPreferences.getInstance();
+    final String? activeSessionId = prefs.getString('active_game_session_id');
+
+    if (activeSessionId == null || activeSessionId.trim().isEmpty) {
+      throw Exception('Session active introuvable');
+    }
+
+    final FirebaseFunctions functions = FirebaseFunctions.instanceFor(
+      region: 'europe-west1',
+    );
+
+    await functions.httpsCallable('markCodeAsUsed').call(<String, dynamic>{
+      'sessionId': activeSessionId,
+    });
+  }
+
   Future<void> _submit() async {
     FocusScope.of(context).unfocus();
 
@@ -165,6 +182,7 @@ class _TeamSetupScreenState extends State<TeamSetupScreen>
 
     try {
       await _saveTeamSetupToFirebase(result: result);
+      await _markActivationCodeAsUsed();
     } catch (e) {
       if (!mounted) {
         return;
@@ -201,11 +219,11 @@ class _TeamSetupScreenState extends State<TeamSetupScreen>
       return;
     }
 
-    unawaited(
-      MediaPreloadService().preloadIntroMedia().catchError((_) {
-        // Le préchargement ne doit pas bloquer l'entrée dans le jeu.
-      }),
-    );
+    try {
+      await MediaPreloadService().preloadIntroMedia();
+    } catch (_) {
+      // Le préchargement ne doit pas bloquer l'entrée dans le jeu.
+    }
 
     if (!mounted) {
       return;

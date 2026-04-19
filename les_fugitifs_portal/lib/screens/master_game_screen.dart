@@ -2803,6 +2803,12 @@ class _GameSession {
       return false;
     }
 
+    final nowUtc = DateTime.now().toUtc();
+
+    if (effectiveEndsAt.isBefore(nowUtc) || effectiveEndsAt.isAtSameMomentAs(nowUtc)) {
+      return false;
+    }
+
     if (!active && normalizedStatus != 'paused') {
       return false;
     }

@@ -736,3 +736,67 @@ exports.getStructuredAiHelp = onRequest(
     }
   }
 );
+// AJOUT EN BAS DU FICHIER
+
+exports.markCodeAsUsed = onCall(async (request) => {
+  const { sessionId } = request.data || {};
+
+  if (!sessionId) {
+    throw new HttpsError("invalid-argument", "sessionId requis.");
+  }
+
+  const sessionRef = firestore.collection("gameSessions").doc(sessionId);
+
+  await firestore.runTransaction(async (tx) => {
+    const sessionSnap = await tx.get(sessionRef);
+
+    if (!sessionSnap.exists) {
+      throw new HttpsError("not-found", "Session introuvable.");
+    }
+
+    const session = sessionSnap.data() || {};
+
+    const batchId = session.activationBatchId;
+    const code = session.activationCode;
+
+    if (!batchId || !code) {
+      throw new HttpsError("failed-precondition", "Données d’activation manquantes.");
+    }
+
+    const codeRef = firestore
+      .collection("activationBatches")
+      .doc(batchId)
+      .collection("codes")
+      .doc(code);
+
+    const batchRef = firestore.collection("activationBatches").doc(batchId);
+
+    const codeSnap = await tx.get(codeRef);
+    const batchSnap = await tx.get(batchRef);
+
+    if (!codeSnap.exists) {
+      throw new HttpsError("not-found", "Code introuvable.");
+    }
+
+    const codeData = codeSnap.data() || {};
+    const batchData = batchSnap.data() || {};
+
+    // Si déjà used → on ne refait rien
+    if (codeData.status === "used") {
+      return;
+    }
+
+    tx.update(codeRef, {
+      status: "used",
+      usedAt: new Date().toISOString(),
+      usedBySessionId: sessionId,
+    });
+
+    tx.update(batchRef, {
+      countReserved: Math.max(0, (batchData.countReserved || 0) - 1),
+      countUsed: (batchData.countUsed || 0) + 1,
+    });
+  });
+
+  return { success: true };
+});
