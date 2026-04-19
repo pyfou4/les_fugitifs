@@ -1,8 +1,6 @@
 import '../models/media_asset.dart';
 import '../models/media_block.dart';
 import '../models/media_slot.dart';
-import '../models/media_block.dart';
-import '../models/media_slot.dart';
 
 abstract class MediaRepository {
   Future<List<MediaBlock>> getBlocksForScenario(String scenarioId);

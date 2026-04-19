@@ -1,3 +1,4 @@
+import 'dart:async';
 
 import 'dart:ui';
 
@@ -200,11 +201,11 @@ class _TeamSetupScreenState extends State<TeamSetupScreen>
       return;
     }
 
-    try {
-      await MediaPreloadService().preloadIntroMedia();
-    } catch (_) {
-      // Le préchargement ne doit pas bloquer l'entrée dans le jeu.
-    }
+    unawaited(
+      MediaPreloadService().preloadIntroMedia().catchError((_) {
+        // Le préchargement ne doit pas bloquer l'entrée dans le jeu.
+      }),
+    );
 
     if (!mounted) {
       return;

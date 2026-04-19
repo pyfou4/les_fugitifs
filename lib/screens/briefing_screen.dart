@@ -1,13 +1,12 @@
 import 'dart:async';
-import 'dart:io';
-
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:path_provider/path_provider.dart';
+import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
 
 import '../constants/firebase_media.dart';
+import '../media/repository/firestore_media_repository.dart';
+import '../media/repository/media_repository.dart';
 import '../services/media_preload_service.dart';
 import 'home_screen.dart';
 
@@ -19,7 +18,7 @@ class BriefingScreen extends StatefulWidget {
 }
 
 class _BriefingScreenState extends State<BriefingScreen> {
-  final MediaPreloadService _mediaPreloadService = MediaPreloadService();
+  final MediaRepository _mediaRepository = FirestoreMediaRepository();
 
   VideoPlayerController? _rulesController;
   VideoPlayerController? _briefingController;
@@ -39,30 +38,41 @@ class _BriefingScreenState extends State<BriefingScreen> {
   @override
   void initState() {
     super.initState();
-    _initVideos();
+    _startVideoInitialization();
   }
 
-  Future<File> _resolveVideoFile({
+  Future<String> _resolveVideoUrl({
     required bool isRules,
   }) async {
-    return _mediaPreloadService.getCachedOrFetchVideo(
+    final asset = await _mediaRepository.getActiveMediaForSlot(
+      scenarioId: MediaPreloadService.scenarioId,
       slotKey: isRules
           ? MediaPreloadService.introRulesSlotKey
           : MediaPreloadService.introBriefingSlotKey,
-      cacheBasename: isRules
-          ? 'briefing_regles_backend'
-          : 'briefing_mission_backend',
     );
+
+    final downloadUrl = asset?.downloadUrl.trim() ?? '';
+    if (downloadUrl.isEmpty) {
+      throw Exception(
+        'Aucun média backend actif pour le slot '
+        '${isRules ? MediaPreloadService.introRulesSlotKey : MediaPreloadService.introBriefingSlotKey}.',
+      );
+    }
+
+    return downloadUrl;
   }
 
   Future<void> _initOneVideo({
     required bool isRules,
   }) async {
     try {
-      final file = await _resolveVideoFile(isRules: isRules);
+      final downloadUrl = await _resolveVideoUrl(isRules: isRules);
 
-      final controller = VideoPlayerController.file(file);
-      await controller.initialize().timeout(const Duration(seconds: 20));
+      final controller = VideoPlayerController.networkUrl(
+        Uri.parse(downloadUrl),
+      );
+
+      await controller.initialize().timeout(const Duration(seconds: 45));
 
       controller.addListener(() {
         final value = controller.value;
@@ -83,7 +93,10 @@ class _BriefingScreenState extends State<BriefingScreen> {
         }
       });
 
-      if (!mounted) return;
+      if (!mounted) {
+        await controller.dispose();
+        return;
+      }
 
       setState(() {
         if (isRules) {
@@ -103,25 +116,49 @@ class _BriefingScreenState extends State<BriefingScreen> {
 
       if (!mounted) return;
       setState(() {
+        final message = _formatVideoError(e);
         if (isRules) {
-          _rulesError = 'Vidéo backend indisponible';
+          _rulesError = message;
+          _rulesReady = false;
         } else {
-          _briefingError = 'Vidéo backend indisponible';
+          _briefingError = message;
+          _briefingReady = false;
         }
       });
     }
   }
 
-  Future<void> _initVideos() async {
-    await Future.wait([
-      _initOneVideo(isRules: true),
-      _initOneVideo(isRules: false),
-    ]);
+  void _startVideoInitialization() {
+    unawaited(() async {
+      if (!mounted) return;
+      setState(() {
+        _isPreparing = true;
+      });
 
-    if (!mounted) return;
-    setState(() {
-      _isPreparing = false;
-    });
+      await Future.wait([
+        _initOneVideo(isRules: true),
+        _initOneVideo(isRules: false),
+      ]);
+
+      if (!mounted) return;
+      setState(() {
+        _isPreparing = false;
+      });
+    }());
+  }
+
+
+  String _formatVideoError(Object error) {
+    final raw = error.toString().replaceFirst('Exception: ', '').trim();
+    if (raw.isEmpty) {
+      return 'Vidéo backend indisponible';
+    }
+
+    if (raw.length <= 140) {
+      return raw;
+    }
+
+    return '${raw.substring(0, 137)}...';
   }
 
   double _progress(VideoPlayerController? controller) {
@@ -695,11 +732,32 @@ class _FullscreenVideoPage extends StatefulWidget {
 }
 
 class _FullscreenVideoPageState extends State<_FullscreenVideoPage> {
+  bool _showControls = true;
+
   @override
   void initState() {
     super.initState();
+    _enterImmersiveMode();
     widget.controller.play();
     widget.controller.addListener(_refresh);
+  }
+
+  Future<void> _enterImmersiveMode() async {
+    await SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.immersiveSticky,
+    );
+    SystemChrome.setSystemUIOverlayStyle(
+      const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        systemNavigationBarColor: Colors.transparent,
+      ),
+    );
+  }
+
+  Future<void> _restoreSystemUi() async {
+    await SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.edgeToEdge,
+    );
   }
 
   void _refresh() {
@@ -708,10 +766,18 @@ class _FullscreenVideoPageState extends State<_FullscreenVideoPage> {
     }
   }
 
+  void _toggleControls() {
+    setState(() {
+      _showControls = !_showControls;
+    });
+    _enterImmersiveMode();
+  }
+
   @override
   void dispose() {
     widget.controller.pause();
     widget.controller.removeListener(_refresh);
+    _restoreSystemUi();
     super.dispose();
   }
 
@@ -733,7 +799,9 @@ class _FullscreenVideoPageState extends State<_FullscreenVideoPage> {
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: SafeArea(
+      body: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: _toggleControls,
         child: Stack(
           children: [
             Positioned.fill(
@@ -746,85 +814,103 @@ class _FullscreenVideoPageState extends State<_FullscreenVideoPage> {
                 ),
               ),
             ),
-            Positioned(
-              top: 12,
-              left: 12,
-              right: 12,
-              child: Row(
-                children: [
-                  IconButton(
-                    onPressed: () => Navigator.of(context).pop(),
-                    icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                    color: Colors.white,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      widget.title,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Positioned(
-              left: 18,
-              right: 18,
-              bottom: 18,
-              child: Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.55),
-                  borderRadius: BorderRadius.circular(18),
-                  border: Border.all(
-                    color: Colors.white.withOpacity(0.10),
-                  ),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+            AnimatedOpacity(
+              duration: const Duration(milliseconds: 180),
+              opacity: _showControls ? 1.0 : 0.0,
+              child: IgnorePointer(
+                ignoring: !_showControls,
+                child: Stack(
                   children: [
-                    LinearProgressIndicator(
-                      value: progress,
-                      minHeight: 8,
-                      backgroundColor: Colors.white.withOpacity(0.12),
-                      valueColor: const AlwaysStoppedAnimation<Color>(
-                        Color(0xFFE3B560),
+                    Positioned(
+                      top: 12,
+                      left: 12,
+                      right: 12,
+                      child: SafeArea(
+                        bottom: false,
+                        child: Row(
+                          children: [
+                            IconButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                              color: Colors.white,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                widget.title,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        IconButton(
-                          onPressed: () {
-                            if (isPlaying) {
-                              widget.controller.pause();
-                            } else {
-                              widget.controller.play();
-                            }
-                          },
-                          icon: Icon(
-                            isPlaying
-                                ? Icons.pause_circle_filled_rounded
-                                : Icons.play_circle_fill_rounded,
-                            color: Colors.white,
-                            size: 34,
+                    Positioned(
+                      left: 18,
+                      right: 18,
+                      bottom: 18,
+                      child: SafeArea(
+                        top: false,
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.55),
+                            borderRadius: BorderRadius.circular(18),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.10),
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              LinearProgressIndicator(
+                                value: progress,
+                                minHeight: 8,
+                                backgroundColor: Colors.white.withOpacity(0.12),
+                                valueColor: const AlwaysStoppedAnimation<Color>(
+                                  Color(0xFFE3B560),
+                                ),
+                              ),
+                              const SizedBox(height: 12),
+                              Row(
+                                children: [
+                                  IconButton(
+                                    onPressed: () {
+                                      if (isPlaying) {
+                                        widget.controller.pause();
+                                      } else {
+                                        widget.controller.play();
+                                      }
+                                      _enterImmersiveMode();
+                                    },
+                                    icon: Icon(
+                                      isPlaying
+                                          ? Icons.pause_circle_filled_rounded
+                                          : Icons.play_circle_fill_rounded,
+                                      color: Colors.white,
+                                      size: 34,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    _formatDuration(position),
+                                    style: const TextStyle(color: Colors.white),
+                                  ),
+                                  const Spacer(),
+                                  Text(
+                                    _formatDuration(duration),
+                                    style: const TextStyle(color: Colors.white70),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _formatDuration(position),
-                          style: const TextStyle(color: Colors.white),
-                        ),
-                        const Spacer(),
-                        Text(
-                          _formatDuration(duration),
-                          style: const TextStyle(color: Colors.white70),
-                        ),
-                      ],
+                      ),
                     ),
                   ],
                 ),

@@ -619,7 +619,7 @@ class _DeskBackdrop extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: Color(0xFF040608),
         image: DecorationImage(
           image: NetworkImage(_backgroundUrl),

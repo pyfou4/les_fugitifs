@@ -573,8 +573,6 @@ class _AdminScreenState extends State<AdminScreen> {
               final issuedBySite = <String, int>{};
               final issuedByScenario = <String, int>{};
 
-              int emittedTotal = 0;
-
               for (final doc in codeDocs) {
                 final data = doc.data();
                 if (!_isIssuedCode(data)) continue;
@@ -583,8 +581,6 @@ class _AdminScreenState extends State<AdminScreen> {
                 final siteId = (data['issuedSiteId'] ?? '').toString().trim();
                 final scenarioId =
                     (data['issuedScenarioId'] ?? '').toString().trim();
-
-                emittedTotal += 1;
 
                 if (siteId.isNotEmpty) {
                   issuedBySite.update(

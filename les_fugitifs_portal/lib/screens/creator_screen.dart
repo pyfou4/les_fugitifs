@@ -1185,31 +1185,6 @@ class _CreatorScreenState extends State<CreatorScreen>
           ),
         ),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: FilledButton.icon(
-              onPressed: _isMediaStructureSeeding ? null : _seedMediaStructure,
-              style: FilledButton.styleFrom(
-                backgroundColor: const Color(0xFF294C74),
-                foregroundColor: Colors.white,
-              ),
-              icon: _isMediaStructureSeeding
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const Icon(Icons.schema_outlined),
-              label: Text(
-                _isMediaStructureSeeding
-                    ? 'Initialisation...'
-                    : 'Init structure médias',
-              ),
-            ),
-          ),
           if (_isScenarioLocked && widget.profile.role == PortalUserRole.admin)
             Padding(
               padding: const EdgeInsets.only(right: 16),

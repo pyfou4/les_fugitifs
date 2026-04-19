@@ -10,6 +10,7 @@ import '../models/motive_model.dart';
 import '../models/place_node.dart';
 import '../models/suspect_model.dart';
 import '../services/ai_service.dart';
+import '../services/narrative_progress_service.dart';
 import '../services/runtime_session_service.dart';
 
 import 'archives_screen.dart';
@@ -60,54 +61,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
   int get progress => _places.where((p) => p.isVisited).length.clamp(0, 19);
 
-  static const Map<String, int> _weightedProgressByPlaceId = {
-    'A0': 18,
-    'B0': 18,
-    'C0': 18,
-    'D0': 18,
-    'A1': 6,
-    'A2': 6,
-    'B1': 5,
-    'B2': 5,
-    'C1': 6,
-  };
+  int get narrativeProgressScore =>
+      NarrativeProgressService.narrativeProgressScore(_places);
 
-  static const List<String> _requiredMainPlaceIds = [
-    'A0',
-    'B0',
-    'C0',
-    'D0',
-  ];
+  double get progressRatio =>
+      NarrativeProgressService.progressRatio(_places);
 
-  Set<String> get _visitedPlaceIds =>
-      _places.where((p) => p.isVisited).map((p) => p.id).toSet();
+  bool get canExitNarrative =>
+      NarrativeProgressService.canExitNarrative(_places);
 
-  int get narrativeProgressScore {
-    int score = 0;
-    final visitedIds = _visitedPlaceIds;
-
-    for (final entry in _weightedProgressByPlaceId.entries) {
-      if (visitedIds.contains(entry.key)) {
-        score += entry.value;
-      }
-    }
-
-    return score.clamp(0, 100);
-  }
-
-  double get progressRatio {
-    return (narrativeProgressScore / 100).clamp(0.0, 1.0);
-  }
-
-  bool get canExitNarrative {
-    final visitedIds = _visitedPlaceIds;
-    return _requiredMainPlaceIds.every(visitedIds.contains);
-  }
-
-  List<String> get missingMainPlaceIds {
-    final visitedIds = _visitedPlaceIds;
-    return _requiredMainPlaceIds.where((id) => !visitedIds.contains(id)).toList();
-  }
+  List<String> get missingMainPlaceIds =>
+      NarrativeProgressService.missingMainPlaceIds(_places);
 
   Future<void> _loadGameData() async {
     if (!mounted) return;

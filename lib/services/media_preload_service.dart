@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
@@ -20,6 +21,24 @@ class MediaPreloadService {
   static const String introCall2SlotKey = 'intro_call_2';
   static const String d0FinalCallSlotKey = 'd0_final_call';
 
+  static const List<String> _introRulesFallbackSlotKeys = <String>[
+    'intro_regles',
+    'intro_rules',
+    'regles_intro',
+    'rules_intro',
+    'regles',
+    'rules',
+  ];
+
+  static const List<String> _introBriefingFallbackSlotKeys = <String>[
+    'intro_briefing',
+    'intro_mission',
+    'briefing_intro',
+    'mission_intro',
+    'briefing',
+    'mission',
+  ];
+
   final MediaRepository _mediaRepository;
 
   Future<void> preloadIntroMedia() async {
@@ -38,16 +57,52 @@ class MediaPreloadService {
   Future<String> getActiveMediaDownloadUrl({
     required String slotKey,
   }) async {
-    final asset = await _mediaRepository.getActiveMediaForSlot(
-      scenarioId: scenarioId,
-      slotKey: slotKey,
-    );
+    final candidateSlotKeys = _slotCandidatesFor(slotKey);
+    Object? lastError;
 
-    final downloadUrl = asset?.downloadUrl.trim() ?? '';
-    if (downloadUrl.isEmpty) {
-      throw Exception('Aucun média backend actif pour le slot $slotKey.');
+    for (final candidate in candidateSlotKeys) {
+      try {
+        debugPrint(
+          '[MediaPreloadService] Recherche média actif pour scenario='
+          '$scenarioId slot=$candidate',
+        );
+
+        final asset = await _mediaRepository.getActiveMediaForSlot(
+          scenarioId: scenarioId,
+          slotKey: candidate,
+        );
+
+        final downloadUrl = asset?.downloadUrl.trim() ?? '';
+        if (downloadUrl.isNotEmpty) {
+          debugPrint(
+            '[MediaPreloadService] Média trouvé pour slot=$candidate',
+          );
+          return downloadUrl;
+        }
+
+        debugPrint(
+          '[MediaPreloadService] Aucun média actif pour slot=$candidate',
+        );
+      } catch (e) {
+        lastError = e;
+        debugPrint(
+          '[MediaPreloadService] Erreur pendant la recherche du slot='
+          '$candidate : $e',
+        );
+      }
     }
-    return downloadUrl;
+
+    final candidatesText = candidateSlotKeys.join(', ');
+    if (lastError != null) {
+      throw Exception(
+        'Aucun média backend actif trouvé pour les slots [$candidatesText]. '
+        'Dernière erreur: $lastError',
+      );
+    }
+
+    throw Exception(
+      'Aucun média backend actif trouvé pour les slots [$candidatesText].',
+    );
   }
 
   Future<File> getCachedOrFetchVideo({
@@ -94,12 +149,20 @@ class MediaPreloadService {
             as Map<String, dynamic>;
         final cachedUrl = (meta['downloadUrl'] ?? '').toString().trim();
         if (cachedUrl == downloadUrl && await file.length() > 0) {
+          debugPrint(
+            '[MediaPreloadService] Cache utilisé pour slot=$slotKey '
+            '($cacheBasename.$safeExtension)',
+          );
           return file;
         }
       } catch (_) {
         // On retélécharge proprement.
       }
     }
+
+    debugPrint(
+      '[MediaPreloadService] Téléchargement du média slot=$slotKey',
+    );
 
     final response = await http
         .get(Uri.parse(downloadUrl))
@@ -130,6 +193,17 @@ class MediaPreloadService {
     );
 
     return file;
+  }
+
+  List<String> _slotCandidatesFor(String slotKey) {
+    switch (slotKey) {
+      case introRulesSlotKey:
+        return _introRulesFallbackSlotKeys;
+      case introBriefingSlotKey:
+        return _introBriefingFallbackSlotKeys;
+      default:
+        return <String>[slotKey];
+    }
   }
 
   String _guessAudioExtension(String downloadUrl) {

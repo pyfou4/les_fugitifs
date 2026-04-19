@@ -20,7 +20,6 @@ class ArchivesScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final visitedPlaces = places.where((p) => p.isVisited).toList();
-    final theme = Theme.of(context);
     final screenWidth = MediaQuery.of(context).size.width;
     final isTablet = screenWidth >= 700;
     final crossAxisCount = isTablet ? 2 : 1;
