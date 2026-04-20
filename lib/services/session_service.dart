@@ -25,8 +25,8 @@ class SessionService {
       return androidInfo.id.isNotEmpty
           ? androidInfo.id
           : (androidInfo.device.isNotEmpty
-              ? androidInfo.device
-              : 'unknown_android');
+          ? androidInfo.device
+          : 'unknown_android');
     } else if (Platform.isIOS) {
       final iosInfo = await deviceInfo.iosInfo;
       return iosInfo.identifierForVendor ?? 'unknown_ios';
@@ -46,8 +46,56 @@ class SessionService {
 
   static bool _isAllowedStatus(String status) {
     return status == 'active' ||
-         status == 'started' ||
-         status == 'reserved';
+        status == 'started' ||
+        status == 'reserved';
+  }
+
+  /// Supprime toutes les données locales liées à une ancienne session,
+  /// y compris les clés dynamiques du type session_<id>_...
+  ///
+  /// IMPORTANT :
+  /// cette purge ne doit être appelée que lorsqu'on bascule réellement
+  /// vers une NOUVELLE session.
+  static Future<void> _clearStoredSessionState(SharedPreferences prefs) async {
+    final keys = prefs.getKeys().toList();
+
+    for (final key in keys) {
+      if (key.startsWith('session_')) {
+        await prefs.remove(key);
+      }
+    }
+
+    await prefs.remove(_sessionActiveKey);
+    await prefs.remove(_sessionExpiresAtKey);
+    await prefs.remove(_activeGameSessionIdKey);
+    await prefs.remove(_gameSessionIdKey);
+    await prefs.remove(_activeActivationCodeKey);
+    await prefs.remove(_activationCodeKey);
+    await prefs.remove(_sessionDeviceIdKey);
+  }
+
+  /// Vérifie si la session Firestore trouvée correspond à la session locale
+  /// actuellement stockée sur l'appareil.
+  ///
+  /// Si oui, on ne purge surtout rien afin de préserver la reprise normale
+  /// d'une session en cours sur le même téléphone.
+  static bool _isSameStoredSession(
+      SharedPreferences prefs, {
+        required String sessionId,
+        required String activationCode,
+      }) {
+    final storedSessionId = _firstNonEmpty([
+      prefs.getString(_activeGameSessionIdKey),
+      prefs.getString(_gameSessionIdKey),
+    ]);
+
+    final storedActivationCode = _firstNonEmpty([
+      prefs.getString(_activeActivationCodeKey),
+      prefs.getString(_activationCodeKey),
+    ]);
+
+    return storedSessionId == sessionId &&
+        storedActivationCode == activationCode;
   }
 
   /// Vérifie si une session locale est active ET encore valide.
@@ -58,7 +106,9 @@ class SessionService {
     final isActive = prefs.getBool(_sessionActiveKey) ?? false;
     final expiresAtString = prefs.getString(_sessionExpiresAtKey);
 
-    if (!isActive || expiresAtString == null || expiresAtString.trim().isEmpty) {
+    if (!isActive ||
+        expiresAtString == null ||
+        expiresAtString.trim().isEmpty) {
       return false;
     }
 
@@ -86,7 +136,8 @@ class SessionService {
       DocumentSnapshot<Map<String, dynamic>>? sessionDoc;
 
       if (sessionId != null) {
-        final doc = await _firestore.collection('gameSessions').doc(sessionId).get();
+        final doc =
+        await _firestore.collection('gameSessions').doc(sessionId).get();
         if (!doc.exists) return false;
         sessionDoc = doc;
       } else {
@@ -118,7 +169,8 @@ class SessionService {
       }
 
       final localDeviceId = prefs.getString(_sessionDeviceIdKey);
-      final remoteUsedByDeviceId = (data['usedByDeviceId'] ?? '').toString().trim();
+      final remoteUsedByDeviceId =
+      (data['usedByDeviceId'] ?? '').toString().trim();
 
       if (localDeviceId != null &&
           localDeviceId.isNotEmpty &&
@@ -127,12 +179,15 @@ class SessionService {
         return false;
       }
 
-      final code = (data['activationCode'] ?? activationCode ?? '').toString().trim();
+      final code =
+      (data['activationCode'] ?? activationCode ?? '').toString().trim();
 
       await prefs.setBool(_sessionActiveKey, true);
       await prefs.setString(
         _sessionExpiresAtKey,
-        remoteExpiresAtString.isNotEmpty ? remoteExpiresAtString : expiresAtString,
+        remoteExpiresAtString.isNotEmpty
+            ? remoteExpiresAtString
+            : expiresAtString,
       );
       await prefs.setString(_activeGameSessionIdKey, sessionDoc.id);
       await prefs.setString(_gameSessionIdKey, sessionDoc.id);
@@ -154,6 +209,11 @@ class SessionService {
   /// - vérifie statut + expiration
   /// - rattache l'appareil si nécessaire
   /// - autorise la reprise sur le même appareil
+  ///
+  /// Correction importante :
+  /// - si le code pointe vers une NOUVELLE session, on purge l'ancien état local
+  ///   pour éviter de réinjecter une progression d'une autre équipe
+  /// - si c'est la MÊME session, on ne purge rien
   static Future<bool> activateCode(String rawCode) async {
     final code = rawCode.trim().toUpperCase();
     if (code.isEmpty) return false;
@@ -205,6 +265,16 @@ class SessionService {
         }, SetOptions(merge: true));
       }
 
+      final isSameSession = _isSameStoredSession(
+        prefs,
+        sessionId: sessionDoc.id,
+        activationCode: code,
+      );
+
+      if (!isSameSession) {
+        await _clearStoredSessionState(prefs);
+      }
+
       await prefs.setBool(_sessionActiveKey, true);
       await prefs.setString(_sessionExpiresAtKey, expiresAtString);
       await prefs.setString(_activeGameSessionIdKey, sessionDoc.id);
@@ -219,15 +289,9 @@ class SessionService {
     }
   }
 
-  /// Reset session locale.
+  /// Reset session locale complète.
   static Future<void> clearSession() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_sessionActiveKey);
-    await prefs.remove(_sessionExpiresAtKey);
-    await prefs.remove(_activeGameSessionIdKey);
-    await prefs.remove(_gameSessionIdKey);
-    await prefs.remove(_activeActivationCodeKey);
-    await prefs.remove(_activationCodeKey);
-    await prefs.remove(_sessionDeviceIdKey);
+    await _clearStoredSessionState(prefs);
   }
 }
