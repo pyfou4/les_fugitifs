@@ -1,0 +1,48 @@
+[
+  {
+    "id": "A0",
+    "placeType": "media",
+    "mediaRequirements": {
+      "intro": {
+        "acceptedFormats": [],
+        "enabled": false
+      },
+      "outro": {
+        "acceptedFormats": [],
+        "enabled": false
+      },
+      "challenge": {
+        "acceptedFormats": [
+          "video"
+        ],
+        "enabled": true
+      }
+    },
+    "outro": {
+      "narrativeRole": "transition",
+      "format": "none",
+      "enabled": false,
+      "requiresMedia": false
+    },
+    "challenge": {
+      "interactionMode": "passive",
+      "taskDescription": "Visionner entièrement la séquence.",
+      "type": "media_playback",
+      "params": {
+        "clue": {
+          "mode": "fixed_strength",
+          "strength": "medium",
+          "target": "suspect"
+        },
+        "mediaKind": "video",
+        "completionMode": "play_to_end"
+      }
+    },
+    "trigger": {
+      "delayMs": 0,
+      "retryPolicy": "none",
+      "params": {},
+      "type": "auto_on_enter"
+    }
+  }
+]

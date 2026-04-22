@@ -1,0 +1,23 @@
+{
+  "id": "les_fugitifs",
+  "createdAt": {
+    "_seconds": 1775170034,
+    "_nanoseconds": 0
+  },
+  "structureLocked": true,
+  "mediaFrozenBy": "admin_portal",
+  "mediaFrozenAt": "2026-04-15T11:25:21.162",
+  "title": "les Fugitifs",
+  "mediaFrozen": false,
+  "publishedVersionId": "v1",
+  "updatedAt": "2026-04-16T00:22:14.673792",
+  "lockVersion": 1,
+  "creatorLockedBy": "admin_portal",
+  "creatorUnlockedBy": "admin_portal",
+  "creatorUnlockedAt": "2026-04-21T22:40:20.176",
+  "creatorLockedAt": "2026-04-21T22:43:25.893",
+  "lastLockedAt": "2026-04-21T22:43:25.893",
+  "creatorLocked": true,
+  "lastLockedScenarioId": "SdeTLxjJfMc8duN2J5Ab",
+  "status": "locked"
+}

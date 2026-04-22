@@ -1,0 +1,67 @@
+[
+  {
+    "id": "anna",
+    "name": "Anna",
+    "image": "games/les_fugitifs/assets/suspects/anna.png",
+    "imagePath": "games/les_fugitifs/assets/suspects/anna.png",
+    "age": 45,
+    "build": "mince/cheveux long noirs et gris",
+    "profession": "\"La Clé\"",
+    "updatedAt": "2026-04-13T17:58:06.001"
+  },
+  {
+    "id": "juliette",
+    "createdAt": "2026-04-06T14:51:08.725",
+    "build": "petite/blonde",
+    "name": "Juliette",
+    "age": 31,
+    "profession": "\"Silk\"",
+    "image": "games/les_fugitifs/assets/suspects/juliette.png",
+    "imagePath": "games/les_fugitifs/assets/suspects/juliette.png",
+    "updatedAt": "2026-04-07T23:06:07.750"
+  },
+  {
+    "id": "kim",
+    "createdAt": "2026-04-06T14:47:03.796",
+    "name": "Kim",
+    "age": 25,
+    "build": "sportive/cheveux au carré brune",
+    "profession": "\"Flash\"",
+    "image": "games/les_fugitifs/assets/suspects/kim.png",
+    "imagePath": "games/les_fugitifs/assets/suspects/kim.png",
+    "updatedAt": "2026-04-07T23:06:21.836"
+  },
+  {
+    "id": "pedro",
+    "createdAt": "2026-04-06T14:52:29.272",
+    "build": "moyen/musclé/tatoué",
+    "name": "Pedro",
+    "age": 28,
+    "profession": "\"Le Chien\"",
+    "image": "games/les_fugitifs/assets/suspects/pedro.png",
+    "imagePath": "games/les_fugitifs/assets/suspects/pedro.png",
+    "updatedAt": "2026-04-07T23:06:35.309"
+  },
+  {
+    "id": "robert",
+    "createdAt": "2026-04-06T14:55:03.545",
+    "build": "enrobé/chauve/barbe",
+    "name": "Robert",
+    "age": 21,
+    "profession": "\"Scrap\"",
+    "image": "games/les_fugitifs/assets/suspects/robert.png",
+    "imagePath": "games/les_fugitifs/assets/suspects/robert.png",
+    "updatedAt": "2026-04-07T23:06:58.202"
+  },
+  {
+    "id": "viktor",
+    "createdAt": "2026-04-06T14:53:42.883",
+    "build": "grand/mince/cheveux gris en brosse",
+    "name": "Viktor",
+    "age": 49,
+    "profession": "\"Le Plan\"",
+    "image": "games/les_fugitifs/assets/suspects/viktor.png",
+    "imagePath": "games/les_fugitifs/assets/suspects/viktor.png",
+    "updatedAt": "2026-04-07T23:07:18.338"
+  }
+]

@@ -953,6 +953,10 @@ class _CreatorScreenState extends State<CreatorScreen>
       );
 
       if (!mounted) return;
+      setState(() {
+        _lastLockedScenarioId = null;
+        _lockIssues = const <ScenarioValidationIssue>[];
+      });
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Scénario déverrouillé.')),
       );

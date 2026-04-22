@@ -1,0 +1,15 @@
+{
+  "id": "les_fugitifs",
+  "createdAt": {
+    "_seconds": 1775170034,
+    "_nanoseconds": 0
+  },
+  "structureLocked": true,
+  "mediaFrozenBy": "admin_portal",
+  "mediaFrozenAt": "2026-04-15T11:25:21.162",
+  "title": "les Fugitifs",
+  "mediaFrozen": false,
+  "status": "published",
+  "publishedVersionId": "v1",
+  "updatedAt": "2026-04-16T00:22:14.673792"
+}

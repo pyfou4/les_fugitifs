@@ -1,0 +1,44 @@
+{
+  "id": "les_fugitifs",
+  "title": "Les Fugitifs",
+  "structureLocked": false,
+  "createdAt": {
+    "_seconds": 1775273306,
+    "_nanoseconds": 0
+  },
+  "structureRules": {
+    "phases": {
+      "A0": 1,
+      "A": 6,
+      "B0": 1,
+      "B": 5,
+      "C0": 1,
+      "C": 4,
+      "D0": 1
+    },
+    "totalPlaces": 19
+  },
+  "distributionRules": {
+    "suspects": {
+      "totalExpected": 6,
+      "removeAtSessionStart": 1,
+      "mustDistribute": 5
+    },
+    "motives": {
+      "totalExpected": 6,
+      "removeAtSessionStart": 1,
+      "mustDistribute": 5
+    }
+  },
+  "creatorLockedBy": "admin_portal",
+  "creatorUnlockedBy": "admin_portal",
+  "briefing": "Mise en contexte :\nNous sommes en 2041. Un ancien quartier industriel « Le Grid » dans la ville de Varon a été laissé à l’abandon et la vie s’y est redistribuée en gangs unifiés dans le meilleur des cas, en groupes éphémères de loups isolés et peu commodes dans le pire des cas. Une seule personne élue par consensus silencieux est chargée de faire respecter l’ordre dans Le Grid : Le Gardien du Pacte.\n\nDescription:\nTerritoire partagé entre plusieurs groupes\nAvec leurs propres règles\nÉquilibre fragile \nLe Gardien du Pacte veille aux respect du Pacte, des règles et équilibre \nLes conflits dans Le Grid sont réglés non pas par la violence directe mais par des épreuves codifiées qui déterminent les rapports de force.\n\nLe Grid : \nZone tolérée par le reste de la ville\nActivités surveillées \nPrésence policière en périphérie \nTant que les règles sont respectées, la police n’intervient pas, d’où l’importance de respecter Le Pacte.\n« Pas de violence grave, pas de mise en danger, pas de crime réel » sinon, intervention immédiate des autorités.\n\nIl y a 7 mois, le Gardien du Pacte a été retrouvé mort, visiblement assassiné avec une balle en plein cœur et les yeux arrachés, dans le garage d’un habitant de Varon, à la frontière du Grid. Vous, les membres du gang Korva avez été accusés et emprisonnés à tort. Aujourd’hui, grâce à l’aide extérieure de votre ami « Cherry On The Cake » (COTC) et d’un gardien de prison corrompu, vous avez réussi à vous évader. Vous devez maintenant prouver votre innocence et livrer un coupable à la police ou vous retournerez en prison pour 10 ans (et encore, c’est combien pour une évasion?)\n\nUn mot sur vous, les Korva :\nLes Korva ne dirigent pas le Grid, ils le traversent. Vous faites le lien entre Le Grid et Varon et passez là où d’autres s’arrêtent.\nMessagers, intermédiaires, observateurs: vous parlez à tout le monde sans appartenir à personne. Vous voyez ce que les autres ratent et savez souvent ce que les autres cachent. Sans surprise, ça vous cause quelques ennuis.",
+  "gameRules": "- ne pas mettre le téléphone sous silence durant le jeu\n- avoir assez de batterie (avant le jeu)",
+  "creatorLockedAt": "2026-04-21T11:13:42.011",
+  "lastLockedAt": "2026-04-21T11:13:42.011",
+  "lastLockedScenarioId": "gFN5hKpIG60U8xgmwJWA",
+  "creatorLocked": false,
+  "creatorUnlockedAt": "2026-04-21T11:13:49.991",
+  "status": "draft",
+  "updatedAt": "2026-04-21T18:29:46.061"
+}

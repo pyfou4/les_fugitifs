@@ -1,0 +1,1774 @@
+{
+  "id": "SdeTLxjJfMc8duN2J5Ab",
+  "createdAt": "2026-04-21T22:43:25.893",
+  "sourceScenarioId": "les_fugitifs",
+  "data": {
+    "motives": {
+      "vengeance": {
+        "attributes": [
+          "Préparation : Complexes",
+          "Délais : 2 semaines",
+          "Violence : Surprise"
+        ],
+        "id": "vengeance",
+        "title": "Vengeance",
+        "identityVisual": {
+          "mediaKey": "games/les_fugitifs/assets/motives/vengeance.png"
+        }
+      },
+      "argent": {
+        "attributes": [
+          "Préparation : Subtils",
+          "Délais : 1 mois",
+          "Violence : Gore"
+        ],
+        "id": "argent",
+        "title": "Argent",
+        "identityVisual": {
+          "mediaKey": "games/les_fugitifs/assets/motives/argent.png"
+        }
+      },
+      "justice": {
+        "attributes": [
+          "Préparation : importants",
+          "Délais : 6 mois",
+          "Violence : Précis"
+        ],
+        "id": "justice",
+        "title": "Justice",
+        "identityVisual": {
+          "mediaKey": "games/les_fugitifs/assets/motives/justice.png"
+        }
+      },
+      "amour": {
+        "attributes": [
+          "Préparation : Aucun",
+          "Délais : 1 heure",
+          "Violence : Passionnelle"
+        ],
+        "id": "amour",
+        "title": "Amour",
+        "identityVisual": {
+          "mediaKey": "games/les_fugitifs/assets/motives/amour.png"
+        }
+      },
+      "opportunisme": {
+        "attributes": [
+          "Préparation : Rapide",
+          "Délais : 1 semaine",
+          "Violence : fatalité"
+        ],
+        "id": "opportunisme",
+        "title": "Opportunisme",
+        "identityVisual": {
+          "mediaKey": "games/les_fugitifs/assets/motives/opportunisme.png"
+        }
+      },
+      "confusion": {
+        "attributes": [
+          "Préparation : Mal compris",
+          "Délais : 3 jours",
+          "Violence : Absurde"
+        ],
+        "id": "confusion",
+        "title": "Confusion",
+        "identityVisual": {
+          "mediaKey": "games/les_fugitifs/assets/motives/confusion.png"
+        }
+      }
+    },
+    "placeTemplates": {
+      "D0": {
+        "phase": "D0",
+        "requiresAllVisited": [],
+        "mediaDescription": "",
+        "requiresAnyVisited": [],
+        "storySynopsis": "Moment de l'accusation finale, remplir le questionnaire de fin",
+        "keywords": [
+          "test"
+        ],
+        "mediaRequirements": {
+          "intro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "outro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "challenge": {
+            "acceptedFormats": [
+              "video"
+            ],
+            "enabled": true
+          }
+        },
+        "phaseIndex": 0,
+        "experienceType": "media",
+        "synopsis": "Moment de l'accusation finale, remplir le questionnaire de fin",
+        "trigger": {
+          "delayMs": 0,
+          "retryPolicy": "none",
+          "type": "manual_start",
+          "params": {
+            "startLabel": "Commencer"
+          }
+        },
+        "isActive": false,
+        "title": "T49",
+        "placeType": "media",
+        "mediaNotes": "",
+        "name": "T49",
+        "outro": {
+          "narrativeRole": "transition",
+          "format": "none",
+          "enabled": false,
+          "requiresMedia": false
+        },
+        "challenge": {
+          "interactionMode": "passive",
+          "taskDescription": "Moment de l'accusation finale, remplir le questionnaire de fin",
+          "type": "media_playback",
+          "params": {
+            "clue": {
+              "mode": "fixed_strength",
+              "strength": "medium",
+              "target": "suspect"
+            },
+            "mediaKind": "video",
+            "completionMode": "play_to_end"
+          }
+        },
+        "id": "D0",
+        "unlockRules": {
+          "openAfterMinPhaseVisits": {
+            "phase": "C",
+            "count": 2
+          },
+          "visibleAfterMinPhaseVisits": {
+            "phase": "C",
+            "count": 1
+          }
+        }
+      },
+      "C0": {
+        "phase": "C0",
+        "requiresAllVisited": [],
+        "mediaDescription": "",
+        "requiresAnyVisited": [],
+        "storySynopsis": "Un élément clé rapproche de la vérité.",
+        "keywords": [
+          "test34",
+          "ancien",
+          "cercle",
+          "combat",
+          "enquête",
+          "secret"
+        ],
+        "mediaRequirements": {
+          "intro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "outro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "challenge": {
+            "acceptedFormats": [
+              "video"
+            ],
+            "enabled": true
+          }
+        },
+        "phaseIndex": 0,
+        "allowedClueStrengths": [
+          "strong"
+        ],
+        "experienceType": "media",
+        "synopsis": "Un élément clé rapproche de la vérité.",
+        "trigger": {
+          "delayMs": 0,
+          "retryPolicy": "none",
+          "type": "manual_start",
+          "params": {
+            "startLabel": "Commencer"
+          }
+        },
+        "isActive": false,
+        "title": "T44 L'Ancien Cercle",
+        "targets": [
+          {
+            "targetType": "motive",
+            "targetSlot": "MO5"
+          },
+          {
+            "targetType": "suspect",
+            "targetSlot": "PC5"
+          }
+        ],
+        "targetSelectionMode": "one_of",
+        "placeType": "media",
+        "mediaNotes": "",
+        "name": "T44 L'Ancien Cercle",
+        "outro": {
+          "narrativeRole": "transition",
+          "format": "none",
+          "enabled": false,
+          "requiresMedia": false
+        },
+        "challenge": {
+          "interactionMode": "passive",
+          "taskDescription": "Un élément clé rapproche de la vérité.",
+          "type": "media_playback",
+          "params": {
+            "clue": {
+              "mode": "fixed_strength",
+              "strength": "strong",
+              "target": "motive"
+            },
+            "mediaKind": "video",
+            "completionMode": "play_to_end"
+          }
+        },
+        "id": "C0",
+        "unlockRules": {
+          "openAfterMinPhaseVisits": {
+            "phase": "B",
+            "count": 2
+          },
+          "visibleAfterMinPhaseVisits": {
+            "phase": "B",
+            "count": 1
+          }
+        }
+      },
+      "B0": {
+        "phase": "B0",
+        "requiresAllVisited": [],
+        "requiresAnyVisited": [],
+        "storySynopsis": "Dans l'Hôtel du Relais***, Vera, réceptionniste, dites \"La Passeuse\" avait un lien particulier avec le Gardien. Elle qui voit tout le monde transiter dans Varon elle sait certainement quelque chose.",
+        "keywords": [
+          "hôtel",
+          "passeuse",
+          "réservation",
+          "réceptionniste",
+          "réception",
+          "informations"
+        ],
+        "mediaRequirements": {
+          "intro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "outro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "challenge": {
+            "acceptedFormats": [
+              "video"
+            ],
+            "enabled": true
+          }
+        },
+        "phaseIndex": 0,
+        "allowedClueStrengths": [
+          "strong"
+        ],
+        "experienceType": "media",
+        "synopsis": "Dans l'Hôtel du Relais***, Vera, réceptionniste, dites \"La Passeuse\" avait un lien particulier avec le Gardien. Elle qui voit tout le monde transiter dans Varon elle sait certainement quelque chose.",
+        "trigger": {
+          "delayMs": 0,
+          "retryPolicy": "none",
+          "type": "manual_start",
+          "params": {
+            "startLabel": "Commencer"
+          }
+        },
+        "isActive": false,
+        "title": "\"La Passeuse\"",
+        "targets": [
+          {
+            "targetSlot": "PC4",
+            "targetType": "suspect"
+          },
+          {
+            "targetType": "motive",
+            "targetSlot": "MO4"
+          }
+        ],
+        "placeType": "media",
+        "name": "\"La Passeuse\"",
+        "outro": {
+          "narrativeRole": "transition",
+          "format": "none",
+          "enabled": false,
+          "requiresMedia": false
+        },
+        "challenge": {
+          "interactionMode": "passive",
+          "taskDescription": "Dans l'Hôtel du Relais***, Vera, réceptionniste, dites \"La Passeuse\" avait un lien particulier avec le Gardien. Elle qui voit tout le monde transiter dans Varon elle sait certainement quelque chose.",
+          "type": "media_playback",
+          "params": {
+            "clue": {
+              "mode": "fixed_strength",
+              "strength": "strong",
+              "target": "suspect"
+            },
+            "mediaKind": "video",
+            "completionMode": "play_to_end"
+          }
+        },
+        "id": "B0",
+        "unlockRules": {
+          "openAfterMinPhaseVisits": {
+            "phase": "A",
+            "count": 2
+          },
+          "visibleAfterMinPhaseVisits": {
+            "phase": "A",
+            "count": 1
+          }
+        }
+      },
+      "C1": {
+        "phase": "C",
+        "requiresAllVisited": [
+          "C0"
+        ],
+        "mediaDescription": "",
+        "requiresAnyVisited": [],
+        "storySynopsis": "Une mise en situation confirme définitivement une incohérence.",
+        "keywords": [
+          "test35",
+          "bar",
+          "pub",
+          "arriere-salle",
+          "planque"
+        ],
+        "mediaRequirements": {
+          "intro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "outro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "challenge": {
+            "acceptedFormats": [],
+            "enabled": false
+          }
+        },
+        "phaseIndex": 1,
+        "allowedClueStrengths": [
+          "strong",
+          "medium",
+          "weak"
+        ],
+        "experienceType": "physical",
+        "synopsis": "Une mise en situation confirme définitivement une incohérence.",
+        "trigger": {
+          "delayMs": 0,
+          "retryPolicy": "none",
+          "type": "manual_start",
+          "params": {
+            "startLabel": "Commencer"
+          }
+        },
+        "isActive": false,
+        "title": "T45 Bar Le Comptoir",
+        "targets": [
+          {
+            "targetType": "suspect",
+            "targetSlot": "PC1"
+          },
+          {
+            "targetType": "suspect",
+            "targetSlot": "PC2"
+          }
+        ],
+        "targetSelectionMode": "one_of",
+        "placeType": "physical",
+        "mediaNotes": "",
+        "name": "T45 Bar Le Comptoir",
+        "outro": {
+          "narrativeRole": "transition",
+          "format": "none",
+          "enabled": false,
+          "requiresMedia": false
+        },
+        "challenge": {
+          "interactionMode": "numeric_input",
+          "taskDescription": "Une mise en situation confirme définitivement une incohérence.",
+          "type": "physical_task",
+          "params": {
+            "clue": {
+              "mode": "score_based",
+              "clueStrengthRules": [
+                {
+                  "strength": "weak",
+                  "max": 5,
+                  "min": 0
+                },
+                {
+                  "min": 6,
+                  "max": 8,
+                  "strength": "medium"
+                },
+                {
+                  "strength": "strong",
+                  "max": 10,
+                  "min": 9
+                }
+              ],
+              "target": "suspect"
+            },
+            "scoreMax": 10,
+            "scoreMin": 0
+          }
+        },
+        "id": "C1"
+      },
+      "A0": {
+        "phase": "A0",
+        "requiresAllVisited": [],
+        "mediaDescription": "Les joueurs arrivent devant le bâtiment type vieux bâtiment: démarrage du média. \nUne image de porte avec plaque du détective Lukas Frei mise sous scellés. \nSon Klong -> voix:  \"Bon, ça ne sera pas si facile de lui parler apparemment.Vous venez de vous échapper de prison, ce n'est pas ça qui va vous faire peur! Scannez la porte\"\n\nDéclencheur : scan de la porte\n\nImage 2 : bureau de détective avec plans, images et textes au mur.\nDescription de l'image :\nArrière-plan : plan de Varon + Grid \n- Mise en valeur point de la - Nouvelle Arène (non dispo à ce stade)\n- Post-it : I. Lestrade les protège\nrdv parking 0 (dispo)\n- Photo d'un vieil homme: \"Veilleur\" -> confession? (dispo)\n- Mention \"Elden Parc pour entraînement\" (dispo)\n- Pizzeria Al Libì : Napoli pour voir pizzaïolo (dispo)\n-Artcle sur Dr. Eva Hart (dispo)\n- Mis en valeur sur la carte: Point de deal au passage sous-voie (dispo)\n- Note: Confrontation dans 2 semaines au Grid (pas dispo)\n- Photo de Kim sans note\n- Photo de Viktor sans note\n- Photo d'un enfant sans note\n- Photo de la structure du cercle (genre schéma)\nAu bout de 2mn sur l'image, klong + voix: \n\" Ce cher Lukas Frei semble avoir été violemment interrompu dans son enquête. Vous avez de quoi faire pour commencer la vôtre. N'oubliez pas, vous êtes peut-être innocents dans cette histoire mais...là vous êtes des fugitifs! Alors...vous commencez par quoi, bande de voyous?\"\n\nLe média est archivable\nLes joueurs peuvent commencer l'enquête en annonçant les mots clés.",
+        "requiresAnyVisited": [],
+        "storySynopsis": "Une interview du détective en briefing.\nLes fugitifs se rende chez le détective qui mène une contre-enquête sur l'affaire de la mort du Gardien. Arrivés sur les lieux, ils trouvent le bureau mis sous scellés.",
+        "keywords": [
+          "début",
+          "commencement",
+          "crime",
+          "scene",
+          "scène",
+          "détective",
+          "bureau"
+        ],
+        "mediaRequirements": {
+          "intro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "outro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "challenge": {
+            "acceptedFormats": [
+              "video"
+            ],
+            "enabled": true
+          }
+        },
+        "phaseIndex": 0,
+        "targetType": "none",
+        "allowedClueStrengths": [],
+        "experienceType": "media",
+        "synopsis": "Une interview du détective en briefing.\nLes fugitifs se rende chez le détective qui mène une contre-enquête sur l'affaire de la mort du Gardien. Arrivés sur les lieux, ils trouvent le bureau mis sous scellés.",
+        "trigger": {
+          "delayMs": 0,
+          "retryPolicy": "none",
+          "params": {},
+          "type": "auto_on_enter"
+        },
+        "title": "Bureau du détective Lukas Frei",
+        "targetSlot": "none",
+        "placeType": "media",
+        "mediaNotes": "Les joueurs arrivent devant le bâtiment type vieux bâtiment: démarrage du média. \nUne image de porte avec plaque du détective Lukas Frei mise sous scellés. \nSon Klong -> voix:  \"Bon, ça ne sera pas si facile de lui parler apparemment.Vous venez de vous échapper de prison, ce n'est pas ça qui va vous faire peur! Scannez la porte\"\n\nDéclencheur : scan de la porte\n\nImage 2 : bureau de détective avec plans, images et textes au mur.\nDescription de l'image :\nArrière-plan : plan de Varon + Grid \n- Mise en valeur point de la - Nouvelle Arène (non dispo à ce stade)\n- Post-it : I. Lestrade les protège\nrdv parking 0 (dispo)\n- Photo d'un vieil homme: \"Veilleur\" -> confession? (dispo)\n- Mention \"Elden Parc pour entraînement\" (dispo)\n- Pizzeria Al Libì : Napoli pour voir pizzaïolo (dispo)\n-Artcle sur Dr. Eva Hart (dispo)\n- Mis en valeur sur la carte: Point de deal au passage sous-voie (dispo)\n- Note: Confrontation dans 2 semaines au Grid (pas dispo)\n- Photo de Kim sans note\n- Photo de Viktor sans note\n- Photo d'un enfant sans note\n- Photo de la structure du cercle (genre schéma)\nAu bout de 2mn sur l'image, klong + voix: \n\" Ce cher Lukas Frei semble avoir été violemment interrompu dans son enquête. Vous avez de quoi faire pour commencer la vôtre. N'oubliez pas, vous êtes peut-être innocents dans cette histoire mais...là vous êtes des fugitifs! Alors...vous commencez par quoi, bande de voyous?\"\n\nLe média est archivable\nLes joueurs peuvent commencer l'enquête en annonçant les mots clés.",
+        "name": "Bureau du détective Lukas Frei",
+        "outro": {
+          "narrativeRole": "transition",
+          "format": "none",
+          "enabled": false,
+          "requiresMedia": false
+        },
+        "challenge": {
+          "interactionMode": "passive",
+          "taskDescription": "Les joueurs arrivent devant le bâtiment type vieux bâtiment: démarrage du média. \nUne image de porte avec plaque du détective Lukas Frei mise sous scellés. \nSon Klong -> voix:  \"Bon, ça ne sera pas si facile de lui parler apparemment.Vous venez de vous échapper de prison, ce n'est pas ça qui va vous faire peur! Scannez la porte\"\n\nDéclencheur : scan de la porte\n\nImage 2 : bureau de détective avec plans, images et textes au mur.\nDescription de l'image :\nArrière-plan : plan de Varon + Grid \n- Mise en valeur point de la - Nouvelle Arène (non dispo à ce stade)\n- Post-it : I. Lestrade les protège\nrdv parking 0 (dispo)\n- Photo d'un vieil homme: \"Veilleur\" -> confession? (dispo)\n- Mention \"Elden Parc pour entraînement\" (dispo)\n- Pizzeria Al Libì : Napoli pour voir pizzaïolo (dispo)\n-Artcle sur Dr. Eva Hart (dispo)\n- Mis en valeur sur la carte: Point de deal au passage sous-voie (dispo)\n- Note: Confrontation dans 2 semaines au Grid (pas dispo)\n- Photo de Kim sans note\n- Photo de Viktor sans note\n- Photo d'un enfant sans note\n- Photo de la structure du cercle (genre schéma)\nAu bout de 2mn sur l'image, klong + voix: \n\" Ce cher Lukas Frei semble avoir été violemment interrompu dans son enquête. Vous avez de quoi faire pour commencer la vôtre. N'oubliez pas, vous êtes peut-être innocents dans cette histoire mais...là vous êtes des fugitifs! Alors...vous commencez par quoi, bande de voyous?\"\n\nLe média est archivable\nLes joueurs peuvent commencer l'enquête en annonçant les mots clés.",
+          "type": "media_playback",
+          "params": {
+            "clue": {
+              "mode": "fixed_strength",
+              "strength": "medium",
+              "target": "suspect"
+            },
+            "mediaKind": "video",
+            "completionMode": "play_to_end"
+          }
+        },
+        "id": "A0"
+      },
+      "B1": {
+        "phase": "B",
+        "requiresAllVisited": [
+          "B0"
+        ],
+        "requiresAnyVisited": [],
+        "storySynopsis": "Un élément de timing rend impossible la présence d’un suspect.",
+        "keywords": [
+          "salle de sport",
+          "fitness",
+          "musculation",
+          "coach"
+        ],
+        "mediaRequirements": {
+          "intro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "outro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "challenge": {
+            "acceptedFormats": [],
+            "enabled": false
+          }
+        },
+        "phaseIndex": 1,
+        "targetType": "suspect",
+        "allowedClueStrengths": [
+          "strong",
+          "medium",
+          "weak"
+        ],
+        "experienceType": "physical",
+        "synopsis": "Un élément de timing rend impossible la présence d’un suspect.",
+        "trigger": {
+          "delayMs": 0,
+          "retryPolicy": "none",
+          "type": "manual_start",
+          "params": {
+            "startLabel": "Commencer"
+          }
+        },
+        "isActive": false,
+        "title": "La Salle de Sport",
+        "targetSlot": "PC5",
+        "placeType": "physical",
+        "name": "La Salle de Sport",
+        "outro": {
+          "narrativeRole": "transition",
+          "format": "none",
+          "enabled": false,
+          "requiresMedia": false
+        },
+        "challenge": {
+          "interactionMode": "numeric_input",
+          "taskDescription": "Un élément de timing rend impossible la présence d’un suspect.",
+          "type": "physical_task",
+          "params": {
+            "clue": {
+              "mode": "score_based",
+              "clueStrengthRules": [
+                {
+                  "max": 5,
+                  "strength": "weak",
+                  "min": 0
+                },
+                {
+                  "max": 8,
+                  "strength": "medium",
+                  "min": 6
+                },
+                {
+                  "max": 10,
+                  "strength": "strong",
+                  "min": 9
+                }
+              ],
+              "target": "suspect"
+            },
+            "scoreMax": 10,
+            "scoreMin": 0
+          }
+        },
+        "id": "B1"
+      },
+      "C2": {
+        "phase": "C",
+        "requiresAllVisited": [
+          "C0"
+        ],
+        "mediaDescription": "",
+        "requiresAnyVisited": [],
+        "storySynopsis": "Un détail du lieu invalide un mobile.",
+        "keywords": [
+          "test36"
+        ],
+        "mediaRequirements": {
+          "intro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "outro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "challenge": {
+            "acceptedFormats": [],
+            "enabled": false
+          }
+        },
+        "phaseIndex": 2,
+        "allowedClueStrengths": [
+          "strong",
+          "weak"
+        ],
+        "experienceType": "observation",
+        "synopsis": "Un détail du lieu invalide un mobile.",
+        "trigger": {
+          "delayMs": 0,
+          "retryPolicy": "none",
+          "type": "manual_start",
+          "params": {
+            "startLabel": "Commencer"
+          }
+        },
+        "isActive": false,
+        "title": "T46",
+        "targets": [
+          {
+            "targetType": "motive",
+            "targetSlot": "MO3"
+          },
+          {
+            "targetType": "motive",
+            "targetSlot": "MO4"
+          }
+        ],
+        "targetSelectionMode": "one_of",
+        "placeType": "observation",
+        "mediaNotes": "",
+        "name": "T46",
+        "outro": {
+          "narrativeRole": "transition",
+          "format": "none",
+          "enabled": false,
+          "requiresMedia": false
+        },
+        "challenge": {
+          "interactionMode": "confirmation_only",
+          "taskDescription": "Un détail du lieu invalide un mobile.",
+          "type": "observation_validation",
+          "params": {
+            "clue": {
+              "mode": "fixed_strength",
+              "strength": "strong",
+              "target": "motive"
+            },
+            "confirmLabel": "Confirmer",
+            "prompt": "Un détail du lieu invalide un mobile."
+          }
+        },
+        "id": "C2"
+      },
+      "A1": {
+        "phase": "A",
+        "requiresAllVisited": [
+          "A0"
+        ],
+        "mediaDescription": "S'évader de prison pour partir voir un policier, cela s'apparente à de la folie, vous en êtes tous conscients. \nL'inspecteur Lestrade, vous le connaissez depuis 15 ans et vous \"travaillez\" en quelques sortes avec lui : des échanges d'informations ou de bons procédés qui arrangent tout le monde.Le Grid n'est pas anti-police, ils aiment simplement s'arranger entre eux.\nLestrade vous a demandé de faire preuve de discrétion. \n\nIl veut bien répondre à vos questions et vous dire qui ils pensent ne pas être dans le coup mais vous ne devez pas vous faire interrompre par des passants, ce serait trop dangereux. \n\nFaites rebondir votre balle 10x contre le mur sans rebonds parterre pour donner l'impression aux alentours que vous vous amuser nonchalamment.",
+        "requiresAnyVisited": [],
+        "storySynopsis": "Ils y rencontrent le policier avec qui ils ont l'habitude d'échanger des informations",
+        "keywords": [
+          "police",
+          "inspecteur",
+          "agent",
+          "lestrade",
+          "parking",
+          "policier"
+        ],
+        "mediaRequirements": {
+          "intro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "outro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "challenge": {
+            "acceptedFormats": [],
+            "enabled": false
+          }
+        },
+        "phaseIndex": 1,
+        "targetType": "suspect",
+        "allowedClueStrengths": [
+          "strong",
+          "medium",
+          "weak"
+        ],
+        "experienceType": "physical",
+        "synopsis": "Ils y rencontrent le policier avec qui ils ont l'habitude d'échanger des informations",
+        "trigger": {
+          "delayMs": 0,
+          "retryPolicy": "none",
+          "type": "manual_start",
+          "params": {
+            "startLabel": "Commencer"
+          }
+        },
+        "title": "Le Parking du Point Zéro",
+        "targetSlot": "PC1",
+        "placeType": "physical",
+        "mediaNotes": "S'évader de prison pour partir voir un policier, cela s'apparente à de la folie, vous en êtes tous conscients. \nL'inspecteur Lestrade, vous le connaissez depuis 15 ans et vous \"travaillez\" en quelques sortes avec lui : des échanges d'informations ou de bons procédés qui arrangent tout le monde.Le Grid n'est pas anti-police, ils aiment simplement s'arranger entre eux.\nLestrade vous a demandé de faire preuve de discrétion. \n\nIl veut bien répondre à vos questions et vous dire qui ils pensent ne pas être dans le coup mais vous ne devez pas vous faire interrompre par des passants, ce serait trop dangereux. \n\nFaites rebondir votre balle 10x contre le mur sans rebonds parterre pour donner l'impression aux alentours que vous vous amuser nonchalamment.",
+        "name": "Le Parking du Point Zéro",
+        "outro": {
+          "narrativeRole": "transition",
+          "format": "none",
+          "enabled": false,
+          "requiresMedia": false
+        },
+        "challenge": {
+          "interactionMode": "numeric_input",
+          "taskDescription": "S'évader de prison pour partir voir un policier, cela s'apparente à de la folie, vous en êtes tous conscients. \nL'inspecteur Lestrade, vous le connaissez depuis 15 ans et vous \"travaillez\" en quelques sortes avec lui : des échanges d'informations ou de bons procédés qui arrangent tout le monde.Le Grid n'est pas anti-police, ils aiment simplement s'arranger entre eux.\nLestrade vous a demandé de faire preuve de discrétion. \n\nIl veut bien répondre à vos questions et vous dire qui ils pensent ne pas être dans le coup mais vous ne devez pas vous faire interrompre par des passants, ce serait trop dangereux. \n\nFaites rebondir votre balle 10x contre le mur sans rebonds parterre pour donner l'impression aux alentours que vous vous amuser nonchalamment.",
+          "type": "physical_task",
+          "params": {
+            "clue": {
+              "mode": "score_based",
+              "clueStrengthRules": [
+                {
+                  "min": 0,
+                  "max": 5,
+                  "strength": "weak"
+                },
+                {
+                  "min": 6,
+                  "strength": "medium",
+                  "max": 8
+                },
+                {
+                  "max": 10,
+                  "strength": "strong",
+                  "min": 9
+                }
+              ],
+              "target": "suspect"
+            },
+            "scoreMax": 10,
+            "scoreMin": 0
+          }
+        },
+        "id": "A1"
+      },
+      "B2": {
+        "phase": "B",
+        "requiresAllVisited": [
+          "B0"
+        ],
+        "mediaDescription": "",
+        "requiresAnyVisited": [],
+        "storySynopsis": "Un document confirme définitivement une incohérence.",
+        "keywords": [
+          "test31",
+          "hôtel de ville",
+          "mairie",
+          "archives",
+          "registres"
+        ],
+        "mediaRequirements": {
+          "intro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "outro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "challenge": {
+            "acceptedFormats": [
+              "video"
+            ],
+            "enabled": true
+          }
+        },
+        "phaseIndex": 2,
+        "targetType": "motive",
+        "allowedClueStrengths": [
+          "strong"
+        ],
+        "experienceType": "media",
+        "synopsis": "Un document confirme définitivement une incohérence.",
+        "trigger": {
+          "delayMs": 0,
+          "retryPolicy": "none",
+          "type": "manual_start",
+          "params": {
+            "startLabel": "Commencer"
+          }
+        },
+        "isActive": false,
+        "title": "T41 L'Hôtel de Ville",
+        "targetSlot": "MO2",
+        "placeType": "media",
+        "mediaNotes": "",
+        "name": "T41 L'Hôtel de Ville",
+        "outro": {
+          "narrativeRole": "transition",
+          "format": "none",
+          "enabled": false,
+          "requiresMedia": false
+        },
+        "challenge": {
+          "interactionMode": "passive",
+          "taskDescription": "Un document confirme définitivement une incohérence.",
+          "type": "media_playback",
+          "params": {
+            "clue": {
+              "mode": "fixed_strength",
+              "strength": "strong",
+              "target": "motive"
+            },
+            "mediaKind": "video",
+            "completionMode": "play_to_end"
+          }
+        },
+        "id": "B2"
+      },
+      "C3": {
+        "phase": "C",
+        "requiresAllVisited": [
+          "C0"
+        ],
+        "mediaDescription": "",
+        "requiresAnyVisited": [],
+        "storySynopsis": "Une révélation finale croisée verrouille plusieurs hypothèses.",
+        "keywords": [
+          "test37",
+          "cinema",
+          "film",
+          "pub",
+          "pop corn"
+        ],
+        "mediaRequirements": {
+          "intro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "outro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "challenge": {
+            "acceptedFormats": [
+              "video"
+            ],
+            "enabled": true
+          }
+        },
+        "phaseIndex": 3,
+        "allowedClueStrengths": [
+          "strong"
+        ],
+        "experienceType": "media",
+        "synopsis": "Une révélation finale croisée verrouille plusieurs hypothèses.",
+        "trigger": {
+          "delayMs": 0,
+          "retryPolicy": "none",
+          "type": "manual_start",
+          "params": {
+            "startLabel": "Commencer"
+          }
+        },
+        "isActive": false,
+        "title": "T47 Le Cinéma du Grid",
+        "targets": [
+          {
+            "targetType": "suspect",
+            "targetSlot": "PC2"
+          },
+          {
+            "targetType": "motive",
+            "targetSlot": "MO2"
+          }
+        ],
+        "placeType": "media",
+        "mediaNotes": "",
+        "name": "T47 Le Cinéma du Grid",
+        "outro": {
+          "narrativeRole": "transition",
+          "format": "none",
+          "enabled": false,
+          "requiresMedia": false
+        },
+        "challenge": {
+          "interactionMode": "passive",
+          "taskDescription": "Une révélation finale croisée verrouille plusieurs hypothèses.",
+          "type": "media_playback",
+          "params": {
+            "clue": {
+              "mode": "fixed_strength",
+              "strength": "strong",
+              "target": "suspect"
+            },
+            "mediaKind": "video",
+            "completionMode": "play_to_end"
+          }
+        },
+        "id": "C3"
+      },
+      "A2": {
+        "phase": "A",
+        "requiresAllVisited": [
+          "A0"
+        ],
+        "mediaDescription": "Première page de la carte du Menu :\n\n\"À notre aimable clientèle, nous déménageons! Pedro et son équipe vous accueilleront prochainement dans leur nouvel établissement Hors Grid.\nUn grand merci pour votre fidélité dans cette nouvelle aventure! Nouvelle adresse à venir.\"",
+        "requiresAnyVisited": [],
+        "storySynopsis": "Le Gardien avait changé ses habitudes dernièrement et se rendait souvent dans cette pizzeria ces derniers temps.",
+        "keywords": [
+          "pizzeria",
+          "restaurant",
+          "pizza",
+          "livraison",
+          "livreur",
+          "alibi italien"
+        ],
+        "mediaRequirements": {
+          "intro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "outro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "challenge": {
+            "acceptedFormats": [
+              "video"
+            ],
+            "enabled": true
+          }
+        },
+        "phaseIndex": 2,
+        "targetType": "motive",
+        "allowedClueStrengths": [
+          "strong"
+        ],
+        "experienceType": "media",
+        "synopsis": "Le Gardien avait changé ses habitudes dernièrement et se rendait souvent dans cette pizzeria ces derniers temps.",
+        "trigger": {
+          "delayMs": 0,
+          "retryPolicy": "none",
+          "type": "manual_start",
+          "params": {
+            "startLabel": "Commencer"
+          }
+        },
+        "title": "La Pizzeria Al Libì",
+        "targetSlot": "MO1",
+        "placeType": "media",
+        "mediaNotes": "Première page de la carte du Menu :\n\n\"À notre aimable clientèle, nous déménageons! Pedro et son équipe vous accueilleront prochainement dans leur nouvel établissement Hors Grid.\nUn grand merci pour votre fidélité dans cette nouvelle aventure! Nouvelle adresse à venir.\"",
+        "name": "La Pizzeria Al Libì",
+        "outro": {
+          "narrativeRole": "transition",
+          "format": "none",
+          "enabled": false,
+          "requiresMedia": false
+        },
+        "challenge": {
+          "interactionMode": "passive",
+          "taskDescription": "Première page de la carte du Menu :\n\n\"À notre aimable clientèle, nous déménageons! Pedro et son équipe vous accueilleront prochainement dans leur nouvel établissement Hors Grid.\nUn grand merci pour votre fidélité dans cette nouvelle aventure! Nouvelle adresse à venir.\"",
+          "type": "media_playback",
+          "params": {
+            "clue": {
+              "mode": "fixed_strength",
+              "strength": "strong",
+              "target": "motive"
+            },
+            "mediaKind": "video",
+            "completionMode": "play_to_end"
+          }
+        },
+        "id": "A2"
+      },
+      "B3": {
+        "phase": "B",
+        "requiresAllVisited": [
+          "B0"
+        ],
+        "mediaDescription": "",
+        "requiresAnyVisited": [],
+        "storySynopsis": "Une contrainte pratique rend ce mobile irréalisable.",
+        "keywords": [
+          "test32",
+          "concierge",
+          "nouvelle",
+          "défi",
+          "arrangement",
+          "compétition"
+        ],
+        "mediaRequirements": {
+          "intro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "outro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "challenge": {
+            "acceptedFormats": [],
+            "enabled": false
+          }
+        },
+        "phaseIndex": 3,
+        "targetType": "motive",
+        "allowedClueStrengths": [
+          "strong",
+          "medium",
+          "weak"
+        ],
+        "experienceType": "physical",
+        "synopsis": "Une contrainte pratique rend ce mobile irréalisable.",
+        "trigger": {
+          "delayMs": 0,
+          "retryPolicy": "none",
+          "type": "manual_start",
+          "params": {
+            "startLabel": "Commencer"
+          }
+        },
+        "isActive": false,
+        "title": "T42 Le concierge de la Nouvelle Arène",
+        "targetSlot": "MO5",
+        "placeType": "physical",
+        "mediaNotes": "",
+        "name": "T42 Le concierge de la Nouvelle Arène",
+        "outro": {
+          "narrativeRole": "transition",
+          "format": "none",
+          "enabled": false,
+          "requiresMedia": false
+        },
+        "challenge": {
+          "interactionMode": "numeric_input",
+          "taskDescription": "Une contrainte pratique rend ce mobile irréalisable.",
+          "type": "physical_task",
+          "params": {
+            "clue": {
+              "mode": "score_based",
+              "clueStrengthRules": [
+                {
+                  "max": 5,
+                  "strength": "weak",
+                  "min": 0
+                },
+                {
+                  "max": 8,
+                  "strength": "medium",
+                  "min": 6
+                },
+                {
+                  "strength": "strong",
+                  "max": 10,
+                  "min": 9
+                }
+              ],
+              "target": "motive"
+            },
+            "scoreMax": 10,
+            "scoreMin": 0
+          }
+        },
+        "id": "B3"
+      },
+      "C4": {
+        "phase": "C",
+        "requiresAllVisited": [
+          "C0"
+        ],
+        "mediaDescription": "",
+        "requiresAnyVisited": [],
+        "storySynopsis": "Un dernier détail élimine les ultimes doutes.",
+        "keywords": [
+          "test38",
+          "local",
+          "grid",
+          "garage",
+          "hangar",
+          "hall",
+          "secret",
+          "caché"
+        ],
+        "mediaRequirements": {
+          "intro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "outro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "challenge": {
+            "acceptedFormats": [],
+            "enabled": false
+          }
+        },
+        "phaseIndex": 4,
+        "allowedClueStrengths": [
+          "strong",
+          "weak"
+        ],
+        "experienceType": "observation",
+        "synopsis": "Un dernier détail élimine les ultimes doutes.",
+        "trigger": {
+          "delayMs": 0,
+          "retryPolicy": "none",
+          "type": "manual_start",
+          "params": {
+            "startLabel": "Commencer"
+          }
+        },
+        "isActive": false,
+        "title": "T48 Le Local de l'Arène",
+        "targets": [
+          {
+            "targetSlot": "PC3",
+            "targetType": "suspect"
+          },
+          {
+            "targetSlot": "MO1",
+            "targetType": "motive"
+          }
+        ],
+        "targetSelectionMode": "one_of",
+        "placeType": "observation",
+        "mediaNotes": "",
+        "name": "T48 Le Local de l'Arène",
+        "outro": {
+          "narrativeRole": "transition",
+          "format": "none",
+          "enabled": false,
+          "requiresMedia": false
+        },
+        "challenge": {
+          "interactionMode": "confirmation_only",
+          "taskDescription": "Un dernier détail élimine les ultimes doutes.",
+          "type": "observation_validation",
+          "params": {
+            "clue": {
+              "mode": "fixed_strength",
+              "strength": "strong",
+              "target": "suspect"
+            },
+            "confirmLabel": "Confirmer",
+            "prompt": "Un dernier détail élimine les ultimes doutes."
+          }
+        },
+        "id": "C4"
+      },
+      "A3": {
+        "phase": "A",
+        "requiresAllVisited": [
+          "A0"
+        ],
+        "requiresAnyVisited": [],
+        "storySynopsis": "Le Gardien avait ses croyances et aimait échanger avec le Veilleur. Peut-être qu'il sera d'accord de les aider",
+        "keywords": [
+          "eglise",
+          "sanctum",
+          "prêtre",
+          "cérémonie",
+          "confession"
+        ],
+        "mediaRequirements": {
+          "intro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "outro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "challenge": {
+            "acceptedFormats": [],
+            "enabled": false
+          }
+        },
+        "phaseIndex": 3,
+        "targetType": "suspect",
+        "allowedClueStrengths": [
+          "strong",
+          "weak"
+        ],
+        "experienceType": "observation",
+        "synopsis": "Le Gardien avait ses croyances et aimait échanger avec le Veilleur. Peut-être qu'il sera d'accord de les aider",
+        "trigger": {
+          "delayMs": 0,
+          "retryPolicy": "none",
+          "type": "manual_start",
+          "params": {
+            "startLabel": "Commencer"
+          }
+        },
+        "isActive": false,
+        "title": "Le Sanctum",
+        "targetSlot": "PC2",
+        "placeType": "observation",
+        "name": "Le Sanctum",
+        "outro": {
+          "narrativeRole": "transition",
+          "format": "none",
+          "enabled": false,
+          "requiresMedia": false
+        },
+        "challenge": {
+          "interactionMode": "confirmation_only",
+          "taskDescription": "Le Gardien avait ses croyances et aimait échanger avec le Veilleur. Peut-être qu'il sera d'accord de les aider",
+          "type": "observation_validation",
+          "params": {
+            "clue": {
+              "mode": "fixed_strength",
+              "strength": "strong",
+              "target": "suspect"
+            },
+            "confirmLabel": "Confirmer",
+            "prompt": "Le Gardien avait ses croyances et aimait échanger avec le Veilleur. Peut-être qu'il sera d'accord de les aider"
+          }
+        },
+        "id": "A3"
+      },
+      "B4": {
+        "phase": "B",
+        "requiresAllVisited": [
+          "B0"
+        ],
+        "requiresAnyVisited": [],
+        "storySynopsis": "Un détail visible invalide une version des faits.\n\nDario \"Locke\" a souvent eu affaire au Gardien à cause de son caractère sanguin. Il a pour habitude de se poster près de cette statue, on ne sait pas trop pourquoi, ça a l'air de lui tenir à cœur.",
+        "keywords": [
+          "statue",
+          "mémoire",
+          "dario",
+          "locke"
+        ],
+        "mediaRequirements": {
+          "intro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "outro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "challenge": {
+            "acceptedFormats": [],
+            "enabled": false
+          }
+        },
+        "phaseIndex": 4,
+        "targetType": "suspect",
+        "allowedClueStrengths": [
+          "strong",
+          "weak"
+        ],
+        "experienceType": "observation",
+        "synopsis": "Un détail visible invalide une version des faits.\n\nDario \"Locke\" a souvent eu affaire au Gardien à cause de son caractère sanguin. Il a pour habitude de se poster près de cette statue, on ne sait pas trop pourquoi, ça a l'air de lui tenir à cœur.",
+        "trigger": {
+          "delayMs": 0,
+          "retryPolicy": "none",
+          "type": "manual_start",
+          "params": {
+            "startLabel": "Commencer"
+          }
+        },
+        "isActive": false,
+        "title": "Dario \"Locke\"",
+        "targetSlot": "PC2",
+        "placeType": "observation",
+        "name": "Dario \"Locke\"",
+        "outro": {
+          "narrativeRole": "transition",
+          "format": "none",
+          "enabled": false,
+          "requiresMedia": false
+        },
+        "challenge": {
+          "interactionMode": "confirmation_only",
+          "taskDescription": "Un détail visible invalide une version des faits.\n\nDario \"Locke\" a souvent eu affaire au Gardien à cause de son caractère sanguin. Il a pour habitude de se poster près de cette statue, on ne sait pas trop pourquoi, ça a l'air de lui tenir à cœur.",
+          "type": "observation_validation",
+          "params": {
+            "clue": {
+              "mode": "fixed_strength",
+              "strength": "strong",
+              "target": "suspect"
+            },
+            "confirmLabel": "Confirmer",
+            "prompt": "Un détail visible invalide une version des faits.\n\nDario \"Locke\" a souvent eu affaire au Gardien à cause de son caractère sanguin. Il a pour habitude de se poster près de cette statue, on ne sait pas trop pourquoi, ça a l'air de lui tenir à cœur."
+          }
+        },
+        "id": "B4"
+      },
+      "A4": {
+        "phase": "A",
+        "requiresAllVisited": [
+          "A0"
+        ],
+        "mediaDescription": "",
+        "requiresAnyVisited": [],
+        "storySynopsis": "Un élément prouve que ce mobile aurait nécessité des compétences spécifiques",
+        "keywords": [
+          "test21"
+        ],
+        "mediaRequirements": {
+          "intro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "outro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "challenge": {
+            "acceptedFormats": [],
+            "enabled": false
+          }
+        },
+        "phaseIndex": 4,
+        "targetType": "motive",
+        "allowedClueStrengths": [
+          "strong",
+          "medium",
+          "weak"
+        ],
+        "experienceType": "physical",
+        "synopsis": "Un élément prouve que ce mobile aurait nécessité des compétences spécifiques",
+        "trigger": {
+          "delayMs": 0,
+          "retryPolicy": "none",
+          "type": "manual_start",
+          "params": {
+            "startLabel": "Commencer"
+          }
+        },
+        "isActive": false,
+        "title": "Elden Parc",
+        "targetSlot": "MO2",
+        "placeType": "physical",
+        "mediaNotes": "",
+        "name": "Elden Parc",
+        "outro": {
+          "narrativeRole": "transition",
+          "format": "none",
+          "enabled": false,
+          "requiresMedia": false
+        },
+        "challenge": {
+          "interactionMode": "numeric_input",
+          "taskDescription": "Un élément prouve que ce mobile aurait nécessité des compétences spécifiques",
+          "type": "physical_task",
+          "params": {
+            "clue": {
+              "mode": "score_based",
+              "clueStrengthRules": [
+                {
+                  "max": 5,
+                  "strength": "weak",
+                  "min": 0
+                },
+                {
+                  "strength": "medium",
+                  "max": 8,
+                  "min": 6
+                },
+                {
+                  "min": 9,
+                  "max": 10,
+                  "strength": "strong"
+                }
+              ],
+              "target": "motive"
+            },
+            "scoreMax": 10,
+            "scoreMin": 0
+          }
+        },
+        "id": "A4"
+      },
+      "B5": {
+        "phase": "B",
+        "requiresAllVisited": [
+          "B0"
+        ],
+        "mediaDescription": "",
+        "requiresAnyVisited": [],
+        "storySynopsis": "Une reconstitution met en évidence une impossibilité.",
+        "keywords": [
+          "test33"
+        ],
+        "mediaRequirements": {
+          "intro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "outro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "challenge": {
+            "acceptedFormats": [],
+            "enabled": false
+          }
+        },
+        "phaseIndex": 5,
+        "allowedClueStrengths": [
+          "strong",
+          "medium",
+          "weak"
+        ],
+        "experienceType": "physical",
+        "synopsis": "Une reconstitution met en évidence une impossibilité.",
+        "trigger": {
+          "delayMs": 0,
+          "retryPolicy": "none",
+          "type": "manual_start",
+          "params": {
+            "startLabel": "Commencer"
+          }
+        },
+        "isActive": false,
+        "title": "T43",
+        "targets": [
+          {
+            "targetType": "suspect",
+            "targetSlot": "PC1"
+          },
+          {
+            "targetSlot": "MO1",
+            "targetType": "motive"
+          }
+        ],
+        "targetSelectionMode": "one_of",
+        "placeType": "physical",
+        "mediaNotes": "",
+        "name": "T43",
+        "outro": {
+          "narrativeRole": "transition",
+          "format": "none",
+          "enabled": false,
+          "requiresMedia": false
+        },
+        "challenge": {
+          "interactionMode": "numeric_input",
+          "taskDescription": "Une reconstitution met en évidence une impossibilité.",
+          "type": "physical_task",
+          "params": {
+            "clue": {
+              "mode": "score_based",
+              "clueStrengthRules": [
+                {
+                  "strength": "weak",
+                  "max": 5,
+                  "min": 0
+                },
+                {
+                  "min": 6,
+                  "max": 8,
+                  "strength": "medium"
+                },
+                {
+                  "strength": "strong",
+                  "max": 10,
+                  "min": 9
+                }
+              ],
+              "target": "suspect"
+            },
+            "scoreMax": 10,
+            "scoreMin": 0
+          }
+        },
+        "id": "B5"
+      },
+      "A5": {
+        "phase": "A",
+        "requiresAllVisited": [
+          "A0"
+        ],
+        "requiresAnyVisited": [],
+        "storySynopsis": "Une déclaration disculpe clairement un des suspects.",
+        "keywords": [
+          "morgue",
+          "mort",
+          "légiste",
+          "médecin",
+          "hôpital",
+          "police"
+        ],
+        "mediaRequirements": {
+          "intro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "outro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "challenge": {
+            "acceptedFormats": [
+              "video"
+            ],
+            "enabled": true
+          }
+        },
+        "phaseIndex": 5,
+        "targetType": "suspect",
+        "allowedClueStrengths": [
+          "strong"
+        ],
+        "experienceType": "media",
+        "synopsis": "Une déclaration disculpe clairement un des suspects.",
+        "trigger": {
+          "delayMs": 0,
+          "retryPolicy": "none",
+          "type": "manual_start",
+          "params": {
+            "startLabel": "Commencer"
+          }
+        },
+        "isActive": false,
+        "title": "La Morgue",
+        "targetSlot": "PC3",
+        "placeType": "media",
+        "name": "La Morgue",
+        "outro": {
+          "narrativeRole": "transition",
+          "format": "none",
+          "enabled": false,
+          "requiresMedia": false
+        },
+        "challenge": {
+          "interactionMode": "passive",
+          "taskDescription": "Une déclaration disculpe clairement un des suspects.",
+          "type": "media_playback",
+          "params": {
+            "clue": {
+              "mode": "fixed_strength",
+              "strength": "strong",
+              "target": "suspect"
+            },
+            "mediaKind": "video",
+            "completionMode": "play_to_end"
+          }
+        },
+        "id": "A5"
+      },
+      "A6": {
+        "phase": "A",
+        "requiresAllVisited": [
+          "A0"
+        ],
+        "requiresAnyVisited": [],
+        "storySynopsis": "Une contrainte physique rend ce mobile improbable.",
+        "keywords": [
+          "passage",
+          "tunnel",
+          "sous-terrain",
+          "métro",
+          "rail",
+          "escaliers"
+        ],
+        "mediaRequirements": {
+          "intro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "outro": {
+            "acceptedFormats": [],
+            "enabled": false
+          },
+          "challenge": {
+            "acceptedFormats": [],
+            "enabled": false
+          }
+        },
+        "phaseIndex": 6,
+        "targetType": "motive",
+        "allowedClueStrengths": [
+          "strong",
+          "medium",
+          "weak"
+        ],
+        "experienceType": "physical",
+        "synopsis": "Une contrainte physique rend ce mobile improbable.",
+        "trigger": {
+          "delayMs": 0,
+          "retryPolicy": "none",
+          "type": "manual_start",
+          "params": {
+            "startLabel": "Commencer"
+          }
+        },
+        "isActive": false,
+        "title": "Le Passage Sous-Voie",
+        "targetSlot": "MO3",
+        "placeType": "physical",
+        "name": "Le Passage Sous-Voie",
+        "outro": {
+          "narrativeRole": "transition",
+          "format": "none",
+          "enabled": false,
+          "requiresMedia": false
+        },
+        "challenge": {
+          "interactionMode": "numeric_input",
+          "taskDescription": "Une contrainte physique rend ce mobile improbable.",
+          "type": "physical_task",
+          "params": {
+            "clue": {
+              "mode": "score_based",
+              "clueStrengthRules": [
+                {
+                  "strength": "weak",
+                  "max": 5,
+                  "min": 0
+                },
+                {
+                  "max": 8,
+                  "strength": "medium",
+                  "min": 6
+                },
+                {
+                  "min": 9,
+                  "strength": "strong",
+                  "max": 10
+                }
+              ],
+              "target": "motive"
+            },
+            "scoreMax": 10,
+            "scoreMin": 0
+          }
+        },
+        "id": "A6"
+      }
+    },
+    "suspects": {
+      "juliette": {
+        "attributes": [
+          "31 ans",
+          "Silk",
+          "silhouette petite",
+          "blonde"
+        ],
+        "id": "juliette",
+        "title": "Juliette",
+        "identityVisual": {
+          "mediaKey": "games/les_fugitifs/assets/suspects/juliette.png"
+        }
+      },
+      "robert": {
+        "attributes": [
+          "21 ans",
+          "Scrap",
+          "silhouette enrobé",
+          "chauve",
+          "barbe"
+        ],
+        "id": "robert",
+        "title": "Robert",
+        "identityVisual": {
+          "mediaKey": "games/les_fugitifs/assets/suspects/robert.png"
+        }
+      },
+      "pedro": {
+        "attributes": [
+          "28 ans",
+          "Le Chien",
+          "silhouette moyen",
+          "silhouette musclé",
+          "tatoué"
+        ],
+        "id": "pedro",
+        "title": "Pedro",
+        "identityVisual": {
+          "mediaKey": "games/les_fugitifs/assets/suspects/pedro.png"
+        }
+      },
+      "viktor": {
+        "attributes": [
+          "49 ans",
+          "Le Plan",
+          "silhouette grand",
+          "silhouette mince",
+          "cheveux gris en brosse"
+        ],
+        "id": "viktor",
+        "title": "Viktor",
+        "identityVisual": {
+          "mediaKey": "games/les_fugitifs/assets/suspects/viktor.png"
+        }
+      },
+      "anna": {
+        "attributes": [
+          "45 ans",
+          "La Clé",
+          "silhouette mince",
+          "cheveux long noirs et gris"
+        ],
+        "id": "anna",
+        "title": "Anna",
+        "identityVisual": {
+          "mediaKey": "games/les_fugitifs/assets/suspects/anna.png"
+        }
+      },
+      "kim": {
+        "attributes": [
+          "25 ans",
+          "Flash",
+          "silhouette sportive",
+          "cheveux au carré brune"
+        ],
+        "id": "kim",
+        "title": "Kim",
+        "identityVisual": {
+          "mediaKey": "games/les_fugitifs/assets/suspects/kim.png"
+        }
+      }
+    },
+    "clueSystem": {
+      "contentRules": {
+        "motive": {
+          "attributeWeight": 70,
+          "nameWeight": 30
+        },
+        "suspect": {
+          "attributeWeight": 70,
+          "nameWeight": 30
+        }
+      },
+      "revealRules": {
+        "strong": {
+          "trueCount": 1,
+          "optionCount": 1
+        },
+        "medium": {
+          "trueCount": 1,
+          "optionCount": 2
+        },
+        "weak": {
+          "trueCount": 1,
+          "optionCount": 3
+        }
+      }
+    }
+  },
+  "createdBy": "admin_portal",
+  "source": {
+    "scenarioUpdatedAt": "2026-04-16T00:22:14.673792",
+    "scenarioPath": "scenarios/les_fugitifs",
+    "gameUpdatedAt": "2026-04-21T18:29:46.061",
+    "lockedFromDraft": true,
+    "gamePath": "games/les_fugitifs"
+  },
+  "version": 1,
+  "validation": {
+    "isValid": true,
+    "warnings": [],
+    "errors": []
+  },
+  "status": "locked"
+}

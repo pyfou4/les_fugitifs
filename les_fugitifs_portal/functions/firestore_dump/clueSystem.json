@@ -1,0 +1,27 @@
+{
+  "id": "main",
+  "revealRules": {
+    "strong": {
+      "optionCount": 1,
+      "trueCount": 1
+    },
+    "medium": {
+      "optionCount": 2,
+      "trueCount": 1
+    },
+    "weak": {
+      "optionCount": 3,
+      "trueCount": 1
+    }
+  },
+  "contentRules": {
+    "suspect": {
+      "nameWeight": 30,
+      "attributeWeight": 70
+    },
+    "motive": {
+      "nameWeight": 30,
+      "attributeWeight": 70
+    }
+  }
+}
