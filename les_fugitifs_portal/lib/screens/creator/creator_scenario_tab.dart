@@ -7,7 +7,7 @@ import 'creator_place_editor_section.dart';
 import 'creator_places_list_section.dart';
 import 'creator_schema_banner_section.dart';
 
-class CreatorScenarioTab extends StatelessWidget {
+class CreatorScenarioTab extends StatefulWidget {
   final List<QueryDocumentSnapshot<Map<String, dynamic>>> docs;
   final Map<String, Map<String, dynamic>> docsById;
   final String? selectedId;
@@ -40,6 +40,7 @@ class CreatorScenarioTab extends StatelessWidget {
   final VoidCallback? onSave;
   final VoidCallback? onLockScenario;
   final VoidCallback onOpenPrintView;
+  final ValueChanged<Map<String, dynamic>>? onPlaceRuntimeChanged;
 
   const CreatorScenarioTab({
     super.key,
@@ -71,36 +72,57 @@ class CreatorScenarioTab extends StatelessWidget {
     required this.onSave,
     required this.onLockScenario,
     required this.onOpenPrintView,
+    this.onPlaceRuntimeChanged,
   });
+
+  @override
+  State<CreatorScenarioTab> createState() => _CreatorScenarioTabState();
+}
+
+class _CreatorScenarioTabState extends State<CreatorScenarioTab> {
+  bool _isGraphCollapsed = false;
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        CreatorSchemaBannerSection(
-          docsById: docsById,
-          selectedId: selectedId,
-          groupColorBuilder: groupColorBuilder,
-          onSelectFromMap: onSelectFromMap,
-        ),
-        CreatorLockReportBannerSection(
-          issues: lockIssues,
-          lockedScenarioId: lastLockedScenarioId,
+        _buildGraphHeader(),
+        AnimatedCrossFade(
+          firstChild: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CreatorSchemaBannerSection(
+                docsById: widget.docsById,
+                selectedId: widget.selectedId,
+                groupColorBuilder: widget.groupColorBuilder,
+                onSelectFromMap: widget.onSelectFromMap,
+              ),
+              CreatorLockReportBannerSection(
+                issues: widget.lockIssues,
+                lockedScenarioId: widget.lastLockedScenarioId,
+              ),
+            ],
+          ),
+          secondChild: const SizedBox.shrink(),
+          crossFadeState: _isGraphCollapsed
+              ? CrossFadeState.showSecond
+              : CrossFadeState.showFirst,
+          duration: const Duration(milliseconds: 220),
         ),
         Expanded(
           child: Row(
             children: [
               Expanded(
-                flex: 4,
+                flex: 3,
                 child: CreatorPlacesListSection(
-                  docs: docs,
-                  selectedId: selectedId,
-                  groupColorBuilder: groupColorBuilder,
-                  experienceTypeBuilder: experienceTypeBuilder,
-                  experienceLabelBuilder: experienceLabelBuilder,
-                  displayNameBuilder: displayNameBuilder,
-                  revealedCategoriesReader: revealedCategoriesReader,
-                  onSelectDoc: onSelectDoc,
+                  docs: widget.docs,
+                  selectedId: widget.selectedId,
+                  groupColorBuilder: widget.groupColorBuilder,
+                  experienceTypeBuilder: widget.experienceTypeBuilder,
+                  experienceLabelBuilder: widget.experienceLabelBuilder,
+                  displayNameBuilder: widget.displayNameBuilder,
+                  revealedCategoriesReader: widget.revealedCategoriesReader,
+                  onSelectDoc: widget.onSelectDoc,
                 ),
               ),
               const VerticalDivider(
@@ -109,36 +131,65 @@ class CreatorScenarioTab extends StatelessWidget {
                 color: Color(0xFF1B2A42),
               ),
               Expanded(
-                flex: 5,
+                flex: 6,
                 child: CreatorPlaceEditorSection(
-                  selectedId: selectedId,
-                  selectedData: selectedData,
-                  nameCtrl: nameCtrl,
-                  synopsisCtrl: synopsisCtrl,
-                  mediaNotesCtrl: mediaNotesCtrl,
-                  keywordCtrl: keywordCtrl,
-                  keywords: keywords,
-                  gameRulesCtrl: gameRulesCtrl,
-                  briefingCtrl: briefingCtrl,
-                  isSaving: isSaving,
-                  isLocking: isLocking,
-                  groupColorBuilder: groupColorBuilder,
-                  experienceTypeBuilder: experienceTypeBuilder,
-                  experienceLabelBuilder: experienceLabelBuilder,
-                  displayNameBuilder: displayNameBuilder,
-                  revealedCategoriesReader: revealedCategoriesReader,
-                  revealedSummaryBuilder: revealedSummaryBuilder,
-                  onAddKeyword: onAddKeyword,
-                  onRemoveKeyword: onRemoveKeyword,
-                  onSave: onSave,
-                  onLockScenario: onLockScenario,
-                  onOpenPrintView: onOpenPrintView,
+                  selectedId: widget.selectedId,
+                  selectedData: widget.selectedData,
+                  nameCtrl: widget.nameCtrl,
+                  synopsisCtrl: widget.synopsisCtrl,
+                  mediaNotesCtrl: widget.mediaNotesCtrl,
+                  keywordCtrl: widget.keywordCtrl,
+                  keywords: widget.keywords,
+                  gameRulesCtrl: widget.gameRulesCtrl,
+                  briefingCtrl: widget.briefingCtrl,
+                  isSaving: widget.isSaving,
+                  isLocking: widget.isLocking,
+                  groupColorBuilder: widget.groupColorBuilder,
+                  experienceTypeBuilder: widget.experienceTypeBuilder,
+                  experienceLabelBuilder: widget.experienceLabelBuilder,
+                  displayNameBuilder: widget.displayNameBuilder,
+                  revealedCategoriesReader: widget.revealedCategoriesReader,
+                  revealedSummaryBuilder: widget.revealedSummaryBuilder,
+                  onAddKeyword: widget.onAddKeyword,
+                  onRemoveKeyword: widget.onRemoveKeyword,
+                  onSave: widget.onSave,
+                  onLockScenario: widget.onLockScenario,
+                  onOpenPrintView: widget.onOpenPrintView,
+                  onPlaceRuntimeChanged: widget.onPlaceRuntimeChanged,
                 ),
               ),
             ],
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildGraphHeader() {
+    return Container(
+      width: double.infinity,
+      color: const Color(0xFF091425),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: TextButton.icon(
+          onPressed: () {
+            setState(() {
+              _isGraphCollapsed = !_isGraphCollapsed;
+            });
+          },
+          icon: Icon(
+            _isGraphCollapsed ? Icons.expand_more : Icons.expand_less,
+            size: 18,
+          ),
+          label: Text(
+            _isGraphCollapsed ? 'Afficher le graphe' : 'Réduire le graphe',
+          ),
+          style: TextButton.styleFrom(
+            foregroundColor: const Color(0xFFAED0FF),
+          ),
+        ),
+      ),
     );
   }
 }

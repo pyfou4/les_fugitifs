@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
 
 import 'creator_big_info_chip.dart';
+import 'creator_place_media_requirements_preview_section.dart';
+import 'creator_place_sequence_editor_section.dart';
+import 'creator_place_trigger_editor_section.dart';
+import 'utils/place_media_requirements.dart';
+import 'utils/place_runtime_normalizer.dart';
 
-class CreatorPlaceEditorSection extends StatelessWidget {
+class CreatorPlaceEditorSection extends StatefulWidget {
   final String? selectedId;
   final Map<String, dynamic>? selectedData;
   final TextEditingController nameCtrl;
@@ -18,15 +23,20 @@ class CreatorPlaceEditorSection extends StatelessWidget {
   final String Function(Map<String, dynamic> data) experienceTypeBuilder;
   final String Function(String type) experienceLabelBuilder;
   final String Function(String id, Map<String, dynamic> data)
-      displayNameBuilder;
+  displayNameBuilder;
   final List<String> Function(Map<String, dynamic> data)
-      revealedCategoriesReader;
+  revealedCategoriesReader;
   final String Function(Map<String, dynamic> data) revealedSummaryBuilder;
   final VoidCallback onAddKeyword;
   final ValueChanged<String> onRemoveKeyword;
   final VoidCallback? onSave;
   final VoidCallback? onLockScenario;
   final VoidCallback onOpenPrintView;
+
+  /// Nouveau callback optionnel pour remonter le patch runtime.
+  /// Il reste optionnel pour ne rien casser tant que le parent
+  /// n'est pas encore branché.
+  final ValueChanged<Map<String, dynamic>>? onPlaceRuntimeChanged;
 
   const CreatorPlaceEditorSection({
     super.key,
@@ -52,7 +62,96 @@ class CreatorPlaceEditorSection extends StatelessWidget {
     required this.onSave,
     required this.onLockScenario,
     required this.onOpenPrintView,
+    this.onPlaceRuntimeChanged,
   });
+
+  @override
+  State<CreatorPlaceEditorSection> createState() =>
+      _CreatorPlaceEditorSectionState();
+}
+
+class _CreatorPlaceEditorSectionState extends State<CreatorPlaceEditorSection> {
+  Map<String, dynamic> _trigger = <String, dynamic>{};
+  List<Map<String, dynamic>> _sequence = <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> _mediaRequirementsPreview =
+  <Map<String, dynamic>>[];
+  String? _loadedPlaceId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRuntimeStateFromSelectedData();
+  }
+
+  @override
+  void didUpdateWidget(covariant CreatorPlaceEditorSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+
+    final selectedIdChanged = oldWidget.selectedId != widget.selectedId;
+    final selectedDataChanged = oldWidget.selectedData != widget.selectedData;
+
+    if (selectedIdChanged || selectedDataChanged) {
+      _loadRuntimeStateFromSelectedData();
+    }
+  }
+
+  void _loadRuntimeStateFromSelectedData() {
+    final selectedAvailable =
+        widget.selectedId != null && widget.selectedData != null;
+
+    if (!selectedAvailable) {
+      setState(() {
+        _loadedPlaceId = null;
+        _trigger = <String, dynamic>{};
+        _sequence = <Map<String, dynamic>>[];
+        _mediaRequirementsPreview = <Map<String, dynamic>>[];
+      });
+      return;
+    }
+
+    final runtimeFields =
+    normalizePlaceRuntimeFields(widget.selectedData ?? <String, dynamic>{});
+    final nextTrigger =
+    Map<String, dynamic>.from(runtimeFields['trigger'] as Map);
+    final nextSequence =
+    List<Map<String, dynamic>>.from(runtimeFields['sequence'] as List);
+
+    setState(() {
+      _loadedPlaceId = widget.selectedId;
+      _trigger = nextTrigger;
+      _sequence = nextSequence;
+      _mediaRequirementsPreview =
+          computeMediaRequirementsFromSequence(nextSequence);
+    });
+
+    _notifyRuntimePatch();
+  }
+
+  void _updateTrigger(Map<String, dynamic> newTrigger) {
+    setState(() {
+      _trigger = Map<String, dynamic>.from(newTrigger);
+    });
+    _notifyRuntimePatch();
+  }
+
+  void _updateSequence(List<Map<String, dynamic>> newSequence) {
+    final safeSequence = List<Map<String, dynamic>>.from(newSequence);
+
+    setState(() {
+      _sequence = safeSequence;
+      _mediaRequirementsPreview =
+          computeMediaRequirementsFromSequence(safeSequence);
+    });
+
+    _notifyRuntimePatch();
+  }
+
+  void _notifyRuntimePatch() {
+    widget.onPlaceRuntimeChanged?.call({
+      'trigger': _trigger,
+      'sequence': _sequence,
+    });
+  }
 
   InputDecoration _fieldDecoration({
     required String label,
@@ -86,18 +185,26 @@ class CreatorPlaceEditorSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final selectedAvailable = selectedId != null && selectedData != null;
-    final type =
-        selectedAvailable ? experienceTypeBuilder(selectedData!) : 'media';
+    final selectedAvailable =
+        widget.selectedId != null && widget.selectedData != null;
+
+    final type = selectedAvailable
+        ? widget.experienceTypeBuilder(widget.selectedData!)
+        : 'media';
+
     final color = selectedAvailable
-        ? groupColorBuilder(selectedId!)
+        ? widget.groupColorBuilder(widget.selectedId!)
         : const Color(0xFFD65A00);
+
     final revealed = selectedAvailable
-        ? revealedCategoriesReader(selectedData!)
+        ? widget.revealedCategoriesReader(widget.selectedData!)
         : const <String>[];
+
     final displayTitle = selectedAvailable
-        ? displayNameBuilder(selectedId!, selectedData!)
+        ? widget.displayNameBuilder(widget.selectedId!, widget.selectedData!)
         : 'Aucun lieu sélectionné';
+
+    final selected = widget.selectedData ?? <String, dynamic>{};
 
     return Container(
       color: const Color(0xFF091425),
@@ -135,7 +242,7 @@ class CreatorPlaceEditorSection extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   TextField(
-                    controller: gameRulesCtrl,
+                    controller: widget.gameRulesCtrl,
                     maxLines: 4,
                     minLines: 3,
                     style: const TextStyle(
@@ -151,7 +258,7 @@ class CreatorPlaceEditorSection extends StatelessWidget {
                   ),
                   const SizedBox(height: 12),
                   TextField(
-                    controller: briefingCtrl,
+                    controller: widget.briefingCtrl,
                     maxLines: 4,
                     minLines: 3,
                     style: const TextStyle(
@@ -198,12 +305,12 @@ class CreatorPlaceEditorSection extends StatelessWidget {
                 runSpacing: 6,
                 children: [
                   CreatorBigInfoChip(
-                    label: experienceLabelBuilder(type),
+                    label: widget.experienceLabelBuilder(type),
                     color: color,
                   ),
                   if (revealed.isNotEmpty)
                     ...revealed.map(
-                      (info) => CreatorBigInfoChip(
+                          (info) => CreatorBigInfoChip(
                         label: info,
                         color: const Color(0xFFFFB24A),
                       ),
@@ -217,7 +324,7 @@ class CreatorPlaceEditorSection extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Infos révélées : ${revealedSummaryBuilder(selectedData!)}',
+                'Infos révélées : ${widget.revealedSummaryBuilder(widget.selectedData!)}',
                 style: const TextStyle(
                   fontSize: 14,
                   height: 1.2,
@@ -225,6 +332,24 @@ class CreatorPlaceEditorSection extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
+
+              /// NOUVEAU BLOC : déclenchement
+              CreatorPlaceTriggerEditorSection(
+                trigger: _trigger,
+                onChanged: _updateTrigger,
+              ),
+
+              /// NOUVEAU BLOC : séquence
+              CreatorPlaceSequenceEditorSection(
+                sequence: _sequence,
+                onChanged: _updateSequence,
+              ),
+
+              /// NOUVEAU BLOC : preview média
+              CreatorPlaceMediaRequirementsPreviewSection(
+                items: _mediaRequirementsPreview,
+              ),
+
               const SizedBox(height: 10),
               Container(
                 width: double.infinity,
@@ -259,7 +384,7 @@ class CreatorPlaceEditorSection extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               TextField(
-                controller: nameCtrl,
+                controller: widget.nameCtrl,
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 16,
@@ -271,7 +396,7 @@ class CreatorPlaceEditorSection extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               TextField(
-                controller: synopsisCtrl,
+                controller: widget.synopsisCtrl,
                 maxLines: 5,
                 minLines: 4,
                 style: const TextStyle(
@@ -287,7 +412,7 @@ class CreatorPlaceEditorSection extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               TextField(
-                controller: mediaNotesCtrl,
+                controller: widget.mediaNotesCtrl,
                 maxLines: 5,
                 minLines: 4,
                 style: const TextStyle(
@@ -324,9 +449,9 @@ class CreatorPlaceEditorSection extends StatelessWidget {
                 spacing: 6,
                 runSpacing: 6,
                 children: [
-                  if (keywords.isNotEmpty)
-                    ...keywords.map(
-                      (keyword) => Container(
+                  if (widget.keywords.isNotEmpty)
+                    ...widget.keywords.map(
+                          (keyword) => Container(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 8,
                           vertical: 6,
@@ -349,7 +474,7 @@ class CreatorPlaceEditorSection extends StatelessWidget {
                             ),
                             const SizedBox(width: 5),
                             InkWell(
-                              onTap: () => onRemoveKeyword(keyword),
+                              onTap: () => widget.onRemoveKeyword(keyword),
                               child: const Icon(
                                 Icons.close,
                                 size: 13,
@@ -387,8 +512,8 @@ class CreatorPlaceEditorSection extends StatelessWidget {
                 children: [
                   Expanded(
                     child: TextField(
-                      controller: keywordCtrl,
-                      onSubmitted: (_) => onAddKeyword(),
+                      controller: widget.keywordCtrl,
+                      onSubmitted: (_) => widget.onAddKeyword(),
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 14,
@@ -401,7 +526,7 @@ class CreatorPlaceEditorSection extends StatelessWidget {
                   ),
                   const SizedBox(width: 8),
                   FilledButton.icon(
-                    onPressed: onAddKeyword,
+                    onPressed: widget.onAddKeyword,
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFF294C74),
                       foregroundColor: Colors.white,
@@ -430,7 +555,7 @@ class CreatorPlaceEditorSection extends StatelessWidget {
                 runSpacing: 8,
                 children: [
                   FilledButton.icon(
-                    onPressed: onSave,
+                    onPressed: widget.onSave,
                     style: FilledButton.styleFrom(
                       backgroundColor: const Color(0xFFD65A00),
                       foregroundColor: Colors.white,
@@ -442,18 +567,20 @@ class CreatorPlaceEditorSection extends StatelessWidget {
                         borderRadius: BorderRadius.circular(14),
                       ),
                     ),
-                    icon: isSaving
+                    icon: widget.isSaving
                         ? const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
-                            ),
-                          )
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    )
                         : const Icon(Icons.save_outlined, size: 16),
                     label: Text(
-                      isSaving ? 'Enregistrement...' : 'Sauvegarder',
+                      widget.isSaving
+                          ? 'Enregistrement...'
+                          : 'Sauvegarder',
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
@@ -461,7 +588,7 @@ class CreatorPlaceEditorSection extends StatelessWidget {
                     ),
                   ),
                   OutlinedButton.icon(
-                    onPressed: onLockScenario,
+                    onPressed: widget.onLockScenario,
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFFFFD7B8),
                       side: const BorderSide(color: Color(0xFF4A2B1D)),
@@ -473,18 +600,20 @@ class CreatorPlaceEditorSection extends StatelessWidget {
                         borderRadius: BorderRadius.circular(14),
                       ),
                     ),
-                    icon: isLocking
+                    icon: widget.isLocking
                         ? const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Color(0xFFFFD7B8),
-                            ),
-                          )
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Color(0xFFFFD7B8),
+                      ),
+                    )
                         : const Icon(Icons.lock_outline, size: 16),
                     label: Text(
-                      isLocking ? 'Verrouillage...' : 'Lock scénario',
+                      widget.isLocking
+                          ? 'Verrouillage...'
+                          : 'Lock scénario',
                       style: const TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
@@ -492,7 +621,7 @@ class CreatorPlaceEditorSection extends StatelessWidget {
                     ),
                   ),
                   OutlinedButton.icon(
-                    onPressed: onOpenPrintView,
+                    onPressed: widget.onOpenPrintView,
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFFAED0FF),
                       side: const BorderSide(color: Color(0xFF294C74)),

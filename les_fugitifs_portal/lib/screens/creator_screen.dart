@@ -92,6 +92,8 @@ class _CreatorScreenState extends State<CreatorScreen>
 
   String? _selectedId;
   Map<String, dynamic>? _selectedData;
+  Map<String, dynamic>? _pendingPlaceRuntimePatch;
+  String? _pendingPlaceRuntimeForPlaceId;
   final TextEditingController _gameRulesCtrl = TextEditingController();
   final TextEditingController _briefingCtrl = TextEditingController();
   final TextEditingController _nameCtrl = TextEditingController();
@@ -290,6 +292,8 @@ class _CreatorScreenState extends State<CreatorScreen>
     setState(() {
       _selectedId = doc.id;
       _selectedData = data;
+      _pendingPlaceRuntimePatch = null;
+      _pendingPlaceRuntimeForPlaceId = null;
       _nameCtrl.text = (data['title'] ?? data['name'] ?? '').toString().trim();
       _synopsisCtrl.text =
           (data['storySynopsis'] ?? data['synopsis'] ?? '').toString().trim();
@@ -308,6 +312,8 @@ class _CreatorScreenState extends State<CreatorScreen>
     setState(() {
       _selectedId = id;
       _selectedData = data;
+      _pendingPlaceRuntimePatch = null;
+      _pendingPlaceRuntimeForPlaceId = null;
       _nameCtrl.text = (data['title'] ?? data['name'] ?? '').toString().trim();
       _synopsisCtrl.text =
           (data['storySynopsis'] ?? data['synopsis'] ?? '').toString().trim();
@@ -541,6 +547,19 @@ class _CreatorScreenState extends State<CreatorScreen>
     });
   }
 
+  void _updatePendingPlaceRuntimePatch(Map<String, dynamic> patch) {
+    if (_selectedId == null) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+
+      setState(() {
+        _pendingPlaceRuntimeForPlaceId = _selectedId;
+        _pendingPlaceRuntimePatch = Map<String, dynamic>.from(patch);
+      });
+    });
+  }
+
   Future<void> _save() async {
     if (_isScenarioLocked) {
       _showLockedSnackBar();
@@ -554,7 +573,7 @@ class _CreatorScreenState extends State<CreatorScreen>
     });
 
     try {
-      await _placesRef.doc(_selectedId).update({
+      final placePayload = <String, dynamic>{
         'title': _nameCtrl.text.trim(),
         'name': _nameCtrl.text.trim(),
         'storySynopsis': _synopsisCtrl.text.trim(),
@@ -562,7 +581,14 @@ class _CreatorScreenState extends State<CreatorScreen>
         'mediaNotes': _mediaNotesCtrl.text.trim(),
         'mediaDescription': _mediaNotesCtrl.text.trim(),
         'keywords': _keywords,
-      });
+      };
+
+      if (_pendingPlaceRuntimeForPlaceId == _selectedId &&
+          _pendingPlaceRuntimePatch != null) {
+        placePayload.addAll(_pendingPlaceRuntimePatch!);
+      }
+
+      await _placesRef.doc(_selectedId).update(placePayload);
 
       await _gameRef.set({
         'gameRules': _gameRulesCtrl.text.trim(),
@@ -587,8 +613,13 @@ class _CreatorScreenState extends State<CreatorScreen>
             'mediaNotes': _mediaNotesCtrl.text.trim(),
             'mediaDescription': _mediaNotesCtrl.text.trim(),
             'keywords': _keywords,
+            if (_pendingPlaceRuntimeForPlaceId == _selectedId &&
+                _pendingPlaceRuntimePatch != null)
+              ..._pendingPlaceRuntimePatch!,
           };
         }
+        _pendingPlaceRuntimePatch = null;
+        _pendingPlaceRuntimeForPlaceId = null;
       });
     } catch (e) {
       if (!mounted) return;
@@ -1351,6 +1382,7 @@ class _CreatorScreenState extends State<CreatorScreen>
                       onSave: (_isSaving || isScenarioLocked) ? null : () => _save(),
                       onLockScenario: (!isAdmin || _isLocking || isScenarioLocked) ? null : () => _lockScenario(),
                       onOpenPrintView: _openPrintView,
+                      onPlaceRuntimeChanged: _updatePendingPlaceRuntimePatch,
                     ),
                   ),
                   _buildSitesTab(docs),
