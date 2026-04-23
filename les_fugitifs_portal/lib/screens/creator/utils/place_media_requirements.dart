@@ -238,3 +238,15 @@ String _capitalize(String value) {
   if (value.isEmpty) return value;
   return value[0].toUpperCase() + value.substring(1);
 }
+
+// PHYSICAL MEDIA REQUIREMENT
+
+if (stepType == 'physical') {
+  return [
+    {
+      'usageType': 'instruction_visual',
+      'requiredFormat': 'image',
+      'label': 'Schéma de l’épreuve',
+    }
+  ];
+}

@@ -24,8 +24,14 @@ class CreatorPlaceSequenceStepCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final stepType = (step['type'] ?? 'popup').toString();
-    final title = (step['title'] ?? '').toString();
+    final rawStepType = (step['type'] ?? 'popup').toString();
+    final stepType = rawStepType.trim().toLowerCase();
+    final rawTitle = (step['title'] ?? '').toString();
+    final isPhysicalStep = _isPhysicalStepType(rawStepType);
+    final title = isPhysicalStep &&
+            (rawTitle.trim().isEmpty || rawTitle.trim() == 'Nouveau popup')
+        ? 'Nouvelle épreuve physique'
+        : rawTitle;
     final description = (step['description'] ?? '').toString();
     final stepId = (step['id'] ?? '').toString();
 
@@ -50,6 +56,225 @@ class CreatorPlaceSequenceStepCard extends StatelessWidget {
     final confirmLabel = (params['confirmLabel'] ?? "D'accord").toString();
     final callerLabel = (params['callerLabel'] ?? '').toString();
     final displayMode = (params['displayMode'] ?? 'standard').toString();
+    final observationQuestion = (params['question'] ?? '').toString();
+    final observationAnswerType = (params['answerType'] ?? 'text').toString();
+    final rawExpectedAnswer = params['expectedAnswer'];
+    final expectedAnswer = rawExpectedAnswer is Map
+        ? Map<String, dynamic>.from(rawExpectedAnswer as Map)
+        : <String, dynamic>{};
+    final observationExpectedValue = expectedAnswer['value'];
+
+    final physicalInstruction = (params['instruction'] ?? '').toString();
+    final physicalEquipment = (params['equipment'] ?? '').toString();
+    final physicalValidationMode =
+        (params['validationMode'] ?? 'success').toString();
+    final physicalSuccessCondition =
+        (params['successCondition'] ?? '').toString();
+    final physicalFailureText = (params['failureText'] ?? '').toString();
+    final physicalTargetRepetitions =
+        _readInt(params['targetRepetitions'], fallback: 1);
+    final physicalTimeLimitSeconds =
+        _readInt(params['timeLimitSeconds'], fallback: 60);
+    final physicalTargetScore = _readInt(params['targetScore'], fallback: 1);
+    final physicalMaxScore = _readInt(params['maxScore'], fallback: 10);
+    final physicalTargetTimeSeconds =
+        _readInt(params['targetTimeSeconds'], fallback: 60);
+    final rawPhysicalBenchmark = params['performanceBenchmark'];
+    final physicalBenchmark = rawPhysicalBenchmark is Map
+        ? Map<String, dynamic>.from(rawPhysicalBenchmark as Map)
+        : <String, dynamic>{};
+    final physicalStrongMin = _readInt(
+      physicalBenchmark['strongMin'] ?? params['strongMin'],
+      fallback: 10,
+    );
+    final physicalMediumMin = _readInt(
+      physicalBenchmark['mediumMin'] ?? params['mediumMin'],
+      fallback: 7,
+    );
+    final physicalMediumMax = _readInt(
+      physicalBenchmark['mediumMax'] ?? params['mediumMax'],
+      fallback: 9,
+    );
+    final physicalWeakMax = _readInt(
+      physicalBenchmark['weakMax'] ?? params['weakMax'],
+      fallback: 6,
+    );
+
+    Map<String, dynamic> buildPhysicalParams({
+      String? instruction,
+      String? equipment,
+      String? validationMode,
+      String? successCondition,
+      String? failureText,
+      int? targetRepetitions,
+      int? timeLimitSeconds,
+      int? targetScore,
+      int? maxScore,
+      int? targetTimeSeconds,
+      int? strongMin,
+      int? mediumMin,
+      int? mediumMax,
+      int? weakMax,
+    }) {
+      final nextStrongMin = strongMin ?? physicalStrongMin;
+      final nextMediumMin = mediumMin ?? physicalMediumMin;
+      final nextMediumMax = mediumMax ?? physicalMediumMax;
+      final nextWeakMax = weakMax ?? physicalWeakMax;
+
+      return <String, dynamic>{
+        'instruction': instruction ?? physicalInstruction,
+        'equipment': equipment ?? physicalEquipment,
+        'validationMode': validationMode ?? physicalValidationMode,
+        'successCondition': successCondition ?? physicalSuccessCondition,
+        'failureText': failureText ?? physicalFailureText,
+        'targetRepetitions': targetRepetitions ?? physicalTargetRepetitions,
+        'timeLimitSeconds': timeLimitSeconds ?? physicalTimeLimitSeconds,
+        'targetScore': targetScore ?? physicalTargetScore,
+        'maxScore': maxScore ?? physicalMaxScore,
+        'targetTimeSeconds': targetTimeSeconds ?? physicalTargetTimeSeconds,
+        'performanceBenchmark': <String, dynamic>{
+          'strongMin': nextStrongMin,
+          'mediumMin': nextMediumMin,
+          'mediumMax': nextMediumMax,
+          'weakMax': nextWeakMax,
+        },
+      };
+    }
+
+    Widget buildPhysicalBenchmarkSection(String keyPrefix) {
+      TextFormField benchmarkField({
+        required String keySuffix,
+        required String label,
+        required int value,
+        required ValueChanged<int> onChangedValue,
+      }) {
+        return TextFormField(
+          key: ValueKey('${keyPrefix}_${keySuffix}_${stepId}_$stepType'),
+          initialValue: value.toString(),
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(
+            labelText: label,
+            border: const OutlineInputBorder(),
+          ),
+          onChanged: (rawValue) {
+            onChangedValue(_readInt(rawValue, fallback: value));
+          },
+        );
+      }
+
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const SizedBox(height: 16),
+          const Divider(height: 1),
+          const SizedBox(height: 14),
+          const Text(
+            'Benchmark de performance',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFFFFD400),
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Renseigne les fourchettes qui transformeront le résultat de l’épreuve en indice faible, moyen ou fort.',
+            style: TextStyle(
+              fontSize: 12,
+              color: Color(0xFFB8C1D1),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: benchmarkField(
+                  keySuffix: 'strong_min',
+                  label: 'Indice fort dès',
+                  value: physicalStrongMin,
+                  onChangedValue: (value) {
+                    onChanged(_copyWith(
+                      step,
+                      title: title,
+                      description: description,
+                      params: buildPhysicalParams(strongMin: value),
+                      runtime: runtime,
+                      mediaUsages: mediaUsages,
+                    ));
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: benchmarkField(
+                  keySuffix: 'weak_max',
+                  label: 'Indice faible jusqu’à',
+                  value: physicalWeakMax,
+                  onChangedValue: (value) {
+                    onChanged(_copyWith(
+                      step,
+                      title: title,
+                      description: description,
+                      params: buildPhysicalParams(weakMax: value),
+                      runtime: runtime,
+                      mediaUsages: mediaUsages,
+                    ));
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: benchmarkField(
+                  keySuffix: 'medium_min',
+                  label: 'Indice moyen de',
+                  value: physicalMediumMin,
+                  onChangedValue: (value) {
+                    onChanged(_copyWith(
+                      step,
+                      title: title,
+                      description: description,
+                      params: buildPhysicalParams(mediumMin: value),
+                      runtime: runtime,
+                      mediaUsages: mediaUsages,
+                    ));
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: benchmarkField(
+                  keySuffix: 'medium_max',
+                  label: 'Indice moyen jusqu’à',
+                  value: physicalMediumMax,
+                  onChangedValue: (value) {
+                    onChanged(_copyWith(
+                      step,
+                      title: title,
+                      description: description,
+                      params: buildPhysicalParams(mediumMax: value),
+                      runtime: runtime,
+                      mediaUsages: mediaUsages,
+                    ));
+                  },
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Exemple : faible ≤ 6, moyen 7–9, fort ≥ 10.',
+            style: TextStyle(
+              fontSize: 12,
+              color: Color(0xFFFFD7A8),
+            ),
+          ),
+        ],
+      );
+    }
 
     final startMode = (runtime['startMode'] ?? 'after_previous').toString();
     final referenceStepId = runtime['referenceStepId']?.toString();
@@ -178,6 +403,322 @@ class CreatorPlaceSequenceStepCard extends StatelessWidget {
                 ));
               },
             ),
+            if (isPhysicalStep) ...[
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF111A2B),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFFFF8A3D)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Épreuve physique',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Décris l’action réelle à faire, le matériel nécessaire et la manière de valider la réussite.',
+                      style: TextStyle(fontSize: 12, color: Color(0xFFB8C1D1)),
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      key: ValueKey('physical_instruction_${stepId}_$stepType'),
+                      initialValue: physicalInstruction,
+                      minLines: 2,
+                      maxLines: 4,
+                      decoration: const InputDecoration(
+                        labelText: 'Consigne physique',
+                        border: OutlineInputBorder(),
+                        alignLabelWithHint: true,
+                      ),
+                      onChanged: (value) {
+                        onChanged(_copyWith(
+                          step,
+                          title: title,
+                          description: description,
+                          params: buildPhysicalParams(instruction: value),
+                          runtime: runtime,
+                          mediaUsages: mediaUsages,
+                        ));
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    TextFormField(
+                      key: ValueKey('physical_equipment_${stepId}_$stepType'),
+                      initialValue: physicalEquipment,
+                      minLines: 1,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                        labelText: 'Matériel nécessaire',
+                        border: OutlineInputBorder(),
+                        alignLabelWithHint: true,
+                      ),
+                      onChanged: (value) {
+                        onChanged(_copyWith(
+                          step,
+                          title: title,
+                          description: description,
+                          params: buildPhysicalParams(equipment: value),
+                          runtime: runtime,
+                          mediaUsages: mediaUsages,
+                        ));
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: const <String>[
+                        'success',
+                        'repetition',
+                        'score',
+                        'time',
+                      ].contains(physicalValidationMode)
+                          ? physicalValidationMode
+                          : 'success',
+                      decoration: const InputDecoration(
+                        labelText: 'Mode de validation',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(
+                          value: 'success',
+                          child: Text('Réussite / échec'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'repetition',
+                          child: Text('Répétitions dans un temps donné'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'score',
+                          child: Text('Score à atteindre'),
+                        ),
+                        DropdownMenuItem(
+                          value: 'time',
+                          child: Text('Temps à battre'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        onChanged(_copyWith(
+                          step,
+                          title: title,
+                          description: description,
+                          params: buildPhysicalParams(
+                            validationMode: value ?? 'success',
+                          ),
+                          runtime: runtime,
+                          mediaUsages: mediaUsages,
+                        ));
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    if (physicalValidationMode == 'success') ...[
+                      TextFormField(
+                        key: ValueKey(
+                          'physical_success_condition_${stepId}_$stepType',
+                        ),
+                        initialValue: physicalSuccessCondition,
+                        minLines: 2,
+                        maxLines: 3,
+                        decoration: const InputDecoration(
+                          labelText: 'Condition de réussite',
+                          border: OutlineInputBorder(),
+                          alignLabelWithHint: true,
+                        ),
+                        onChanged: (value) {
+                          onChanged(_copyWith(
+                            step,
+                            title: title,
+                            description: description,
+                            params: buildPhysicalParams(successCondition: value),
+                            runtime: runtime,
+                            mediaUsages: mediaUsages,
+                          ));
+                        },
+                      ),
+                      const SizedBox(height: 12),
+                      TextFormField(
+                        key: ValueKey(
+                          'physical_failure_text_${stepId}_$stepType',
+                        ),
+                        initialValue: physicalFailureText,
+                        minLines: 2,
+                        maxLines: 3,
+                        decoration: const InputDecoration(
+                          labelText: 'Texte d’échec ou de relance (optionnel)',
+                          border: OutlineInputBorder(),
+                          alignLabelWithHint: true,
+                        ),
+                        onChanged: (value) {
+                          onChanged(_copyWith(
+                            step,
+                            title: title,
+                            description: description,
+                            params: buildPhysicalParams(failureText: value),
+                            runtime: runtime,
+                            mediaUsages: mediaUsages,
+                          ));
+                        },
+                      ),
+                    ] else if (physicalValidationMode == 'repetition') ...[
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              key: ValueKey(
+                                'physical_target_repetitions_${stepId}_$stepType',
+                              ),
+                              initialValue: physicalTargetRepetitions.toString(),
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                labelText: 'Nombre de réussites attendues',
+                                border: OutlineInputBorder(),
+                              ),
+                              onChanged: (value) {
+                                onChanged(_copyWith(
+                                  step,
+                                  title: title,
+                                  description: description,
+                                  params: buildPhysicalParams(
+                                    targetRepetitions:
+                                        _readInt(value, fallback: 1),
+                                  ),
+                                  runtime: runtime,
+                                  mediaUsages: mediaUsages,
+                                ));
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextFormField(
+                              key: ValueKey(
+                                'physical_time_limit_${stepId}_$stepType',
+                              ),
+                              initialValue: physicalTimeLimitSeconds.toString(),
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                labelText: 'Temps imparti (secondes)',
+                                border: OutlineInputBorder(),
+                              ),
+                              onChanged: (value) {
+                                onChanged(_copyWith(
+                                  step,
+                                  title: title,
+                                  description: description,
+                                  params: buildPhysicalParams(
+                                    timeLimitSeconds:
+                                        _readInt(value, fallback: 60),
+                                  ),
+                                  runtime: runtime,
+                                  mediaUsages: mediaUsages,
+                                ));
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ] else if (physicalValidationMode == 'score') ...[
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextFormField(
+                              key: ValueKey(
+                                'physical_target_score_${stepId}_$stepType',
+                              ),
+                              initialValue: physicalTargetScore.toString(),
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                labelText: 'Score cible',
+                                border: OutlineInputBorder(),
+                              ),
+                              onChanged: (value) {
+                                onChanged(_copyWith(
+                                  step,
+                                  title: title,
+                                  description: description,
+                                  params: buildPhysicalParams(
+                                    targetScore: _readInt(value, fallback: 1),
+                                  ),
+                                  runtime: runtime,
+                                  mediaUsages: mediaUsages,
+                                ));
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextFormField(
+                              key: ValueKey(
+                                'physical_max_score_${stepId}_$stepType',
+                              ),
+                              initialValue: physicalMaxScore.toString(),
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(
+                                labelText: 'Score maximum possible',
+                                border: OutlineInputBorder(),
+                              ),
+                              onChanged: (value) {
+                                onChanged(_copyWith(
+                                  step,
+                                  title: title,
+                                  description: description,
+                                  params: buildPhysicalParams(
+                                    maxScore: _readInt(value, fallback: 10),
+                                  ),
+                                  runtime: runtime,
+                                  mediaUsages: mediaUsages,
+                                ));
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ] else if (physicalValidationMode == 'time') ...[
+                      TextFormField(
+                        key: ValueKey(
+                          'physical_target_time_${stepId}_$stepType',
+                        ),
+                        initialValue: physicalTargetTimeSeconds.toString(),
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Temps cible à battre (secondes)',
+                          border: OutlineInputBorder(),
+                        ),
+                        onChanged: (value) {
+                          onChanged(_copyWith(
+                            step,
+                            title: title,
+                            description: description,
+                            params: buildPhysicalParams(
+                              targetTimeSeconds: _readInt(value, fallback: 60),
+                            ),
+                            runtime: runtime,
+                            mediaUsages: mediaUsages,
+                          ));
+                        },
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    Text(
+                      _physicalModeHelpText(physicalValidationMode),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFFB8C1D1),
+                      ),
+                    ),
+                    buildPhysicalBenchmarkSection('physical_main_benchmark'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
             const SizedBox(height: 12),
             if (stepType == 'image') ...[
               DropdownButtonFormField<String>(
@@ -391,6 +932,282 @@ class CreatorPlaceSequenceStepCard extends StatelessWidget {
               ),
               children: [
                 const SizedBox(height: 8),
+                if (isPhysicalStep) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF111A2B),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: const Color(0xFFFFD400),
+                        width: 1.4,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Épreuve physique',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFFFFD400),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Bloc physique visible dans le panneau Comportement : consigne, matériel et validation.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFFB8C1D1),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+                        TextFormField(
+                          key: ValueKey('physical_visible_instruction_${stepId}_$stepType'),
+                          initialValue: physicalInstruction,
+                          minLines: 2,
+                          maxLines: 4,
+                          decoration: const InputDecoration(
+                            labelText: 'Consigne physique',
+                            border: OutlineInputBorder(),
+                            alignLabelWithHint: true,
+                          ),
+                          onChanged: (value) {
+                            onChanged(_copyWith(
+                              step,
+                              title: title,
+                              description: description,
+                              params: buildPhysicalParams(instruction: value),
+                              runtime: runtime,
+                              mediaUsages: mediaUsages,
+                            ));
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          key: ValueKey('physical_visible_equipment_${stepId}_$stepType'),
+                          initialValue: physicalEquipment,
+                          minLines: 1,
+                          maxLines: 3,
+                          decoration: const InputDecoration(
+                            labelText: 'Matériel nécessaire',
+                            border: OutlineInputBorder(),
+                            alignLabelWithHint: true,
+                          ),
+                          onChanged: (value) {
+                            onChanged(_copyWith(
+                              step,
+                              title: title,
+                              description: description,
+                              params: buildPhysicalParams(equipment: value),
+                              runtime: runtime,
+                              mediaUsages: mediaUsages,
+                            ));
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          value: const <String>[
+                            'success',
+                            'repetition',
+                            'score',
+                            'time',
+                          ].contains(physicalValidationMode)
+                              ? physicalValidationMode
+                              : 'success',
+                          decoration: const InputDecoration(
+                            labelText: 'Mode de validation',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: const [
+                            DropdownMenuItem(
+                              value: 'success',
+                              child: Text('Réussite / échec'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'repetition',
+                              child: Text('Répétitions dans un temps donné'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'score',
+                              child: Text('Score atteint'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'time',
+                              child: Text('Temps réalisé'),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            onChanged(_copyWith(
+                              step,
+                              title: title,
+                              description: description,
+                              params: buildPhysicalParams(
+                                validationMode: value ?? 'success',
+                              ),
+                              runtime: runtime,
+                              mediaUsages: mediaUsages,
+                            ));
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        if (physicalValidationMode == 'success') ...[
+                          TextFormField(
+                            key: ValueKey('physical_visible_success_${stepId}_$stepType'),
+                            initialValue: physicalSuccessCondition,
+                            minLines: 2,
+                            maxLines: 4,
+                            decoration: const InputDecoration(
+                              labelText: 'Condition de réussite',
+                              border: OutlineInputBorder(),
+                              alignLabelWithHint: true,
+                            ),
+                            onChanged: (value) {
+                              onChanged(_copyWith(
+                                step,
+                                title: title,
+                                description: description,
+                                params: buildPhysicalParams(successCondition: value),
+                                runtime: runtime,
+                                mediaUsages: mediaUsages,
+                              ));
+                            },
+                          ),
+                        ] else if (physicalValidationMode == 'repetition') ...[
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  key: ValueKey('physical_visible_repetitions_${stepId}_$stepType'),
+                                  initialValue: physicalTargetRepetitions.toString(),
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Réussites attendues',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  onChanged: (value) {
+                                    onChanged(_copyWith(
+                                      step,
+                                      title: title,
+                                      description: description,
+                                      params: buildPhysicalParams(
+                                        targetRepetitions: _readInt(value, fallback: 1),
+                                      ),
+                                      runtime: runtime,
+                                      mediaUsages: mediaUsages,
+                                    ));
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: TextFormField(
+                                  key: ValueKey('physical_visible_time_limit_${stepId}_$stepType'),
+                                  initialValue: physicalTimeLimitSeconds.toString(),
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Temps imparti (sec.)',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  onChanged: (value) {
+                                    onChanged(_copyWith(
+                                      step,
+                                      title: title,
+                                      description: description,
+                                      params: buildPhysicalParams(
+                                        timeLimitSeconds: _readInt(value, fallback: 60),
+                                      ),
+                                      runtime: runtime,
+                                      mediaUsages: mediaUsages,
+                                    ));
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ] else if (physicalValidationMode == 'score') ...[
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextFormField(
+                                  key: ValueKey('physical_visible_target_score_${stepId}_$stepType'),
+                                  initialValue: physicalTargetScore.toString(),
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Score cible',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  onChanged: (value) {
+                                    onChanged(_copyWith(
+                                      step,
+                                      title: title,
+                                      description: description,
+                                      params: buildPhysicalParams(
+                                        targetScore: _readInt(value, fallback: 1),
+                                      ),
+                                      runtime: runtime,
+                                      mediaUsages: mediaUsages,
+                                    ));
+                                  },
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: TextFormField(
+                                  key: ValueKey('physical_visible_max_score_${stepId}_$stepType'),
+                                  initialValue: physicalMaxScore.toString(),
+                                  keyboardType: TextInputType.number,
+                                  decoration: const InputDecoration(
+                                    labelText: 'Score maximum',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  onChanged: (value) {
+                                    onChanged(_copyWith(
+                                      step,
+                                      title: title,
+                                      description: description,
+                                      params: buildPhysicalParams(
+                                        maxScore: _readInt(value, fallback: 10),
+                                      ),
+                                      runtime: runtime,
+                                      mediaUsages: mediaUsages,
+                                    ));
+                                  },
+                                ),
+                              ),
+                            ],
+                          ),
+                        ] else if (physicalValidationMode == 'time') ...[
+                          TextFormField(
+                            key: ValueKey('physical_visible_target_time_${stepId}_$stepType'),
+                            initialValue: physicalTargetTimeSeconds.toString(),
+                            keyboardType: TextInputType.number,
+                            decoration: const InputDecoration(
+                              labelText: 'Temps cible à battre (sec.)',
+                              border: OutlineInputBorder(),
+                            ),
+                            onChanged: (value) {
+                              onChanged(_copyWith(
+                                step,
+                                title: title,
+                                description: description,
+                                params: buildPhysicalParams(
+                                  targetTimeSeconds: _readInt(value, fallback: 60),
+                                ),
+                                runtime: runtime,
+                                mediaUsages: mediaUsages,
+                              ));
+                            },
+                          ),
+                        ],
+                        buildPhysicalBenchmarkSection('physical_behavior_benchmark'),
+                      ],
+                    ),
+                  ),
+                ],
                 DropdownButtonFormField<String>(
                   value: allowedStepStartModes().contains(startMode)
                       ? startMode
@@ -675,6 +1492,175 @@ class CreatorPlaceSequenceStepCard extends StatelessWidget {
                 },
               ),
             ],
+            if (stepType == 'observation') ...[
+              TextFormField(
+                key: ValueKey('observation_question_${stepId}'),
+                initialValue: observationQuestion,
+                minLines: 2,
+                maxLines: 4,
+                decoration: const InputDecoration(
+                  labelText: 'Consigne d’observation',
+                  border: OutlineInputBorder(),
+                  alignLabelWithHint: true,
+                ),
+                onChanged: (value) {
+                  final nextParams = <String, dynamic>{
+                    'question': value,
+                    'answerType': observationAnswerType,
+                    'expectedAnswer': <String, dynamic>{
+                      'value': observationExpectedValue,
+                    },
+                  };
+                  onChanged(_copyWith(
+                    step,
+                    title: title,
+                    description: description,
+                    params: nextParams,
+                    runtime: runtime,
+                    mediaUsages: mediaUsages,
+                  ));
+                },
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: const <String>['text', 'number', 'boolean']
+                        .contains(observationAnswerType)
+                    ? observationAnswerType
+                    : 'text',
+                decoration: const InputDecoration(
+                  labelText: 'Type de réponse attendu',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(
+                    value: 'text',
+                    child: Text('Texte'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'number',
+                    child: Text('Chiffre'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'boolean',
+                    child: Text('Oui / Non'),
+                  ),
+                ],
+                onChanged: (value) {
+                  final nextAnswerType = value ?? 'text';
+                  final dynamic nextExpectedValue;
+                  if (nextAnswerType == 'number') {
+                    nextExpectedValue = 0;
+                  } else if (nextAnswerType == 'boolean') {
+                    nextExpectedValue = false;
+                  } else {
+                    nextExpectedValue = '';
+                  }
+
+                  final nextParams = <String, dynamic>{
+                    'question': observationQuestion,
+                    'answerType': nextAnswerType,
+                    'expectedAnswer': <String, dynamic>{
+                      'value': nextExpectedValue,
+                    },
+                  };
+                  onChanged(_copyWith(
+                    step,
+                    title: title,
+                    description: description,
+                    params: nextParams,
+                    runtime: runtime,
+                    mediaUsages: mediaUsages,
+                  ));
+                },
+              ),
+              const SizedBox(height: 12),
+              if (observationAnswerType == 'boolean') ...[
+                DropdownButtonFormField<bool>(
+                  value: observationExpectedValue == true,
+                  decoration: const InputDecoration(
+                    labelText: 'Réponse attendue',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem<bool>(
+                      value: true,
+                      child: Text('Oui'),
+                    ),
+                    DropdownMenuItem<bool>(
+                      value: false,
+                      child: Text('Non'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    final nextParams = <String, dynamic>{
+                      'question': observationQuestion,
+                      'answerType': 'boolean',
+                      'expectedAnswer': <String, dynamic>{
+                        'value': value == true,
+                      },
+                    };
+                    onChanged(_copyWith(
+                      step,
+                      title: title,
+                      description: description,
+                      params: nextParams,
+                      runtime: runtime,
+                      mediaUsages: mediaUsages,
+                    ));
+                  },
+                ),
+              ] else ...[
+                TextFormField(
+                  key: ValueKey(
+                    'observation_expected_${stepId}_$observationAnswerType',
+                  ),
+                  initialValue: observationExpectedValue?.toString() ??
+                      (observationAnswerType == 'number' ? '0' : ''),
+                  keyboardType: observationAnswerType == 'number'
+                      ? TextInputType.number
+                      : TextInputType.text,
+                  decoration: InputDecoration(
+                    labelText: observationAnswerType == 'number'
+                        ? 'Réponse attendue (nombre exact)'
+                        : 'Réponse attendue',
+                    border: const OutlineInputBorder(),
+                  ),
+                  onChanged: (value) {
+                    final nextParams = <String, dynamic>{
+                      'question': observationQuestion,
+                      'answerType': observationAnswerType,
+                      'expectedAnswer': <String, dynamic>{
+                        'value': observationAnswerType == 'number'
+                            ? _readInt(value, fallback: 0)
+                            : value,
+                      },
+                    };
+                    onChanged(_copyWith(
+                      step,
+                      title: title,
+                      description: description,
+                      params: nextParams,
+                      runtime: runtime,
+                      mediaUsages: mediaUsages,
+                    ));
+                  },
+                ),
+              ],
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade300),
+                ),
+                child: const Text(
+                  'Validation V1 prévue : texte normalisé, nombre exact, ou oui/non strict.',
+                  style: TextStyle(fontSize: 12),
+                ),
+              ),
+            ],
             if (stepType == 'video' || stepType == 'audio')
               Container(
                 width: double.infinity,
@@ -837,6 +1823,28 @@ class CreatorPlaceSequenceStepCard extends StatelessWidget {
     return int.tryParse(raw?.toString() ?? '') ?? fallback;
   }
 
+  static String _physicalModeHelpText(String mode) {
+    switch (mode) {
+      case 'repetition':
+        return 'Exemple : réussir 5 lancers dans une poubelle en 60 secondes.';
+      case 'score':
+        return 'Exemple : obtenir au moins 8 points sur 10 pendant l’épreuve.';
+      case 'time':
+        return 'Exemple : parcourir une distance ou accomplir une action en moins de 45 secondes.';
+      case 'success':
+      default:
+        return 'Exemple : action réussie ou échouée selon la condition décrite.';
+    }
+  }
+
+  static bool _isPhysicalStepType(String type) {
+    final normalized = type.trim().toLowerCase();
+    return normalized == 'physical' ||
+        normalized == 'physique' ||
+        normalized.contains('physical') ||
+        normalized.contains('physique');
+  }
+
   static String _displayStepType(String type) {
     switch (type) {
       case 'popup':
@@ -849,6 +1857,10 @@ class CreatorPlaceSequenceStepCard extends StatelessWidget {
         return 'Audio';
       case 'image':
         return 'Image';
+      case 'observation':
+        return 'Observation';
+      case 'physical':
+        return 'Physique';
       default:
         return 'Inconnu';
     }
