@@ -110,6 +110,12 @@ Map<String, dynamic> normalizeSequenceStep(dynamic rawStep) {
 
   rebuilt['runtime'] = normalizeStepRuntime(runtime);
   rebuilt['blocking'] = true;
+  rebuilt['mediaUsages'] = normalizeMediaUsages(
+    rawMap['mediaUsages'],
+    stepType: rebuilt['type'].toString(),
+    stepId: rebuilt['id'].toString(),
+    params: Map<String, dynamic>.from(rebuilt['params'] as Map),
+  );
   return rebuilt;
 }
 

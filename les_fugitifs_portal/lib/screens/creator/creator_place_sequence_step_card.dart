@@ -39,6 +39,13 @@ class CreatorPlaceSequenceStepCard extends StatelessWidget {
         ? normalizeStepRuntime(Map<String, dynamic>.from(rawRuntime as Map))
         : buildDefaultStepRuntime();
 
+    final mediaUsages = normalizeMediaUsages(
+      step['mediaUsages'],
+      stepType: stepType,
+      stepId: stepId.isEmpty ? buildStableStepId() : stepId,
+      params: params,
+    );
+
     final popupText = (params['text'] ?? '').toString();
     final confirmLabel = (params['confirmLabel'] ?? "D'accord").toString();
     final callerLabel = (params['callerLabel'] ?? '').toString();
@@ -145,6 +152,7 @@ class CreatorPlaceSequenceStepCard extends StatelessWidget {
                   description: description,
                   params: params,
                   runtime: runtime,
+                  mediaUsages: mediaUsages,
                 ));
               },
             ),
@@ -166,6 +174,7 @@ class CreatorPlaceSequenceStepCard extends StatelessWidget {
                   description: value,
                   params: params,
                   runtime: runtime,
+                  mediaUsages: mediaUsages,
                 ));
               },
             ),
@@ -192,17 +201,43 @@ class CreatorPlaceSequenceStepCard extends StatelessWidget {
                   ),
                 ],
                 onChanged: (value) {
+                  final nextDisplayMode = value == 'exploration_window'
+                      ? 'exploration_window'
+                      : 'standard';
                   final nextParams = <String, dynamic>{
-                    'displayMode': value == 'exploration_window'
-                        ? 'exploration_window'
-                        : 'standard',
+                    'displayMode': nextDisplayMode,
                   };
+                  final nextMediaUsages = mediaUsages.isEmpty
+                      ? buildDefaultMediaUsagesForStepType(
+                          stepType,
+                          stepId: stepId.isEmpty ? buildStableStepId() : stepId,
+                          params: nextParams,
+                        )
+                      : _copyMediaUsageAt(
+                          mediaUsages,
+                          0,
+                          runtimeMode: nextDisplayMode == 'exploration_window'
+                              ? 'dynamic_pan_zoom'
+                              : 'standard_image',
+                          archiveEnabled: mediaUsages.first['archive'] is Map
+                              ? mediaUsages.first['archive']['enabled'] == true
+                              : false,
+                          archiveMode: mediaUsages.first['archive'] is Map &&
+                                  mediaUsages.first['archive']['enabled'] == true
+                              ? defaultArchiveModeForRuntimeMode(
+                                  nextDisplayMode == 'exploration_window'
+                                      ? 'dynamic_pan_zoom'
+                                      : 'standard_image',
+                                )
+                              : 'none',
+                        );
                   onChanged(_copyWith(
                     step,
                     title: title,
                     description: description,
                     params: nextParams,
                     runtime: runtime,
+                    mediaUsages: nextMediaUsages,
                   ));
                 },
               ),
@@ -214,6 +249,134 @@ class CreatorPlaceSequenceStepCard extends StatelessWidget {
                 style: const TextStyle(fontSize: 12, color: Colors.grey),
               ),
               const SizedBox(height: 12),
+            ],
+
+            if (stepTypeRequiresMedia(stepType)) ...[
+              ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: EdgeInsets.zero,
+                initiallyExpanded: true,
+                title: const Text(
+                  'Archivage du média',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                subtitle: const Text(
+                  'Définit si le média reste consultable dans les archives après la visite du poste.',
+                  style: TextStyle(fontSize: 12),
+                ),
+                children: [
+                  const SizedBox(height: 8),
+                  ...mediaUsages.asMap().entries.expand((entry) {
+                    final mediaIndex = entry.key;
+                    final usage = entry.value;
+                    final runtimeMode =
+                        (usage['runtimeMode'] ?? '').toString().trim();
+                    final archive = usage['archive'] is Map
+                        ? Map<String, dynamic>.from(usage['archive'] as Map)
+                        : <String, dynamic>{};
+                    final archiveEnabled = archive['enabled'] == true;
+                    final archiveMode = archiveEnabled
+                        ? (archive['mode'] ?? 'none').toString()
+                        : 'none';
+
+                    final archiveModeItems =
+                        _archiveModeItemsForRuntimeMode(runtimeMode);
+
+                    return <Widget>[
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF111A2B),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: const Color(0xFF2A3445)),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            SwitchListTile.adaptive(
+                              value: archiveEnabled,
+                              contentPadding: EdgeInsets.zero,
+                              activeColor: const Color(0xFFFF8A3D),
+                              title: const Text(
+                                'Conserver ce média dans les archives',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                              subtitle: Text(
+                                archiveEnabled
+                                    ? 'Ce média restera consultable plus tard dans les archives.'
+                                    : 'Ce média ne sera visible que pendant le poste.',
+                                style: const TextStyle(color: Color(0xFFB8C1D1)),
+                              ),
+                              onChanged: (enabled) {
+                                final nextArchiveMode = enabled
+                                    ? defaultArchiveModeForRuntimeMode(runtimeMode)
+                                    : 'none';
+                                onChanged(_copyWith(
+                                  step,
+                                  title: title,
+                                  description: description,
+                                  params: params,
+                                  runtime: runtime,
+                                  mediaUsages: _copyMediaUsageAt(
+                                    mediaUsages,
+                                    mediaIndex,
+                                    archiveEnabled: enabled,
+                                    archiveMode: nextArchiveMode,
+                                  ),
+                                ));
+                              },
+                            ),
+                            if (archiveEnabled) ...[
+                              const SizedBox(height: 8),
+                              DropdownButtonFormField<String>(
+                                value: archiveModeItems.any(
+                                  (item) => item.value == archiveMode,
+                                )
+                                    ? archiveMode
+                                    : defaultArchiveModeForRuntimeMode(runtimeMode),
+                                decoration: const InputDecoration(
+                                  labelText: 'Comportement dans les archives',
+                                  border: OutlineInputBorder(),
+                                ),
+                                items: archiveModeItems,
+                                onChanged: (value) {
+                                  final nextArchiveMode = value ??
+                                      defaultArchiveModeForRuntimeMode(
+                                        runtimeMode,
+                                      );
+                                  onChanged(_copyWith(
+                                    step,
+                                    title: title,
+                                    description: description,
+                                    params: params,
+                                    runtime: runtime,
+                                    mediaUsages: _copyMediaUsageAt(
+                                      mediaUsages,
+                                      mediaIndex,
+                                      archiveEnabled: true,
+                                      archiveMode: nextArchiveMode,
+                                    ),
+                                  ));
+                                },
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                _archiveModeDescription(archiveMode),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Color(0xFFB8C1D1),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                    ];
+                  }),
+                ],
+              ),
             ],
             ExpansionTile(
               tilePadding: EdgeInsets.zero,
@@ -268,6 +431,7 @@ class CreatorPlaceSequenceStepCard extends StatelessWidget {
                       description: description,
                       params: params,
                       runtime: nextRuntime,
+                      mediaUsages: mediaUsages,
                     ));
                   },
                 ),
@@ -299,6 +463,7 @@ class CreatorPlaceSequenceStepCard extends StatelessWidget {
                         description: description,
                         params: params,
                         runtime: nextRuntime,
+                        mediaUsages: mediaUsages,
                       ));
                     },
                   ),
@@ -324,6 +489,7 @@ class CreatorPlaceSequenceStepCard extends StatelessWidget {
                         description: description,
                         params: params,
                         runtime: nextRuntime,
+                        mediaUsages: mediaUsages,
                       ));
                     },
                   ),
@@ -358,6 +524,7 @@ class CreatorPlaceSequenceStepCard extends StatelessWidget {
                       description: description,
                       params: params,
                       runtime: nextRuntime,
+                      mediaUsages: mediaUsages,
                     ));
                   },
                 ),
@@ -395,6 +562,7 @@ class CreatorPlaceSequenceStepCard extends StatelessWidget {
                       description: description,
                       params: params,
                       runtime: nextRuntime,
+                      mediaUsages: mediaUsages,
                     ));
                   },
                 ),
@@ -426,6 +594,7 @@ class CreatorPlaceSequenceStepCard extends StatelessWidget {
                         description: description,
                         params: params,
                         runtime: nextRuntime,
+                        mediaUsages: mediaUsages,
                       ));
                     },
                   ),
@@ -455,6 +624,7 @@ class CreatorPlaceSequenceStepCard extends StatelessWidget {
                     description: description,
                     params: nextParams,
                     runtime: runtime,
+                    mediaUsages: mediaUsages,
                   ));
                 },
               ),
@@ -477,6 +647,7 @@ class CreatorPlaceSequenceStepCard extends StatelessWidget {
                     description: description,
                     params: nextParams,
                     runtime: runtime,
+                    mediaUsages: mediaUsages,
                   ));
                 },
               ),
@@ -499,6 +670,7 @@ class CreatorPlaceSequenceStepCard extends StatelessWidget {
                     description: description,
                     params: nextParams,
                     runtime: runtime,
+                    mediaUsages: mediaUsages,
                   ));
                 },
               ),
@@ -531,20 +703,133 @@ class CreatorPlaceSequenceStepCard extends StatelessWidget {
     String? description,
     Map<String, dynamic>? params,
     Map<String, dynamic>? runtime,
+    List<Map<String, dynamic>>? mediaUsages,
   }) {
     final originalId = (original['id'] ?? '').toString();
     final originalType = (original['type'] ?? 'popup').toString();
+    final safeId = originalId.isEmpty ? buildStableStepId() : originalId;
+    final nextParams = params ?? <String, dynamic>{};
 
     return <String, dynamic>{
-      'id': originalId.isEmpty ? buildStableStepId() : originalId,
+      'id': safeId,
       'type': originalType,
       'title': title ?? (original['title'] ?? '').toString(),
       'description':
           description ?? (original['description'] ?? '').toString(),
       'blocking': true,
-      'params': params ?? <String, dynamic>{},
+      'params': nextParams,
       'runtime': normalizeStepRuntime(runtime),
+      'mediaUsages': mediaUsages ??
+          normalizeMediaUsages(
+            original['mediaUsages'],
+            stepType: originalType,
+            stepId: safeId,
+            params: nextParams,
+          ),
     };
+  }
+
+  List<Map<String, dynamic>> _copyMediaUsageAt(
+    List<Map<String, dynamic>> mediaUsages,
+    int index, {
+    String? runtimeMode,
+    bool? archiveEnabled,
+    String? archiveMode,
+  }) {
+    final next = mediaUsages
+        .map((usage) => Map<String, dynamic>.from(usage))
+        .toList(growable: false);
+
+    if (index < 0 || index >= next.length) {
+      return next;
+    }
+
+    final current = Map<String, dynamic>.from(next[index]);
+    final currentArchive = current['archive'] is Map
+        ? Map<String, dynamic>.from(current['archive'] as Map)
+        : <String, dynamic>{};
+
+    final nextRuntimeMode = runtimeMode ?? (current['runtimeMode'] ?? '').toString();
+    final nextArchiveEnabled = archiveEnabled ?? (currentArchive['enabled'] == true);
+    final nextArchiveMode = nextArchiveEnabled
+        ? (archiveMode ?? defaultArchiveModeForRuntimeMode(nextRuntimeMode))
+        : 'none';
+
+    current['runtimeMode'] = nextRuntimeMode;
+    current['archive'] = <String, dynamic>{
+      'enabled': nextArchiveEnabled,
+      'mode': nextArchiveMode,
+    };
+    next[index] = current;
+    return next;
+  }
+
+  List<DropdownMenuItem<String>> _runtimeModeItemsForStepType(String stepType) {
+    switch (stepType) {
+      case 'image':
+        return const [
+          DropdownMenuItem(
+            value: 'standard_image',
+            child: Text('Image standard'),
+          ),
+          DropdownMenuItem(
+            value: 'dynamic_pan_zoom',
+            child: Text('Fenêtre exploratoire'),
+          ),
+          DropdownMenuItem(
+            value: 'masked_view',
+            child: Text('Image cadrée / masquée'),
+          ),
+        ];
+      case 'video':
+        return const [
+          DropdownMenuItem(
+            value: 'standard_video',
+            child: Text('Vidéo standard'),
+          ),
+        ];
+      case 'audio':
+      case 'call':
+        return const [
+          DropdownMenuItem(
+            value: 'standard_audio',
+            child: Text('Audio standard'),
+          ),
+        ];
+      default:
+        return allowedMediaRuntimeModes()
+            .map(
+              (mode) => DropdownMenuItem<String>(
+                value: mode,
+                child: Text(_displayRuntimeMode(mode)),
+              ),
+            )
+            .toList();
+    }
+  }
+
+  List<DropdownMenuItem<String>> _archiveModeItemsForRuntimeMode(
+    String runtimeMode,
+  ) {
+    final values = <String>[
+      'standard_media',
+      'preserve_runtime',
+    ];
+
+    if (runtimeMode == 'standard_image' ||
+        runtimeMode == 'dynamic_pan_zoom' ||
+        runtimeMode == 'masked_view') {
+      values.insert(1, 'zoomable_image');
+    }
+
+    return values
+        .map(
+          (mode) => DropdownMenuItem<String>(
+            value: mode,
+            child: Text(_displayArchiveMode(mode)),
+          ),
+        )
+        .toList();
   }
 
   int _readInt(dynamic raw, {required int fallback}) {
@@ -566,6 +851,112 @@ class CreatorPlaceSequenceStepCard extends StatelessWidget {
         return 'Image';
       default:
         return 'Inconnu';
+    }
+  }
+
+  static 
+String _mediaExpectationLabelForStepType(String stepType) {
+  switch (stepType) {
+    case 'video':
+      return 'Type attendu : vidéo';
+    case 'audio':
+    case 'call':
+      return 'Type attendu : audio';
+    case 'image':
+      return 'Type attendu : image';
+    default:
+      return 'Média lié automatiquement';
+  }
+}
+
+IconData _mediaKindIconForStepType(String stepType) {
+  switch (stepType) {
+    case 'video':
+      return Icons.videocam_outlined;
+    case 'audio':
+    case 'call':
+      return Icons.graphic_eq_outlined;
+    case 'image':
+      return Icons.image_outlined;
+    default:
+      return Icons.perm_media_outlined;
+  }
+}
+
+String _displayMediaRole(String role) {
+    switch (role) {
+      case 'primary':
+        return 'Média principal';
+      case 'secondary':
+        return 'Média secondaire';
+      case 'clue':
+        return 'Indice';
+      default:
+        return role;
+    }
+  }
+
+  static String _displayRuntimeMode(String mode) {
+    switch (mode) {
+      case 'standard_image':
+        return 'Image standard';
+      case 'standard_video':
+        return 'Vidéo standard';
+      case 'standard_audio':
+        return 'Audio standard';
+      case 'dynamic_pan_zoom':
+        return 'Fenêtre exploratoire';
+      case 'masked_view':
+        return 'Image cadrée / masquée';
+      default:
+        return mode;
+    }
+  }
+
+  static String _displayArchiveMode(String mode) {
+    switch (mode) {
+      case 'standard_media':
+        return 'Version standard';
+      case 'zoomable_image':
+        return 'Image zoomable';
+      case 'preserve_runtime':
+        return 'Conserver le rendu du poste';
+      case 'none':
+        return 'Non archivé';
+      default:
+        return mode;
+    }
+  }
+
+  static String _runtimeModeDescription(String mode) {
+    switch (mode) {
+      case 'standard_image':
+        return 'Le document est affiché normalement, en une seule vue.';
+      case 'standard_video':
+        return 'La vidéo est lue comme un média classique, sans comportement visuel spécifique.';
+      case 'standard_audio':
+        return 'L’audio est joué de manière standard pour cette étape.';
+      case 'dynamic_pan_zoom':
+        return 'Le joueur explore une grande image à travers une fenêtre mobile, sans voir tout le document d’un coup.';
+      case 'masked_view':
+        return 'Le média peut être cadré, flouté ou partiellement masqué pour ne révéler qu’une partie de l’indice.';
+      default:
+        return '';
+    }
+  }
+
+  static String _archiveModeDescription(String mode) {
+    switch (mode) {
+      case 'standard_media':
+        return 'Les archives montrent une version simple du média, sans rejouer le comportement visuel spécifique du poste.';
+      case 'zoomable_image':
+        return 'Les archives gardent une image consultable avec zoom, sans imposer la logique exploratoire du poste.';
+      case 'preserve_runtime':
+        return 'Les archives conservent le rendu narratif du poste pour éviter de révéler plus que ce qui a réellement été acquis.';
+      case 'none':
+        return 'Le média n’est pas recopié dans les archives.';
+      default:
+        return '';
     }
   }
 }

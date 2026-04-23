@@ -68,8 +68,12 @@ class CreatorMediaSlotsGridSection extends StatelessWidget {
           });
 
         final screenWidth = MediaQuery.of(context).size.width;
-        final crossAxisCount = screenWidth >= 1600 ? 3 : 2;
-        final aspectRatio = screenWidth >= 1600 ? 2.45 : 2.0;
+        final crossAxisCount = screenWidth >= 1850
+            ? 4
+            : (screenWidth >= 1450 ? 3 : 2);
+        final aspectRatio = screenWidth >= 1850
+            ? 2.72
+            : (screenWidth >= 1450 ? 2.48 : 2.08);
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -90,10 +94,10 @@ class CreatorMediaSlotsGridSection extends StatelessWidget {
             }).length;
 
             return Padding(
-              padding: const EdgeInsets.only(bottom: 14),
+              padding: const EdgeInsets.only(bottom: 12),
               child: Container(
                 width: double.infinity,
-                padding: const EdgeInsets.all(14),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: const Color(0xFF101C31),
                   borderRadius: BorderRadius.circular(18),
@@ -110,15 +114,15 @@ class CreatorMediaSlotsGridSection extends StatelessWidget {
                         Text(
                           blockLabel,
                           style: const TextStyle(
-                            fontSize: 17,
+                            fontSize: 16,
                             fontWeight: FontWeight.w900,
                             color: Colors.white,
                           ),
                         ),
                         Container(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 9,
-                            vertical: 6,
+                            horizontal: 8,
+                            vertical: 5,
                           ),
                           decoration: BoxDecoration(
                             color: const Color(0xFF0D192C),
@@ -136,7 +140,7 @@ class CreatorMediaSlotsGridSection extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 8),
                     GridView.count(
                       crossAxisCount: crossAxisCount,
                       mainAxisSpacing: 10,

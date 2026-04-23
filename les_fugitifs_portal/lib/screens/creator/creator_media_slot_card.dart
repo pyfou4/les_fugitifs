@@ -51,19 +51,17 @@ class CreatorMediaSlotCard extends StatelessWidget {
         : 'Aucun média';
 
     final metaLine = hasMedia
-        ? [
-            if ((activeMimeType ?? '').trim().isNotEmpty) activeMimeType!.trim(),
-            if ((technicalStatus ?? '').trim().isNotEmpty)
-              technicalStatus!.trim(),
-          ].join(' • ')
-        : (acceptedTypes.isEmpty ? 'Type non défini' : acceptedTypes.join(', '));
+        ? null
+        : (acceptedTypes.isEmpty
+            ? 'Formats : non définis'
+            : 'Formats : ${acceptedTypes.join(', ')}');
 
     final normalizedWorkflowStatus =
         workflowStatus.trim().toLowerCase() == 'final' ? 'final' : 'test';
     final isFinal = normalizedWorkflowStatus == 'final';
 
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(
         color: const Color(0xFF0D192C),
         borderRadius: BorderRadius.circular(16),
@@ -74,9 +72,7 @@ class CreatorMediaSlotCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Wrap(
-            spacing: 6,
-            runSpacing: 6,
+          Row(
             children: [
               _Pill(
                 text: statusLabel,
@@ -84,19 +80,12 @@ class CreatorMediaSlotCard extends StatelessWidget {
                 borderColor: statusColor.withValues(alpha: 0.45),
                 backgroundColor: statusColor.withValues(alpha: 0.12),
               ),
-              if (acceptedTypes.isNotEmpty)
-                _Pill(
-                  text: acceptedTypes.join(', '),
-                  textColor: const Color(0xFFAAB7C8),
-                  borderColor: const Color(0xFF2A3A53),
-                  backgroundColor: const Color(0xFF101A2B),
-                ),
-              if (isRequired)
-                const _Pill(
-                  text: 'Obligatoire',
-                  textColor: Color(0xFFFFD7B8),
-                  borderColor: Color(0xFF7A4A24),
-                  backgroundColor: Color(0xFF341F14),
+              const SizedBox(width: 6),
+              if (hasMedia)
+                _WorkflowPill(
+                  value: isFinal ? 'final' : 'test',
+                  enabled: !isFrozen && onWorkflowStatusChanged != null,
+                  onChanged: (value) => onWorkflowStatusChanged?.call(value),
                 ),
             ],
           ),
@@ -106,142 +95,89 @@ class CreatorMediaSlotCard extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              fontSize: 15,
+              fontSize: 13,
               fontWeight: FontWeight.w900,
               color: Colors.white,
+              height: 1.1,
             ),
           ),
           const SizedBox(height: 2),
-          Text(
-            blockLabel,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Color(0xFFAAB7C8),
-              fontSize: 12,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
           Text(
             fileLine,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 13,
+            style: TextStyle(
+              color: hasMedia ? Colors.white : const Color(0xFFD7DFEA),
+              fontSize: 11.5,
               fontWeight: FontWeight.w700,
+              height: 1.1,
             ),
           ),
-          const SizedBox(height: 2),
-          Text(
-            metaLine.isEmpty ? '—' : metaLine,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              color: Color(0xFFAAB7C8),
-              fontSize: 12,
-            ),
-          ),
-          if (hasMedia) ...[
-            const SizedBox(height: 4),
-            Row(
-              children: [
-                const Text(
-                  'Statut',
-                  style: TextStyle(
-                    color: Color(0xFFAAB7C8),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Transform.scale(
-                  scale: 0.72,
-                  alignment: Alignment.centerLeft,
-                  child: Switch(
-                    value: isFinal,
-                    onChanged: (isFrozen || onWorkflowStatusChanged == null)
-                        ? null
-                        : (value) => onWorkflowStatusChanged!(
-                              value ? 'final' : 'test',
-                            ),
-                    activeColor: const Color(0xFF2F7A4E),
-                    activeTrackColor: const Color(0xFF1A3523),
-                    inactiveThumbColor: const Color(0xFFB44545),
-                    inactiveTrackColor: const Color(0xFF351A1A),
-                    trackOutlineColor: WidgetStateProperty.resolveWith(
-                      (states) => states.contains(WidgetState.selected)
-                          ? const Color(0xFF2F7A4E)
-                          : const Color(0xFF8A3D3D),
-                    ),
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                ),
-                Text(
-                  isFinal ? 'Final' : 'Test',
-                  style: TextStyle(
-                    color: isFinal
-                        ? const Color(0xFF9EF0B5)
-                        : const Color(0xFFFF8C8C),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
+          if (metaLine != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              metaLine,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Color(0xFFAAB7C8),
+                fontSize: 11,
+                height: 1.1,
+              ),
             ),
           ],
           const Spacer(),
-          const SizedBox(height: 2),
           Row(
             children: [
               if (hasMedia) ...[
-                Flexible(
+                SizedBox(
+                  height: 26,
                   child: OutlinedButton.icon(
                     onPressed: (isFrozen || onRemove == null) ? null : onRemove,
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFFFFD7B8),
                       side: const BorderSide(color: Color(0xFF7A4A24)),
-                      minimumSize: const Size(0, 28),
-                      maximumSize: const Size(double.infinity, 28),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 2,
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: const Size(0, 26),
                       tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       visualDensity: VisualDensity.compact,
                     ),
                     icon: const Icon(Icons.delete_outline, size: 12),
                     label: const Text(
                       'Retirer',
-                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
                     ),
                   ),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
               ],
               Expanded(
-                flex: 2,
-                child: FilledButton.icon(
-                  onPressed: (isFrozen || onUploadOrReplace == null)
-                      ? null
-                      : onUploadOrReplace,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: const Color(0xFFD65A00),
-                    foregroundColor: Colors.white,
-                    minimumSize: const Size(0, 28),
-                    maximumSize: const Size(double.infinity, 28),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 2,
+                child: SizedBox(
+                  height: 26,
+                  child: FilledButton.icon(
+                    onPressed: (isFrozen || onUploadOrReplace == null)
+                        ? null
+                        : onUploadOrReplace,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFD65A00),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: const Size(0, 26),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
                     ),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    visualDensity: VisualDensity.compact,
-                  ),
-                  icon: Icon(hasMedia ? Icons.sync : Icons.upload_file, size: 12),
-                  label: Text(
-                    hasMedia ? 'Remplacer' : 'Uploader',
-                    overflow: TextOverflow.ellipsis,
+                    icon: Icon(
+                      hasMedia ? Icons.sync : Icons.upload_file,
+                      size: 12,
+                    ),
+                    label: Text(
+                      hasMedia ? 'Remplacer' : 'Uploader',
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -269,7 +205,7 @@ class _Pill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(999),
@@ -283,6 +219,55 @@ class _Pill extends StatelessWidget {
           color: textColor,
           fontWeight: FontWeight.w800,
           fontSize: 11,
+          height: 1.0,
+        ),
+      ),
+    );
+  }
+}
+
+class _WorkflowPill extends StatelessWidget {
+  final String value;
+  final bool enabled;
+  final ValueChanged<String>? onChanged;
+
+  const _WorkflowPill({
+    required this.value,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isFinal = value == 'final';
+    final backgroundColor = isFinal
+        ? const Color(0xFF163A24)
+        : const Color(0xFF351A1A);
+    final borderColor =
+        isFinal ? const Color(0xFF2F7A4E) : const Color(0xFF8A3D3D);
+    final textColor =
+        isFinal ? const Color(0xFF9EF0B5) : const Color(0xFFFF8C8C);
+
+    return InkWell(
+      onTap: enabled
+          ? () => onChanged?.call(isFinal ? 'test' : 'final')
+          : null,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: borderColor),
+        ),
+        child: Text(
+          isFinal ? 'Final' : 'Test',
+          style: TextStyle(
+            color: textColor,
+            fontWeight: FontWeight.w800,
+            fontSize: 11,
+            height: 1.0,
+          ),
         ),
       ),
     );

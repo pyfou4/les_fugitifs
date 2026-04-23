@@ -5,6 +5,25 @@ import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
+
+class ScenarioMediaSyncResult {
+  final String scenarioId;
+  final String blockId;
+  final int definitionsUpserted;
+  final int slotsUpserted;
+  final int definitionsDisabled;
+  final int slotsDisabled;
+
+  const ScenarioMediaSyncResult({
+    required this.scenarioId,
+    required this.blockId,
+    required this.definitionsUpserted,
+    required this.slotsUpserted,
+    required this.definitionsDisabled,
+    required this.slotsDisabled,
+  });
+}
+
 class MediaAdminUploadResult {
   final bool success;
   final bool cancelled;
@@ -182,6 +201,238 @@ class MediaAdminService {
     if (activeMediaId.isNotEmpty) {
       await _deleteExistingMedia(activeMediaId);
     }
+  }
+
+
+  Future<ScenarioMediaSyncResult> syncDynamicSlotsForPlace({
+    required String scenarioId,
+    required String blockId,
+    required List<Map<String, dynamic>> requirements,
+    String actorLabel = 'creator_portal',
+  }) async {
+    final normalizedScenarioId = scenarioId.trim();
+    final normalizedBlockId = blockId.trim().toUpperCase();
+
+    if (normalizedScenarioId.isEmpty) {
+      throw ArgumentError('scenarioId ne peut pas être vide.');
+    }
+
+    if (normalizedBlockId.isEmpty) {
+      throw ArgumentError('blockId ne peut pas être vide.');
+    }
+
+    final nowIso = DateTime.now().toIso8601String();
+
+    final definitionQuery = await firestore
+        .collection('scenario_media_slot_definitions')
+        .where('scenarioId', isEqualTo: normalizedScenarioId)
+        .where('blockId', isEqualTo: normalizedBlockId)
+        .get();
+
+    final slotQuery = await firestore
+        .collection('scenario_media_slots')
+        .where('scenarioId', isEqualTo: normalizedScenarioId)
+        .where('blockId', isEqualTo: normalizedBlockId)
+        .get();
+
+    final existingDefinitionDocs = {
+      for (final doc in definitionQuery.docs) doc.id: doc,
+    };
+    final existingSlotDocs = {
+      for (final doc in slotQuery.docs) doc.id: doc,
+    };
+
+    final desiredDefinitions = <String, Map<String, dynamic>>{};
+    final desiredSlots = <String, Map<String, dynamic>>{};
+
+    for (final rawRequirement in requirements) {
+      final requirement = Map<String, dynamic>.from(rawRequirement);
+      final slotKey = _sanitizeSlotKey(
+        requirement['slotKey']?.toString().trim() ?? '',
+      );
+      final stepId = requirement['stepId']?.toString().trim() ?? '';
+      if (slotKey.isEmpty || stepId.isEmpty) continue;
+
+      final slotId = _buildScenarioSlotId(
+        scenarioId: normalizedScenarioId,
+        blockId: normalizedBlockId,
+        slotKey: slotKey,
+      );
+
+      final acceptedTypes = ((requirement['acceptedTypes'] as List?) ?? const [])
+          .map((e) => e.toString().trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+
+      final definitionLabel =
+          _buildDynamicSlotLabel(requirement['title']?.toString().trim() ?? '');
+
+      final existingSlotData =
+          existingSlotDocs[slotId]?.data() ?? <String, dynamic>{};
+
+      desiredDefinitions[slotId] = <String, dynamic>{
+        'scenarioId': normalizedScenarioId,
+        'blockId': normalizedBlockId,
+        'slotKey': slotKey,
+        'label': definitionLabel,
+        'acceptedTypes': acceptedTypes,
+        'displayOrder': _intFrom(requirement['displayOrder']),
+        'isRequired': true,
+        'isEnabled': true,
+        'source': 'scenario_creator_dynamic',
+        'sourcePlaceId': normalizedBlockId,
+        'sourceStepId': stepId,
+        'sourceStepType': requirement['stepType']?.toString().trim(),
+        'updatedAt': nowIso,
+        if (!existingDefinitionDocs.containsKey(slotId)) 'createdAt': nowIso,
+      };
+
+      desiredSlots[slotId] = <String, dynamic>{
+        'scenarioId': normalizedScenarioId,
+        'blockId': normalizedBlockId,
+        'slotKey': slotKey,
+        'label': definitionLabel,
+        'acceptedTypes': acceptedTypes,
+        'displayOrder': _intFrom(requirement['displayOrder']),
+        'isRequired': true,
+        'isImplemented': true,
+        'isEnabled': true,
+        'workflowStatus':
+            (existingSlotData['workflowStatus'] ?? 'test').toString().trim(),
+        'notes': (existingSlotData['notes'] ?? '').toString(),
+        'updatedAt': nowIso,
+        'updatedBy': actorLabel,
+        'source': 'scenario_creator_dynamic',
+        if (!existingSlotDocs.containsKey(slotId)) 'createdAt': nowIso,
+      };
+    }
+
+    int definitionsUpserted = 0;
+    int slotsUpserted = 0;
+    int definitionsDisabled = 0;
+    int slotsDisabled = 0;
+
+    WriteBatch batch = firestore.batch();
+    int ops = 0;
+
+    Future<void> commitIfNeeded() async {
+      if (ops == 0) return;
+      await batch.commit();
+      batch = firestore.batch();
+      ops = 0;
+    }
+
+    void queueSet(
+      DocumentReference<Map<String, dynamic>> ref,
+      Map<String, dynamic> data,
+    ) {
+      batch.set(ref, data, SetOptions(merge: true));
+      ops += 1;
+    }
+
+    for (final entry in desiredDefinitions.entries) {
+      queueSet(
+        firestore.collection('scenario_media_slot_definitions').doc(entry.key),
+        entry.value,
+      );
+      definitionsUpserted += 1;
+
+      final slotPayload = desiredSlots[entry.key]!;
+      queueSet(
+        firestore.collection('scenario_media_slots').doc(entry.key),
+        slotPayload,
+      );
+      slotsUpserted += 1;
+
+      if (ops >= 400) {
+        await commitIfNeeded();
+      }
+    }
+    await commitIfNeeded();
+
+    batch = firestore.batch();
+    ops = 0;
+
+    for (final doc in existingDefinitionDocs.values) {
+      final data = doc.data();
+      final isDynamic = (data['source'] ?? '').toString().trim() ==
+          'scenario_creator_dynamic';
+      if (!isDynamic) continue;
+      if (desiredDefinitions.containsKey(doc.id)) continue;
+
+      queueSet(doc.reference, <String, dynamic>{
+        'isEnabled': false,
+        'updatedAt': nowIso,
+      });
+      definitionsDisabled += 1;
+
+      if (ops >= 400) {
+        await commitIfNeeded();
+      }
+    }
+
+    for (final doc in existingSlotDocs.values) {
+      final data = doc.data();
+      final isDynamic = (data['source'] ?? '').toString().trim() ==
+              'scenario_creator_dynamic' ||
+          (!existingDefinitionDocs.containsKey(doc.id) &&
+              doc.id.startsWith('${normalizedScenarioId}_${normalizedBlockId}_'));
+      if (!isDynamic) continue;
+      if (desiredSlots.containsKey(doc.id)) continue;
+
+      queueSet(doc.reference, <String, dynamic>{
+        'isEnabled': false,
+        'updatedAt': nowIso,
+        'updatedBy': actorLabel,
+        'source': 'scenario_creator_dynamic',
+      });
+      slotsDisabled += 1;
+
+      if (ops >= 400) {
+        await commitIfNeeded();
+      }
+    }
+
+    await commitIfNeeded();
+
+    return ScenarioMediaSyncResult(
+      scenarioId: normalizedScenarioId,
+      blockId: normalizedBlockId,
+      definitionsUpserted: definitionsUpserted,
+      slotsUpserted: slotsUpserted,
+      definitionsDisabled: definitionsDisabled,
+      slotsDisabled: slotsDisabled,
+    );
+  }
+
+  String _buildScenarioSlotId({
+    required String scenarioId,
+    required String blockId,
+    required String slotKey,
+  }) {
+    return '${scenarioId}_${blockId}_${_sanitizeSlotKey(slotKey)}';
+  }
+
+  String _sanitizeSlotKey(String value) {
+    return value
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9_]+'), '_')
+        .replaceAll(RegExp(r'_+'), '_')
+        .replaceAll(RegExp(r'^_|_$'), '');
+  }
+
+  String _buildDynamicSlotLabel(String title) {
+    final safeTitle = title.trim();
+    if (safeTitle.isEmpty) {
+      return 'Média dynamique';
+    }
+    return safeTitle;
+  }
+
+  int _intFrom(dynamic value) {
+    if (value is int) return value;
+    return int.tryParse(value?.toString() ?? '') ?? 0;
   }
 
   Future<_PickedMediaFile?> _pickFile() async {

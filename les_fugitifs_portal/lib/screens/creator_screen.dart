@@ -18,6 +18,7 @@ import 'creator/creator_scenario_tab.dart';
 import 'creator/creator_sites_tab.dart';
 import 'creator/creator_storage_image_preview.dart';
 import 'creator/creator_suspects_motives_tab.dart';
+import 'creator/utils/place_media_requirements.dart';
 import 'creator_print_screen.dart';
 
 class CreatorScreen extends StatefulWidget {
@@ -560,6 +561,24 @@ class _CreatorScreenState extends State<CreatorScreen>
     });
   }
 
+  Future<String?> _resolveScenarioIdForMediaSync() async {
+    final selectedScenarioId = (_selectedMediaScenarioId ?? '').trim();
+    if (selectedScenarioId.isNotEmpty) {
+      return selectedScenarioId;
+    }
+
+    try {
+      final snapshot = await _scenariosRef.limit(2).get();
+      if (snapshot.docs.length == 1) {
+        return snapshot.docs.first.id;
+      }
+    } catch (_) {
+      // On laisse l'appelant gérer un éventuel fallback plus haut niveau.
+    }
+
+    return null;
+  }
+
   Future<void> _save() async {
     if (_isScenarioLocked) {
       _showLockedSnackBar();
@@ -596,10 +615,70 @@ class _CreatorScreenState extends State<CreatorScreen>
         'updatedAt': DateTime.now().toIso8601String(),
       }, SetOptions(merge: true));
 
+      final runtimeSequence =
+          (_pendingPlaceRuntimeForPlaceId == _selectedId &&
+                  _pendingPlaceRuntimePatch != null)
+              ? List<Map<String, dynamic>>.from(
+                  ((_pendingPlaceRuntimePatch!['sequence'] as List?) ??
+                          const <dynamic>[])
+                      .whereType<Map>()
+                      .map(
+                        (step) => Map<String, dynamic>.from(
+                          step as Map<dynamic, dynamic>,
+                        ),
+                      ),
+                )
+              : List<Map<String, dynamic>>.from(
+                  ((_selectedData?['sequence'] as List?) ?? const <dynamic>[])
+                      .whereType<Map>()
+                      .map(
+                        (step) => Map<String, dynamic>.from(
+                          step as Map<dynamic, dynamic>,
+                        ),
+                      ),
+                );
+
+      final mediaRequirements = computeMediaRequirementsFromSequence(
+        runtimeSequence,
+        blockId: _selectedId,
+      );
+
+      final scenarioIdForMediaSync =
+          await _resolveScenarioIdForMediaSync() ?? 'les_fugitifs';
+
+      debugPrint(
+        '[MEDIA_SYNC] placeId=$_selectedId scenarioId=$scenarioIdForMediaSync '
+        'sequenceLength=${runtimeSequence.length} requirements=${mediaRequirements.length}',
+      );
+      for (final requirement in mediaRequirements) {
+        debugPrint('[MEDIA_SYNC] requirement=$requirement');
+      }
+
+      final syncResult = await _mediaAdminService.syncDynamicSlotsForPlace(
+        scenarioId: scenarioIdForMediaSync,
+        blockId: _selectedId!,
+        requirements: mediaRequirements,
+        actorLabel: 'creator_portal',
+      );
+
+      debugPrint(
+        '[MEDIA_SYNC] result defs+${syncResult.definitionsUpserted} '
+        'slots+${syncResult.slotsUpserted} defsOff=${syncResult.definitionsDisabled} '
+        'slotsOff=${syncResult.slotsDisabled}',
+      );
+
       if (!mounted) return;
 
+      final syncSummary = mediaRequirements.isEmpty
+          ? 'Aucun besoin média détecté pour ce poste.'
+          : 'Sync médias : ${syncResult.definitionsUpserted} slot(s) upserté(s), '
+              '${syncResult.definitionsDisabled} désactivé(s).';
+
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Lieu et textes globaux sauvegardés.')),
+        SnackBar(
+          content: Text('Lieu et textes globaux sauvegardés. $syncSummary'),
+          duration: const Duration(seconds: 6),
+        ),
       );
 
       setState(() {
