@@ -135,6 +135,8 @@ String? mediaFormatForStepType(String type) {
       return 'audio';
     case 'image':
       return 'image';
+    case 'physical':
+      return 'image';
     case 'popup':
     default:
       return null;
@@ -237,16 +239,4 @@ String _defaultTitleForStepType(String type) {
 String _capitalize(String value) {
   if (value.isEmpty) return value;
   return value[0].toUpperCase() + value.substring(1);
-}
-
-// PHYSICAL MEDIA REQUIREMENT
-
-if (stepType == 'physical') {
-  return [
-    {
-      'usageType': 'instruction_visual',
-      'requiredFormat': 'image',
-      'label': 'Schéma de l’épreuve',
-    }
-  ];
 }

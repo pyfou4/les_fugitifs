@@ -15,10 +15,6 @@ class CreatorPlaceEditorSection extends StatefulWidget {
   final TextEditingController mediaNotesCtrl;
   final TextEditingController keywordCtrl;
   final List<String> keywords;
-  final TextEditingController gameRulesCtrl;
-  final TextEditingController briefingCtrl;
-  final bool isSaving;
-  final bool isLocking;
   final Color Function(String id) groupColorBuilder;
   final String Function(Map<String, dynamic> data) experienceTypeBuilder;
   final String Function(String type) experienceLabelBuilder;
@@ -29,9 +25,6 @@ class CreatorPlaceEditorSection extends StatefulWidget {
   final String Function(Map<String, dynamic> data) revealedSummaryBuilder;
   final VoidCallback onAddKeyword;
   final ValueChanged<String> onRemoveKeyword;
-  final VoidCallback? onSave;
-  final VoidCallback? onLockScenario;
-  final VoidCallback onOpenPrintView;
 
   /// Nouveau callback optionnel pour remonter le patch runtime.
   /// Il reste optionnel pour ne rien casser tant que le parent
@@ -47,10 +40,6 @@ class CreatorPlaceEditorSection extends StatefulWidget {
     required this.mediaNotesCtrl,
     required this.keywordCtrl,
     required this.keywords,
-    required this.gameRulesCtrl,
-    required this.briefingCtrl,
-    required this.isSaving,
-    required this.isLocking,
     required this.groupColorBuilder,
     required this.experienceTypeBuilder,
     required this.experienceLabelBuilder,
@@ -59,9 +48,6 @@ class CreatorPlaceEditorSection extends StatefulWidget {
     required this.revealedSummaryBuilder,
     required this.onAddKeyword,
     required this.onRemoveKeyword,
-    required this.onSave,
-    required this.onLockScenario,
-    required this.onOpenPrintView,
     this.onPlaceRuntimeChanged,
   });
 
@@ -213,69 +199,6 @@ class _CreatorPlaceEditorSectionState extends State<CreatorPlaceEditorSection> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFF101C31),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0xFF223250)),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Textes globaux du scénario',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w900,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  const Text(
-                    'Ces deux blocs ne sont liés à aucun lieu. Ils servent au briefing général et aux règles du jeu.',
-                    style: TextStyle(
-                      color: Color(0xFFAAB7C8),
-                      height: 1.35,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: widget.gameRulesCtrl,
-                    maxLines: 4,
-                    minLines: 3,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      height: 1.3,
-                    ),
-                    decoration: _fieldDecoration(
-                      label: 'Règles du jeu',
-                      color: const Color(0xFFD65A00),
-                      multiline: true,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: widget.briefingCtrl,
-                    maxLines: 4,
-                    minLines: 3,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      height: 1.3,
-                    ),
-                    decoration: _fieldDecoration(
-                      label: 'Briefing',
-                      color: const Color(0xFFD65A00),
-                      multiline: true,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
             if (!selectedAvailable)
               const Center(
                 child: Padding(
@@ -342,6 +265,7 @@ class _CreatorPlaceEditorSectionState extends State<CreatorPlaceEditorSection> {
               /// NOUVEAU BLOC : séquence
               CreatorPlaceSequenceEditorSection(
                 sequence: _sequence,
+                placeKind: type,
                 onChanged: _updateSequence,
               ),
 
@@ -541,101 +465,6 @@ class _CreatorPlaceEditorSectionState extends State<CreatorPlaceEditorSection> {
                     icon: const Icon(Icons.add, size: 16),
                     label: const Text(
                       'Ajouter',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  FilledButton.icon(
-                    onPressed: widget.onSave,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFFD65A00),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    icon: widget.isSaving
-                        ? const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
-                      ),
-                    )
-                        : const Icon(Icons.save_outlined, size: 16),
-                    label: Text(
-                      widget.isSaving
-                          ? 'Enregistrement...'
-                          : 'Sauvegarder',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: widget.onLockScenario,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFFFFD7B8),
-                      side: const BorderSide(color: Color(0xFF4A2B1D)),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    icon: widget.isLocking
-                        ? const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Color(0xFFFFD7B8),
-                      ),
-                    )
-                        : const Icon(Icons.lock_outline, size: 16),
-                    label: Text(
-                      widget.isLocking
-                          ? 'Verrouillage...'
-                          : 'Lock scénario',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: widget.onOpenPrintView,
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: const Color(0xFFAED0FF),
-                      side: const BorderSide(color: Color(0xFF294C74)),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 12,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    icon: const Icon(Icons.print_outlined, size: 16),
-                    label: const Text(
-                      'Vue impression',
                       style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,

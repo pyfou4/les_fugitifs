@@ -6,6 +6,8 @@ const List<String> kAllowedSequenceStepTypes = <String>[
   'video',
   'audio',
   'image',
+  'observation',
+  'physical',
 ];
 
 const List<String> kAllowedStepStartModes = <String>[
@@ -41,6 +43,88 @@ const List<String> kAllowedArchiveModes = <String>[
 
 List<String> allowedSequenceStepTypes() =>
     List<String>.from(kAllowedSequenceStepTypes);
+
+const List<String> kMediaSequenceStepTypes = <String>[
+  'popup',
+  'call',
+  'video',
+  'audio',
+  'image',
+];
+
+/// Valeur canonique interne pour les types de postes.
+///
+/// L'UI peut afficher du français, et d'anciennes données peuvent encore contenir
+/// des variantes comme "physique". À partir d'ici, le code métier travaille
+/// uniquement avec : media, observation, physical.
+String normalizePlaceKind(String raw) {
+  final value = raw.trim().toLowerCase();
+  if (value == 'observation' || value.contains('observation')) {
+    return 'observation';
+  }
+  if (value == 'physical' ||
+      value == 'physique' ||
+      value.contains('physical') ||
+      value.contains('physique') ||
+      value.contains('phys')) {
+    return 'physical';
+  }
+  return 'media';
+}
+
+/// Valeur canonique interne pour les types d'étapes.
+///
+/// Tous les nouveaux enregistrements doivent écrire ces valeurs canoniques.
+/// Les variantes françaises ne sont acceptées qu'en lecture, pour compatibilité.
+String normalizeSequenceStepType(String raw) {
+  final value = raw.trim().toLowerCase();
+  if (value == 'appel') return 'call';
+  if (value == 'vidéo' || value == 'video') return 'video';
+  if (value == 'image') return 'image';
+  if (value == 'audio') return 'audio';
+  if (value == 'observation' || value.contains('observation')) {
+    return 'observation';
+  }
+  if (value == 'physical' ||
+      value == 'physique' ||
+      value.contains('physical') ||
+      value.contains('physique') ||
+      value.contains('phys')) {
+    return 'physical';
+  }
+  if (value == 'popup') return 'popup';
+  return 'popup';
+}
+
+List<String> allowedSequenceStepTypesForPlaceKind(String placeKind) {
+  final normalized = normalizePlaceKind(placeKind);
+  if (normalized == 'observation') {
+    return <String>[...kMediaSequenceStepTypes, 'observation'];
+  }
+  if (normalized == 'physical') {
+    return <String>[...kMediaSequenceStepTypes, 'physical'];
+  }
+  return List<String>.from(kMediaSequenceStepTypes);
+}
+
+String inferPlaceKindFromSequence(List<Map<String, dynamic>> sequence) {
+  final hasPhysical = sequence.any(
+    (step) => normalizeSequenceStepType((step['type'] ?? '').toString()) == 'physical',
+  );
+  if (hasPhysical) return 'physical';
+
+  final hasObservation = sequence.any(
+    (step) => normalizeSequenceStepType((step['type'] ?? '').toString()) == 'observation',
+  );
+  if (hasObservation) return 'observation';
+
+  return 'media';
+}
+
+Map<String, dynamic> buildDefaultSequenceStepForPlaceKind(String placeKind) {
+  final allowedTypes = allowedSequenceStepTypesForPlaceKind(normalizePlaceKind(placeKind));
+  return buildSequenceStepForType(allowedTypes.first);
+}
 
 List<String> allowedStepStartModes() =>
     List<String>.from(kAllowedStepStartModes);
@@ -99,9 +183,10 @@ Map<String, dynamic> buildSequenceStepForType(
   final safeId =
       (id == null || id.trim().isEmpty) ? buildStableStepId() : id.trim();
   final safeDescription = description ?? '';
+  final normalizedType = normalizeSequenceStepType(type);
 
   Map<String, dynamic> base;
-  switch (type) {
+  switch (normalizedType) {
     case 'popup':
       base = <String, dynamic>{
         'id': safeId,
@@ -156,6 +241,51 @@ Map<String, dynamic> buildSequenceStepForType(
         'blocking': true,
         'params': <String, dynamic>{
           'displayMode': 'standard',
+        },
+      };
+      break;
+    case 'observation':
+      base = <String, dynamic>{
+        'id': safeId,
+        'type': 'observation',
+        'title': title ?? 'Nouvelle observation',
+        'description': safeDescription,
+        'blocking': true,
+        'params': <String, dynamic>{
+          'question': '',
+          'answerType': 'text',
+          'expectedAnswer': <String, dynamic>{
+            'value': '',
+          },
+        },
+      };
+      break;
+    case 'physical':
+      base = <String, dynamic>{
+        'id': safeId,
+        'type': 'physical',
+        'title': title ?? 'Nouvelle épreuve physique',
+        'description': safeDescription,
+        'blocking': true,
+        'params': <String, dynamic>{
+          'instruction': '',
+          'equipment': '',
+          'validationMode': 'success',
+          'successCondition': '',
+          'failureText': '',
+          'targetRepetitions': 3,
+          'timeLimitSeconds': 60,
+          'targetScore': 1,
+          'maxScore': 10,
+          'targetTimeSeconds': 60,
+          'performanceBenchmark': <String, dynamic>{
+            'strongMin': 10,
+            'mediumMin': 7,
+            'mediumMax': 9,
+            'weakMax': 6,
+          },
+          'requiresRulesImage': true,
+          'requiredImagePurpose': 'physical_rules',
         },
       };
       break;
@@ -316,7 +446,7 @@ String defaultMediaRuntimeModeForStepType(
   String stepType, {
   Map<String, dynamic>? params,
 }) {
-  switch (stepType.trim().toLowerCase()) {
+  switch (normalizeSequenceStepType(stepType)) {
     case 'call':
     case 'audio':
       return 'standard_audio';
@@ -327,6 +457,8 @@ String defaultMediaRuntimeModeForStepType(
       return displayMode == 'exploration_window'
           ? 'dynamic_pan_zoom'
           : 'standard_image';
+    case 'physical':
+      return 'standard_image';
     case 'popup':
     default:
       return 'standard_image';
@@ -348,7 +480,7 @@ String defaultArchiveModeForRuntimeMode(String runtimeMode) {
 }
 
 String? mediaFormatForStepType(String type) {
-  switch (type.trim().toLowerCase()) {
+  switch (normalizeSequenceStepType(type)) {
     case 'call':
       return 'audio';
     case 'video':
@@ -356,6 +488,8 @@ String? mediaFormatForStepType(String type) {
     case 'audio':
       return 'audio';
     case 'image':
+      return 'image';
+    case 'physical':
       return 'image';
     case 'popup':
     default:

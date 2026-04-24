@@ -106,6 +106,37 @@ Map<String, dynamic> normalizeSequenceStep(dynamic rawStep) {
     case 'audio':
       rebuilt['params'] = <String, dynamic>{};
       break;
+    case 'observation':
+      final answerType = (params['answerType'] ?? 'text').toString();
+      final normalizedAnswerType = <String>{'text', 'number', 'boolean'}
+              .contains(answerType)
+          ? answerType
+          : 'text';
+
+      dynamic expectedValue;
+      final rawExpectedAnswer = params['expectedAnswer'];
+      if (rawExpectedAnswer is Map) {
+        expectedValue = rawExpectedAnswer['value'];
+      } else {
+        expectedValue = null;
+      }
+
+      if (normalizedAnswerType == 'number') {
+        expectedValue = _readInt(expectedValue, fallback: 0);
+      } else if (normalizedAnswerType == 'boolean') {
+        expectedValue = expectedValue == true;
+      } else {
+        expectedValue = (expectedValue ?? '').toString();
+      }
+
+      rebuilt['params'] = <String, dynamic>{
+        'question': (params['question'] ?? '').toString(),
+        'answerType': normalizedAnswerType,
+        'expectedAnswer': <String, dynamic>{
+          'value': expectedValue,
+        },
+      };
+      break;
   }
 
   rebuilt['runtime'] = normalizeStepRuntime(runtime);

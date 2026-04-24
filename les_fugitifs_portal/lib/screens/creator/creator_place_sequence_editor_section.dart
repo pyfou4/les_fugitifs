@@ -5,17 +5,21 @@ import 'utils/place_sequence_factories.dart';
 
 class CreatorPlaceSequenceEditorSection extends StatelessWidget {
   final List<Map<String, dynamic>> sequence;
+  final String placeKind;
   final ValueChanged<List<Map<String, dynamic>>> onChanged;
 
   const CreatorPlaceSequenceEditorSection({
     super.key,
     required this.sequence,
+    required this.placeKind,
     required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
     final hasItems = sequence.isNotEmpty;
+    final normalizedPlaceKind = placeKind.trim().toLowerCase();
+    final allowedStepTypes = allowedSequenceStepTypesForPlaceKind(normalizedPlaceKind);
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 12),
@@ -68,7 +72,7 @@ class CreatorPlaceSequenceEditorSection extends StatelessWidget {
                     FilledButton.icon(
                       onPressed: () {
                         final next = List<Map<String, dynamic>>.from(sequence)
-                          ..add(buildDefaultSequenceStep());
+                          ..add(buildDefaultSequenceStepForPlaceKind(normalizedPlaceKind));
                         onChanged(next);
                       },
                       icon: const Icon(Icons.add),
@@ -86,6 +90,7 @@ class CreatorPlaceSequenceEditorSection extends StatelessWidget {
                     step: step,
                     index: index,
                     availableSteps: sequence,
+                    allowedStepTypes: allowedStepTypes,
                     onChanged: (updatedStep) {
                       final next = List<Map<String, dynamic>>.from(sequence);
                       next[index] = updatedStep;
@@ -124,7 +129,7 @@ class CreatorPlaceSequenceEditorSection extends StatelessWidget {
                 child: FilledButton.icon(
                   onPressed: () {
                     final next = List<Map<String, dynamic>>.from(sequence)
-                      ..add(buildDefaultSequenceStep());
+                      ..add(buildDefaultSequenceStepForPlaceKind(normalizedPlaceKind));
                     onChanged(next);
                   },
                   icon: const Icon(Icons.add),

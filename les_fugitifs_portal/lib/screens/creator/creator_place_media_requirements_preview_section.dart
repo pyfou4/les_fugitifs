@@ -36,15 +36,16 @@ class CreatorPlaceMediaRequirementsPreviewSection extends StatelessWidget {
 
             /// CAS : aucun média
             if (items.isEmpty)
-              const Text('Aucun média requis pour ce poste.')
+              const Text('Aucun média requis pour ce poste.'),
 
             /// CAS : liste des médias
-            else
+            if (items.isNotEmpty)
               Column(
                 children: items.map((item) {
                   final title = item['title'] ?? 'Étape';
                   final type = _displayStepType(item['stepType']);
-                  final format = _displayRequiredFormat(item['requiredFormat']);
+                  final format =
+                  _displayRequiredFormat(item['requiredFormat']);
 
                   return Container(
                     margin: const EdgeInsets.symmetric(vertical: 6),
@@ -107,6 +108,8 @@ class CreatorPlaceMediaRequirementsPreviewSection extends StatelessWidget {
         return 'Image';
       case 'popup':
         return 'Popup';
+      case 'observation':
+        return 'Observation';
       default:
         return 'Inconnu';
     }

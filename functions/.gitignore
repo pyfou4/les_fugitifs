@@ -5,8 +5,6 @@ node_modules/
 # Export portal
 les_fugitifs_portal/export-fugitifs/node_modules/
 les_fugitifs_portal/export-fugitifs/package-lock.json
-les_fugitifs_portal/functions/firestore_dump/
-les_fugitifs_portal/functions/firestore_backup_*
 
 # Env
 .env
@@ -16,5 +14,3 @@ functions/.env
 firestore_dump/
 firestore_dump_*
 firestore_backup_*
-serviceAccountKey.json
-functions/serviceAccountKey.json

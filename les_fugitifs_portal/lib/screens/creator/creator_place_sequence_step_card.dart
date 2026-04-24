@@ -10,6 +10,7 @@ class CreatorPlaceSequenceStepCard extends StatelessWidget {
   final VoidCallback? onMoveDown;
   final VoidCallback onDelete;
   final ValueChanged<Map<String, dynamic>> onChanged;
+  final List<String>? allowedStepTypes;
 
   const CreatorPlaceSequenceStepCard({
     super.key,
@@ -20,14 +21,19 @@ class CreatorPlaceSequenceStepCard extends StatelessWidget {
     required this.onChanged,
     this.onMoveUp,
     this.onMoveDown,
+    this.allowedStepTypes,
   });
 
   @override
   Widget build(BuildContext context) {
     final rawStepType = (step['type'] ?? 'popup').toString();
-    final stepType = rawStepType.trim().toLowerCase();
+    final stepType = normalizeSequenceStepType(rawStepType);
+    final effectiveAllowedStepTypes = _effectiveAllowedStepTypes(
+      allowedStepTypes,
+      currentStepType: stepType,
+    );
     final rawTitle = (step['title'] ?? '').toString();
-    final isPhysicalStep = _isPhysicalStepType(rawStepType);
+    final isPhysicalStep = stepType == 'physical';
     final title = isPhysicalStep &&
             (rawTitle.trim().isEmpty || rawTitle.trim() == 'Nouveau popup')
         ? 'Nouvelle épreuve physique'
@@ -138,6 +144,8 @@ class CreatorPlaceSequenceStepCard extends StatelessWidget {
           'mediumMax': nextMediumMax,
           'weakMax': nextWeakMax,
         },
+        'requiresRulesImage': true,
+        'requiredImagePurpose': 'physical_rules',
       };
     }
 
@@ -337,14 +345,14 @@ class CreatorPlaceSequenceStepCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: allowedSequenceStepTypes().contains(stepType)
+              value: effectiveAllowedStepTypes.contains(stepType)
                   ? stepType
-                  : 'popup',
+                  : effectiveAllowedStepTypes.first,
               decoration: const InputDecoration(
                 labelText: 'Type d’étape',
                 border: OutlineInputBorder(),
               ),
-              items: allowedSequenceStepTypes()
+              items: effectiveAllowedStepTypes
                   .map(
                     (type) => DropdownMenuItem<String>(
                       value: type,
@@ -353,7 +361,7 @@ class CreatorPlaceSequenceStepCard extends StatelessWidget {
                   )
                   .toList(),
               onChanged: (value) {
-                final nextType = value ?? 'popup';
+                final nextType = value ?? effectiveAllowedStepTypes.first;
                 final rebuilt = buildSequenceStepForType(
                   nextType,
                   id: stepId.isEmpty ? null : stepId,
@@ -516,6 +524,39 @@ class CreatorPlaceSequenceStepCard extends StatelessWidget {
                           mediaUsages: mediaUsages,
                         ));
                       },
+                    ),
+                    const SizedBox(height: 12),
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Color(0xFF182235),
+                        borderRadius: BorderRadius.all(Radius.circular(12)),
+                        border: Border.fromBorderSide(
+                          BorderSide(color: Color(0xFFFFD59E), width: 0.8),
+                        ),
+                      ),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(
+                            Icons.image_outlined,
+                            size: 18,
+                            color: Color(0xFFFFD59E),
+                          ),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'Image obligatoire : une image de règles ou de consigne visuelle sera requise dans l’onglet Médias pour cette épreuve physique.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFFFFD59E),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 12),
                     if (physicalValidationMode == 'success') ...[
@@ -1837,12 +1878,41 @@ class CreatorPlaceSequenceStepCard extends StatelessWidget {
     }
   }
 
-  static bool _isPhysicalStepType(String type) {
-    final normalized = type.trim().toLowerCase();
-    return normalized == 'physical' ||
-        normalized == 'physique' ||
-        normalized.contains('physical') ||
-        normalized.contains('physique');
+  static List<String> _effectiveAllowedStepTypes(
+    List<String>? rawAllowedTypes, {
+    String? currentStepType,
+  }) {
+    final allTypes = allowedSequenceStepTypes();
+    if (rawAllowedTypes == null || rawAllowedTypes.isEmpty) {
+      return allTypes;
+    }
+
+    final filtered = rawAllowedTypes
+        .map(normalizeSequenceStepType)
+        .where(allTypes.contains)
+        .toList();
+
+    final normalizedCurrentType = normalizeSequenceStepType(currentStepType ?? '');
+
+    // Sécurité métier : le parent filtre selon le type de poste, mais la carte
+    // doit toujours conserver le type ludique déjà présent dans l'étape.
+    // Sinon un poste physique existant peut afficher le bon type sans permettre
+    // de le re-sélectionner, et un poste observation peut perdre Observation.
+    if ((normalizedCurrentType == 'physical' ||
+            normalizedCurrentType == 'observation') &&
+        allTypes.contains(normalizedCurrentType) &&
+        !filtered.contains(normalizedCurrentType)) {
+      filtered.add(normalizedCurrentType);
+    }
+
+    final uniqueFiltered = <String>[];
+    for (final type in filtered) {
+      if (!uniqueFiltered.contains(type)) {
+        uniqueFiltered.add(type);
+      }
+    }
+
+    return uniqueFiltered.isEmpty ? allTypes : uniqueFiltered;
   }
 
   static String _displayStepType(String type) {
