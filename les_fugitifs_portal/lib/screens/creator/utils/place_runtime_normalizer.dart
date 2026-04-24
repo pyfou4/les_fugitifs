@@ -137,6 +137,74 @@ Map<String, dynamic> normalizeSequenceStep(dynamic rawStep) {
         },
       };
       break;
+    case 'physical':
+      final rawValidationMode =
+          (params['validationMode'] ?? 'success').toString();
+      final validationMode = <String>{
+        'success',
+        'repetition',
+        'score',
+        'time',
+      }.contains(rawValidationMode)
+          ? rawValidationMode
+          : 'success';
+
+      final rawBenchmark = params['performanceBenchmark'];
+      final benchmark = rawBenchmark is Map
+          ? Map<String, dynamic>.from(rawBenchmark.cast<dynamic, dynamic>())
+          : <String, dynamic>{};
+
+      rebuilt['params'] = <String, dynamic>{
+        'instruction': (params['instruction'] ?? '').toString(),
+        'equipment': (params['equipment'] ?? '').toString(),
+        'validationMode': validationMode,
+        'successCondition': (params['successCondition'] ?? '').toString(),
+        'failureText': (params['failureText'] ?? '').toString(),
+        'targetRepetitions': _readInt(
+          params['targetRepetitions'],
+          fallback: 3,
+        ),
+        'timeLimitSeconds': _readInt(
+          params['timeLimitSeconds'],
+          fallback: 60,
+        ),
+        'targetScore': _readInt(
+          params['targetScore'],
+          fallback: 1,
+        ),
+        'maxScore': _readInt(
+          params['maxScore'],
+          fallback: 10,
+        ),
+        'targetTimeSeconds': _readInt(
+          params['targetTimeSeconds'],
+          fallback: 60,
+        ),
+        'performanceBenchmark': <String, dynamic>{
+          'strongMin': _readInt(
+            benchmark['strongMin'] ?? params['strongMin'],
+            fallback: 10,
+          ),
+          'mediumMin': _readInt(
+            benchmark['mediumMin'] ?? params['mediumMin'],
+            fallback: 7,
+          ),
+          'mediumMax': _readInt(
+            benchmark['mediumMax'] ?? params['mediumMax'],
+            fallback: 9,
+          ),
+          'weakMax': _readInt(
+            benchmark['weakMax'] ?? params['weakMax'],
+            fallback: 6,
+          ),
+        },
+        'requiresRulesImage': params['requiresRulesImage'] == false
+            ? false
+            : true,
+        'requiredImagePurpose':
+            (params['requiredImagePurpose'] ?? 'physical_rules').toString(),
+      };
+      break;
   }
 
   rebuilt['runtime'] = normalizeStepRuntime(runtime);

@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 
 import '../services/portal_access_service.dart';
 import '../features/scenario_lock/scenario_lock_models.dart';
@@ -96,7 +95,6 @@ class _CreatorScreenState extends State<CreatorScreen>
   Map<String, dynamic>? _selectedData;
   Map<String, dynamic>? _pendingPlaceRuntimePatch;
   String? _pendingPlaceRuntimeForPlaceId;
-  bool _pendingPlaceRuntimeRefreshScheduled = false;
   final TextEditingController _gameRulesCtrl = TextEditingController();
   final TextEditingController _briefingCtrl = TextEditingController();
   final TextEditingController _nameCtrl = TextEditingController();
@@ -109,16 +107,8 @@ class _CreatorScreenState extends State<CreatorScreen>
   final TextEditingController _a0QuestionCtrl = TextEditingController();
   final TextEditingController _b0QuestionCtrl = TextEditingController();
   final TextEditingController _c0QuestionCtrl = TextEditingController();
-  final TextEditingController _a0AnswerCtrl = TextEditingController();
-  final TextEditingController _b0AnswerCtrl = TextEditingController();
-  final TextEditingController _c0AnswerCtrl = TextEditingController();
-  final TextEditingController _a0AliasesCtrl = TextEditingController();
-  final TextEditingController _b0AliasesCtrl = TextEditingController();
-  final TextEditingController _c0AliasesCtrl = TextEditingController();
 
   late final List<TextEditingController> _sideQuestionCtrls;
-  late final List<TextEditingController> _sideAnswerCtrls;
-  late final List<TextEditingController> _sideAliasesCtrls;
   late final List<String?> _sideQuestionPlaceIds;
   bool _gameConfigurationLoaded = false;
 
@@ -145,14 +135,6 @@ class _CreatorScreenState extends State<CreatorScreen>
       5,
       (_) => TextEditingController(),
     );
-    _sideAnswerCtrls = List<TextEditingController>.generate(
-      5,
-      (_) => TextEditingController(),
-    );
-    _sideAliasesCtrls = List<TextEditingController>.generate(
-      5,
-      (_) => TextEditingController(),
-    );
     _sideQuestionPlaceIds = List<String?>.filled(5, null);
   }
 
@@ -166,12 +148,6 @@ class _CreatorScreenState extends State<CreatorScreen>
     _a0QuestionCtrl.dispose();
     _b0QuestionCtrl.dispose();
     _c0QuestionCtrl.dispose();
-    _a0AnswerCtrl.dispose();
-    _b0AnswerCtrl.dispose();
-    _c0AnswerCtrl.dispose();
-    _a0AliasesCtrl.dispose();
-    _b0AliasesCtrl.dispose();
-    _c0AliasesCtrl.dispose();
     for (final ctrl in _sideQuestionCtrls) {
       ctrl.dispose();
     }
@@ -471,41 +447,6 @@ class _CreatorScreenState extends State<CreatorScreen>
     );
   }
 
-
-  List<String> _splitQuestionnaireAliases(String value) {
-    return value
-        .split(RegExp(r'[,;\n]'))
-        .map((entry) => entry.trim())
-        .where((entry) => entry.isNotEmpty)
-        .toList();
-  }
-
-  String _joinQuestionnaireAliases(dynamic raw) {
-    if (raw is Iterable) {
-      return raw
-          .map((entry) => entry.toString().trim())
-          .where((entry) => entry.isNotEmpty)
-          .join(', ');
-    }
-    return raw?.toString().trim() ?? '';
-  }
-
-  Map<String, dynamic> _freeTextAnswerPayload({
-    required String answer,
-    required String aliases,
-  }) {
-    return {
-      'answer': answer.trim(),
-      'aliases': _splitQuestionnaireAliases(aliases),
-      'matchingMode': 'smart',
-      'ignoreCase': true,
-      'ignoreAccents': true,
-      'ignorePunctuation': true,
-      'trimWhitespace': true,
-      'allowMinorTypos': true,
-    };
-  }
-
   void _syncGameConfiguration(Map<String, dynamic>? data) {
     if (_gameConfigurationLoaded) return;
 
@@ -527,27 +468,6 @@ class _CreatorScreenState extends State<CreatorScreen>
     _b0QuestionCtrl.text = (mainQuestions['B0'] ?? '').toString().trim();
     _c0QuestionCtrl.text = (mainQuestions['C0'] ?? '').toString().trim();
 
-    final freeTextAnswers =
-        (finalQuestionnaire['freeTextAnswers'] as Map<String, dynamic>?) ??
-            <String, dynamic>{};
-
-    Map<String, dynamic> answerMap(String key) {
-      final raw = freeTextAnswers[key];
-      if (raw is Map<String, dynamic>) return raw;
-      if (raw is Map) return Map<String, dynamic>.from(raw);
-      return <String, dynamic>{};
-    }
-
-    final a0Answer = answerMap('A0');
-    final b0Answer = answerMap('B0');
-    final c0Answer = answerMap('C0');
-    _a0AnswerCtrl.text = (a0Answer['answer'] ?? '').toString().trim();
-    _b0AnswerCtrl.text = (b0Answer['answer'] ?? '').toString().trim();
-    _c0AnswerCtrl.text = (c0Answer['answer'] ?? '').toString().trim();
-    _a0AliasesCtrl.text = _joinQuestionnaireAliases(a0Answer['aliases']);
-    _b0AliasesCtrl.text = _joinQuestionnaireAliases(b0Answer['aliases']);
-    _c0AliasesCtrl.text = _joinQuestionnaireAliases(c0Answer['aliases']);
-
     for (int i = 0; i < _sideQuestionCtrls.length; i++) {
       final raw = i < sideQuestions.length ? sideQuestions[i] : null;
       if (raw is Map) {
@@ -555,19 +475,9 @@ class _CreatorScreenState extends State<CreatorScreen>
         _sideQuestionPlaceIds[i] = placeId.isEmpty ? null : placeId;
         _sideQuestionCtrls[i].text =
             (raw['question'] ?? '').toString().trim();
-        final answer = raw['answer'];
-        if (answer is Map) {
-          _sideAnswerCtrls[i].text = (answer['answer'] ?? '').toString().trim();
-          _sideAliasesCtrls[i].text = _joinQuestionnaireAliases(answer['aliases']);
-        } else {
-          _sideAnswerCtrls[i].clear();
-          _sideAliasesCtrls[i].clear();
-        }
       } else {
         _sideQuestionPlaceIds[i] = null;
         _sideQuestionCtrls[i].clear();
-        _sideAnswerCtrls[i].clear();
-        _sideAliasesCtrls[i].clear();
       }
     }
 
@@ -592,10 +502,6 @@ class _CreatorScreenState extends State<CreatorScreen>
           'slot': index + 1,
           'placeId': (_sideQuestionPlaceIds[index] ?? '').trim(),
           'question': _sideQuestionCtrls[index].text.trim(),
-          'answer': _freeTextAnswerPayload(
-            answer: _sideAnswerCtrls[index].text,
-            aliases: _sideAliasesCtrls[index].text,
-          ),
         };
       });
 
@@ -607,20 +513,6 @@ class _CreatorScreenState extends State<CreatorScreen>
             'A0': _a0QuestionCtrl.text.trim(),
             'B0': _b0QuestionCtrl.text.trim(),
             'C0': _c0QuestionCtrl.text.trim(),
-          },
-          'freeTextAnswers': {
-            'A0': _freeTextAnswerPayload(
-              answer: _a0AnswerCtrl.text,
-              aliases: _a0AliasesCtrl.text,
-            ),
-            'B0': _freeTextAnswerPayload(
-              answer: _b0AnswerCtrl.text,
-              aliases: _b0AliasesCtrl.text,
-            ),
-            'C0': _freeTextAnswerPayload(
-              answer: _c0AnswerCtrl.text,
-              aliases: _c0AliasesCtrl.text,
-            ),
           },
           'sideQuestions': sideQuestions,
         },
@@ -656,38 +548,135 @@ class _CreatorScreenState extends State<CreatorScreen>
     });
   }
 
+  List<Map<String, dynamic>> _normalizeDynamicMapList(dynamic value) {
+    if (value is! Iterable) {
+      return const <Map<String, dynamic>>[];
+    }
+
+    return value
+        .whereType<Map>()
+        .map(
+          (item) => Map<String, dynamic>.from(
+            item as Map<dynamic, dynamic>,
+          ),
+        )
+        .toList(growable: false);
+  }
+
+  Map<String, dynamic> _deepMergeRuntimeMap(
+    Map<String, dynamic> base,
+    Map<String, dynamic> patch,
+  ) {
+    final merged = Map<String, dynamic>.from(base);
+
+    for (final entry in patch.entries) {
+      final key = entry.key;
+      final patchValue = entry.value;
+      final baseValue = merged[key];
+
+      if (key == 'sequence') {
+        merged[key] = _mergeRuntimeSequence(baseValue, patchValue);
+        continue;
+      }
+
+      if (baseValue is Map && patchValue is Map) {
+        merged[key] = _deepMergeRuntimeMap(
+          Map<String, dynamic>.from(baseValue as Map<dynamic, dynamic>),
+          Map<String, dynamic>.from(patchValue as Map<dynamic, dynamic>),
+        );
+        continue;
+      }
+
+      merged[key] = patchValue;
+    }
+
+    return merged;
+  }
+
+  List<Map<String, dynamic>> _mergeRuntimeSequence(
+    dynamic baseValue,
+    dynamic patchValue,
+  ) {
+    final baseSequence = _normalizeDynamicMapList(baseValue);
+    final patchSequence = _normalizeDynamicMapList(patchValue);
+
+    if (patchSequence.isEmpty) {
+      return baseSequence;
+    }
+
+    final mergedById = <String, Map<String, dynamic>>{};
+    for (final step in baseSequence) {
+      final id = (step['id'] ?? '').toString().trim();
+      if (id.isNotEmpty) {
+        mergedById[id] = Map<String, dynamic>.from(step);
+      }
+    }
+
+    final result = <Map<String, dynamic>>[];
+
+    for (int i = 0; i < patchSequence.length; i++) {
+      final patchStep = patchSequence[i];
+      final id = (patchStep['id'] ?? '').toString().trim();
+      final baseStep = id.isNotEmpty
+          ? mergedById[id]
+          : (i < baseSequence.length
+              ? Map<String, dynamic>.from(baseSequence[i])
+              : null);
+
+      if (baseStep == null) {
+        result.add(Map<String, dynamic>.from(patchStep));
+      } else {
+        result.add(_deepMergeRuntimeMap(baseStep, patchStep));
+      }
+    }
+
+    return result;
+  }
+
+  Map<String, dynamic> _buildCurrentPlaceRuntimeBaseForPatch(
+    Map<String, dynamic> patch,
+  ) {
+    final selectedData = _selectedData;
+    if (selectedData == null) {
+      return <String, dynamic>{};
+    }
+
+    final base = <String, dynamic>{};
+    for (final key in patch.keys) {
+      if (selectedData.containsKey(key)) {
+        base[key] = selectedData[key];
+      }
+    }
+
+    return base;
+  }
+
+  Map<String, dynamic> _buildResolvedPlaceRuntimePatch(
+    Map<String, dynamic> patch,
+  ) {
+    final base = _pendingPlaceRuntimeForPlaceId == _selectedId &&
+            _pendingPlaceRuntimePatch != null
+        ? _pendingPlaceRuntimePatch!
+        : _buildCurrentPlaceRuntimeBaseForPatch(patch);
+
+    return _deepMergeRuntimeMap(
+      Map<String, dynamic>.from(base),
+      Map<String, dynamic>.from(patch),
+    );
+  }
+
   void _updatePendingPlaceRuntimePatch(Map<String, dynamic> patch) {
-    if (_selectedId == null || !mounted) return;
+    final placeId = _selectedId;
+    if (placeId == null) return;
 
-    // Le patch doit être disponible immédiatement pour le bouton Sauvegarder,
-    // mais certains widgets enfants peuvent notifier le parent pendant leur
-    // build. Dans ce cas, on met les données à jour sans setState immédiat,
-    // puis on rafraîchit l'écran au frame suivant.
-    void applyPatch() {
-      _pendingPlaceRuntimeForPlaceId = _selectedId;
-      _pendingPlaceRuntimePatch = Map<String, dynamic>.from(patch);
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
 
-    final schedulerPhase = SchedulerBinding.instance.schedulerPhase;
-    final isBuilding = schedulerPhase == SchedulerPhase.persistentCallbacks ||
-        schedulerPhase == SchedulerPhase.transientCallbacks ||
-        schedulerPhase == SchedulerPhase.midFrameMicrotasks;
-
-    if (isBuilding) {
-      applyPatch();
-
-      if (_pendingPlaceRuntimeRefreshScheduled) return;
-      _pendingPlaceRuntimeRefreshScheduled = true;
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-        _pendingPlaceRuntimeRefreshScheduled = false;
-        setState(() {});
+      setState(() {
+        _pendingPlaceRuntimeForPlaceId = placeId;
+        _pendingPlaceRuntimePatch = _buildResolvedPlaceRuntimePatch(patch);
       });
-      return;
-    }
-
-    setState(applyPatch);
+    });
   }
 
   Future<String?> _resolveScenarioIdForMediaSync() async {
@@ -744,28 +733,14 @@ class _CreatorScreenState extends State<CreatorScreen>
         'updatedAt': DateTime.now().toIso8601String(),
       }, SetOptions(merge: true));
 
-      final runtimeSequence =
+      final runtimeSource =
           (_pendingPlaceRuntimeForPlaceId == _selectedId &&
                   _pendingPlaceRuntimePatch != null)
-              ? List<Map<String, dynamic>>.from(
-                  ((_pendingPlaceRuntimePatch!['sequence'] as List?) ??
-                          const <dynamic>[])
-                      .whereType<Map>()
-                      .map(
-                        (step) => Map<String, dynamic>.from(
-                          step as Map<dynamic, dynamic>,
-                        ),
-                      ),
-                )
-              : List<Map<String, dynamic>>.from(
-                  ((_selectedData?['sequence'] as List?) ?? const <dynamic>[])
-                      .whereType<Map>()
-                      .map(
-                        (step) => Map<String, dynamic>.from(
-                          step as Map<dynamic, dynamic>,
-                        ),
-                      ),
-                );
+              ? _pendingPlaceRuntimePatch
+              : _selectedData;
+      final runtimeSequence = _normalizeDynamicMapList(
+        runtimeSource?['sequence'],
+      );
 
       final mediaRequirements = computeMediaRequirementsFromSequence(
         runtimeSequence,
@@ -1605,15 +1580,7 @@ class _CreatorScreenState extends State<CreatorScreen>
                       a0QuestionCtrl: _a0QuestionCtrl,
                       b0QuestionCtrl: _b0QuestionCtrl,
                       c0QuestionCtrl: _c0QuestionCtrl,
-                      a0AnswerCtrl: _a0AnswerCtrl,
-                      b0AnswerCtrl: _b0AnswerCtrl,
-                      c0AnswerCtrl: _c0AnswerCtrl,
-                      a0AliasesCtrl: _a0AliasesCtrl,
-                      b0AliasesCtrl: _b0AliasesCtrl,
-                      c0AliasesCtrl: _c0AliasesCtrl,
                       sideQuestionCtrls: _sideQuestionCtrls,
-                      sideAnswerCtrls: _sideAnswerCtrls,
-                      sideAliasesCtrls: _sideAliasesCtrls,
                       sideQuestionPlaceIds: _sideQuestionPlaceIds,
                       isSaving: _isQuestionnaireSaving,
                       onSave: isScenarioLocked ? () {} : _saveQuestionnaire,
