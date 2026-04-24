@@ -107,8 +107,16 @@ class _CreatorScreenState extends State<CreatorScreen>
   final TextEditingController _a0QuestionCtrl = TextEditingController();
   final TextEditingController _b0QuestionCtrl = TextEditingController();
   final TextEditingController _c0QuestionCtrl = TextEditingController();
+  final TextEditingController _a0AnswerCtrl = TextEditingController();
+  final TextEditingController _b0AnswerCtrl = TextEditingController();
+  final TextEditingController _c0AnswerCtrl = TextEditingController();
+  final TextEditingController _a0AliasesCtrl = TextEditingController();
+  final TextEditingController _b0AliasesCtrl = TextEditingController();
+  final TextEditingController _c0AliasesCtrl = TextEditingController();
 
   late final List<TextEditingController> _sideQuestionCtrls;
+  late final List<TextEditingController> _sideAnswerCtrls;
+  late final List<TextEditingController> _sideAliasesCtrls;
   late final List<String?> _sideQuestionPlaceIds;
   bool _gameConfigurationLoaded = false;
 
@@ -135,6 +143,14 @@ class _CreatorScreenState extends State<CreatorScreen>
       5,
       (_) => TextEditingController(),
     );
+    _sideAnswerCtrls = List<TextEditingController>.generate(
+      5,
+      (_) => TextEditingController(),
+    );
+    _sideAliasesCtrls = List<TextEditingController>.generate(
+      5,
+      (_) => TextEditingController(),
+    );
     _sideQuestionPlaceIds = List<String?>.filled(5, null);
   }
 
@@ -148,7 +164,19 @@ class _CreatorScreenState extends State<CreatorScreen>
     _a0QuestionCtrl.dispose();
     _b0QuestionCtrl.dispose();
     _c0QuestionCtrl.dispose();
+    _a0AnswerCtrl.dispose();
+    _b0AnswerCtrl.dispose();
+    _c0AnswerCtrl.dispose();
+    _a0AliasesCtrl.dispose();
+    _b0AliasesCtrl.dispose();
+    _c0AliasesCtrl.dispose();
     for (final ctrl in _sideQuestionCtrls) {
+      ctrl.dispose();
+    }
+    for (final ctrl in _sideAnswerCtrls) {
+      ctrl.dispose();
+    }
+    for (final ctrl in _sideAliasesCtrls) {
       ctrl.dispose();
     }
     _nameCtrl.dispose();
@@ -379,6 +407,46 @@ class _CreatorScreenState extends State<CreatorScreen>
     );
   }
 
+  String _readString(dynamic value) {
+    return (value ?? '').toString().trim();
+  }
+
+  List<String> _readAliases(dynamic raw) {
+    if (raw == null) {
+      return const <String>[];
+    }
+
+    if (raw is Iterable) {
+      final values = <String>[];
+      for (final item in raw) {
+        final value = item.toString().trim();
+        if (value.isNotEmpty) {
+          values.add(value);
+        }
+      }
+      return values;
+    }
+
+    final text = raw.toString().trim();
+    if (text.isEmpty) {
+      return const <String>[];
+    }
+
+    return text
+        .split(',')
+        .map((value) => value.trim())
+        .where((value) => value.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  String _aliasesToText(dynamic raw) {
+    return _readAliases(raw).join(', ');
+  }
+
+  List<String> _aliasesFromController(TextEditingController controller) {
+    return _readAliases(controller.text);
+  }
+
   Widget _wrapCreatorTabLocked({
     required bool locked,
     required Widget child,
@@ -468,6 +536,28 @@ class _CreatorScreenState extends State<CreatorScreen>
     _b0QuestionCtrl.text = (mainQuestions['B0'] ?? '').toString().trim();
     _c0QuestionCtrl.text = (mainQuestions['C0'] ?? '').toString().trim();
 
+    final mainAnswers =
+        (finalQuestionnaire['mainAnswers'] as Map<String, dynamic>?) ??
+            <String, dynamic>{};
+
+    Map<String, dynamic> mainAnswerFor(String key) {
+      final value = mainAnswers[key];
+      return value is Map
+          ? Map<String, dynamic>.from(value as Map<dynamic, dynamic>)
+          : <String, dynamic>{};
+    }
+
+    final a0Answer = mainAnswerFor('A0');
+    final b0Answer = mainAnswerFor('B0');
+    final c0Answer = mainAnswerFor('C0');
+
+    _a0AnswerCtrl.text = _readString(a0Answer['answer']);
+    _b0AnswerCtrl.text = _readString(b0Answer['answer']);
+    _c0AnswerCtrl.text = _readString(c0Answer['answer']);
+    _a0AliasesCtrl.text = _aliasesToText(a0Answer['aliases']);
+    _b0AliasesCtrl.text = _aliasesToText(b0Answer['aliases']);
+    _c0AliasesCtrl.text = _aliasesToText(c0Answer['aliases']);
+
     for (int i = 0; i < _sideQuestionCtrls.length; i++) {
       final raw = i < sideQuestions.length ? sideQuestions[i] : null;
       if (raw is Map) {
@@ -475,9 +565,13 @@ class _CreatorScreenState extends State<CreatorScreen>
         _sideQuestionPlaceIds[i] = placeId.isEmpty ? null : placeId;
         _sideQuestionCtrls[i].text =
             (raw['question'] ?? '').toString().trim();
+        _sideAnswerCtrls[i].text = _readString(raw['answer']);
+        _sideAliasesCtrls[i].text = _aliasesToText(raw['aliases']);
       } else {
         _sideQuestionPlaceIds[i] = null;
         _sideQuestionCtrls[i].clear();
+        _sideAnswerCtrls[i].clear();
+        _sideAliasesCtrls[i].clear();
       }
     }
 
@@ -502,6 +596,8 @@ class _CreatorScreenState extends State<CreatorScreen>
           'slot': index + 1,
           'placeId': (_sideQuestionPlaceIds[index] ?? '').trim(),
           'question': _sideQuestionCtrls[index].text.trim(),
+          'answer': _sideAnswerCtrls[index].text.trim(),
+          'aliases': _aliasesFromController(_sideAliasesCtrls[index]),
         };
       });
 
@@ -513,6 +609,20 @@ class _CreatorScreenState extends State<CreatorScreen>
             'A0': _a0QuestionCtrl.text.trim(),
             'B0': _b0QuestionCtrl.text.trim(),
             'C0': _c0QuestionCtrl.text.trim(),
+          },
+          'mainAnswers': {
+            'A0': {
+              'answer': _a0AnswerCtrl.text.trim(),
+              'aliases': _aliasesFromController(_a0AliasesCtrl),
+            },
+            'B0': {
+              'answer': _b0AnswerCtrl.text.trim(),
+              'aliases': _aliasesFromController(_b0AliasesCtrl),
+            },
+            'C0': {
+              'answer': _c0AnswerCtrl.text.trim(),
+              'aliases': _aliasesFromController(_c0AliasesCtrl),
+            },
           },
           'sideQuestions': sideQuestions,
         },
@@ -1580,7 +1690,15 @@ class _CreatorScreenState extends State<CreatorScreen>
                       a0QuestionCtrl: _a0QuestionCtrl,
                       b0QuestionCtrl: _b0QuestionCtrl,
                       c0QuestionCtrl: _c0QuestionCtrl,
+                      a0AnswerCtrl: _a0AnswerCtrl,
+                      b0AnswerCtrl: _b0AnswerCtrl,
+                      c0AnswerCtrl: _c0AnswerCtrl,
+                      a0AliasesCtrl: _a0AliasesCtrl,
+                      b0AliasesCtrl: _b0AliasesCtrl,
+                      c0AliasesCtrl: _c0AliasesCtrl,
                       sideQuestionCtrls: _sideQuestionCtrls,
+                      sideAnswerCtrls: _sideAnswerCtrls,
+                      sideAliasesCtrls: _sideAliasesCtrls,
                       sideQuestionPlaceIds: _sideQuestionPlaceIds,
                       isSaving: _isQuestionnaireSaving,
                       onSave: isScenarioLocked ? () {} : _saveQuestionnaire,
