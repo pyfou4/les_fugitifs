@@ -98,13 +98,18 @@ class RuntimeSessionService {
       throw Exception('Le snapshot verrouillé est vide.');
     }
 
+    final runtimeData = await _loadRuntimeScenarioDataForSession(
+      session: session,
+      sessionData: sessionData,
+    );
+
     final sitePlacesSnapshot = await _firestore
         .collection('sites')
         .doc(session.siteId)
         .collection('places')
         .get();
 
-    final templateMaps = _extractEntityMaps(
+    final lockedTemplateMaps = _extractEntityMaps(
       lockedData,
       preferredKeys: const [
         'placeTemplates',
@@ -113,6 +118,35 @@ class RuntimeSessionService {
         'templates',
       ],
     );
+
+    final lockedTemplatesById = <String, Map<String, dynamic>>{
+      for (final template in lockedTemplateMaps)
+        if ((template['id'] ?? '').toString().trim().isNotEmpty)
+          (template['id'] ?? '').toString().trim(): template,
+    };
+
+    final runtimeTemplateMaps = runtimeData == null
+        ? const <Map<String, dynamic>>[]
+        : _extractEntityMaps(
+            runtimeData,
+            preferredKeys: const [
+              'places',
+              'runtimePlaces',
+              'placeTemplates',
+              'lockedPlaces',
+              'templates',
+            ],
+          );
+
+    final templateMaps = runtimeTemplateMaps.isEmpty
+        ? lockedTemplateMaps
+        : runtimeTemplateMaps.map((runtimePlace) {
+            final placeId = (runtimePlace['id'] ?? '').toString().trim();
+            return _normalizeRuntimePlaceForPlaceNode(
+              runtimePlace,
+              fallbackTemplate: lockedTemplatesById[placeId],
+            );
+          }).toList();
 
     final suspectMaps = _extractEntityMaps(
       lockedData,
@@ -131,8 +165,11 @@ class RuntimeSessionService {
     );
 
     if (templateMaps.isEmpty) {
+      final sourcePath = runtimeData == null
+          ? 'lockedScenarios/${session.lockedScenarioId}'
+          : 'runtime_scenarios/${runtimeData['id']}';
       throw Exception(
-        'Aucun lieu verrouillé exploitable trouvé dans lockedScenarios/${session.lockedScenarioId}.',
+        'Aucun lieu exploitable trouvé dans $sourcePath.',
       );
     }
 
@@ -164,6 +201,124 @@ class RuntimeSessionService {
     );
   }
 
+  Future<Map<String, dynamic>?> _loadRuntimeScenarioDataForSession({
+    required GameSession session,
+    required Map<String, dynamic> sessionData,
+  }) async {
+    final explicitRuntimeScenarioId = _firstNonEmpty([
+      sessionData['runtimeScenarioId']?.toString(),
+      sessionData['activeRuntimeScenarioId']?.toString(),
+      _nestedString(sessionData['runtimeScenario'], 'id'),
+    ]);
+
+    if (explicitRuntimeScenarioId != null) {
+      final runtimeData = await _loadRuntimeScenarioById(
+        explicitRuntimeScenarioId,
+        expectedLockedScenarioId: session.lockedScenarioId,
+      );
+      if (runtimeData != null) {
+        return runtimeData;
+      }
+    }
+
+    final gameId = _firstNonEmpty([
+          sessionData['gameId']?.toString(),
+          sessionData['game'] is Map
+              ? (sessionData['game'] as Map)['id']?.toString()
+              : null,
+        ]) ??
+        'les_fugitifs';
+
+    final gameSnapshot = await _firestore.collection('games').doc(gameId).get();
+    final gameData = gameSnapshot.data();
+    final runtimeScenarioId = gameData?['lastRuntimeScenarioId']?.toString();
+
+    if (runtimeScenarioId == null || runtimeScenarioId.trim().isEmpty) {
+      return null;
+    }
+
+    return _loadRuntimeScenarioById(
+      runtimeScenarioId.trim(),
+      expectedLockedScenarioId: session.lockedScenarioId,
+    );
+  }
+
+  Future<Map<String, dynamic>?> _loadRuntimeScenarioById(
+    String runtimeScenarioId, {
+    required String expectedLockedScenarioId,
+  }) async {
+    final runtimeSnapshot = await _firestore
+        .collection('runtime_scenarios')
+        .doc(runtimeScenarioId)
+        .get();
+
+    final runtimeData = runtimeSnapshot.data();
+    if (!runtimeSnapshot.exists || runtimeData == null) {
+      return null;
+    }
+
+    final sourceLockedScenarioId =
+        (runtimeData['sourceLockedScenarioId'] ?? '').toString().trim();
+
+    if (sourceLockedScenarioId.isNotEmpty &&
+        sourceLockedScenarioId != expectedLockedScenarioId) {
+      return null;
+    }
+
+    return runtimeData;
+  }
+
+  Map<String, dynamic> _normalizeRuntimePlaceForPlaceNode(
+    Map<String, dynamic> runtimePlace, {
+    Map<String, dynamic>? fallbackTemplate,
+  }) {
+    final visibility = _asStringKeyMap(runtimePlace['visibility']);
+    final narration = _asStringKeyMap(runtimePlace['narration']);
+    final reward = _asStringKeyMap(runtimePlace['reward']);
+    final fallback = fallbackTemplate ?? const <String, dynamic>{};
+
+    return {
+      ...fallback,
+      ...runtimePlace,
+      'id': runtimePlace['id'] ?? fallback['id'],
+      'name': runtimePlace['title'] ?? runtimePlace['name'] ?? fallback['name'],
+      'title': runtimePlace['title'] ?? runtimePlace['name'] ?? fallback['title'],
+      'phase': runtimePlace['phase'] ?? fallback['phase'],
+      'phaseIndex': runtimePlace['order'] ??
+          runtimePlace['phaseIndex'] ??
+          fallback['phaseIndex'],
+      'experienceType': runtimePlace['type'] ??
+          runtimePlace['experienceType'] ??
+          fallback['experienceType'],
+      'placeType': runtimePlace['type'] ??
+          runtimePlace['placeType'] ??
+          fallback['placeType'],
+      'requiresAllVisited': visibility['requiresAll'] ??
+          runtimePlace['requiresAllVisited'] ??
+          fallback['requiresAllVisited'] ??
+          const <String>[],
+      'requiresAnyVisited': visibility['requiresAny'] ??
+          runtimePlace['requiresAnyVisited'] ??
+          fallback['requiresAnyVisited'] ??
+          const <String>[],
+      'unlockRules': visibility['unlockRules'] ??
+          runtimePlace['unlockRules'] ??
+          fallback['unlockRules'],
+      'synopsis': narration['brief'] ??
+          runtimePlace['synopsis'] ??
+          fallback['synopsis'],
+      'storySynopsis': narration['description'] ??
+          runtimePlace['storySynopsis'] ??
+          fallback['storySynopsis'],
+      'targetType': reward['targetType'] ??
+          runtimePlace['targetType'] ??
+          fallback['targetType'],
+      'targetSlot': reward['targetSlot'] ??
+          runtimePlace['targetSlot'] ??
+          fallback['targetSlot'],
+    };
+  }
+
   static String? _firstNonEmpty(List<String?> values) {
     for (final value in values) {
       if (value != null && value.trim().isNotEmpty) {
@@ -171,6 +326,18 @@ class RuntimeSessionService {
       }
     }
     return null;
+  }
+
+  static String? _nestedString(dynamic rawParent, String key) {
+    if (rawParent is! Map) return null;
+    return rawParent[key]?.toString();
+  }
+
+  static Map<String, dynamic> _asStringKeyMap(dynamic raw) {
+    if (raw is! Map) return const <String, dynamic>{};
+    return raw.map(
+      (key, value) => MapEntry(key.toString(), value),
+    );
   }
 
   List<Map<String, dynamic>> _extractEntityMaps(

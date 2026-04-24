@@ -92,8 +92,10 @@ class CreatorPlaceSequenceEditorSection extends StatelessWidget {
                     availableSteps: sequence,
                     allowedStepTypes: allowedStepTypes,
                     onChanged: (updatedStep) {
-                      final next = List<Map<String, dynamic>>.from(sequence);
-                      next[index] = updatedStep;
+                      final next = sequence
+                          .map((item) => Map<String, dynamic>.from(item))
+                          .toList();
+                      next[index] = Map<String, dynamic>.from(updatedStep);
                       onChanged(next);
                     },
                     onDelete: () {

@@ -1735,7 +1735,9 @@ class CreatorPlaceSequenceStepCard extends StatelessWidget {
     final originalId = (original['id'] ?? '').toString();
     final originalType = (original['type'] ?? 'popup').toString();
     final safeId = originalId.isEmpty ? buildStableStepId() : originalId;
-    final nextParams = params ?? <String, dynamic>{};
+    final nextParams = params ?? (original['params'] is Map
+        ? Map<String, dynamic>.from(original['params'] as Map)
+        : <String, dynamic>{});
 
     return <String, dynamic>{
       'id': safeId,

@@ -27,6 +27,40 @@ class HomeScreen extends StatefulWidget {
 }
 
 
+class _RuntimePlaceConfig {
+  final String type;
+  final String? mechanicMode;
+  final String? interaction;
+  final String? rewardMode;
+  final String? rewardTargetType;
+  final String? rewardTargetSlot;
+  final String? rulesSummary;
+  final String? scoringSummary;
+  final bool hasScoring;
+
+  const _RuntimePlaceConfig({
+    required this.type,
+    this.mechanicMode,
+    this.interaction,
+    this.rewardMode,
+    this.rewardTargetType,
+    this.rewardTargetSlot,
+    this.rulesSummary,
+    this.scoringSummary,
+    required this.hasScoring,
+  });
+
+  bool get hasPreparedEngine =>
+      (mechanicMode != null && mechanicMode!.trim().isNotEmpty) ||
+      (interaction != null && interaction!.trim().isNotEmpty) ||
+      hasScoring ||
+      (rulesSummary != null && rulesSummary!.trim().isNotEmpty) ||
+      (scoringSummary != null && scoringSummary!.trim().isNotEmpty) ||
+      (rewardMode != null && rewardMode!.trim().isNotEmpty) ||
+      (rewardTargetType != null && rewardTargetType!.trim().isNotEmpty) ||
+      (rewardTargetSlot != null && rewardTargetSlot!.trim().isNotEmpty);
+}
+
 class _HomeScreenState extends State<HomeScreen> {
   final RuntimeSessionService _runtimeSessionService = RuntimeSessionService();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -43,6 +77,7 @@ class _HomeScreenState extends State<HomeScreen> {
   GameSession? _session;
   String? _storagePrefix;
   String? _currentHelpPlaceId;
+  Map<String, _RuntimePlaceConfig> _runtimePlaceConfigById = {};
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
       _humanHelpMessagesSubscription;
   bool _humanHelpDialogOpen = false;
@@ -89,6 +124,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _motives = bundle.motives;
       _session = bundle.session;
       _storagePrefix = 'session_${bundle.session.id}';
+      _runtimePlaceConfigById = await _loadRuntimePlaceConfigs();
 
       await _loadSessionAndProgress();
       await _startHumanHelpMessagesListener();
@@ -104,6 +140,118 @@ class _HomeScreenState extends State<HomeScreen> {
         _error = 'Erreur chargement runtime : $e';
       });
     }
+  }
+
+  Future<Map<String, _RuntimePlaceConfig>> _loadRuntimePlaceConfigs() async {
+    try {
+      final gameDoc = await _firestore.collection('games').doc('les_fugitifs').get();
+      final gameData = gameDoc.data();
+      final runtimeScenarioId = gameData?['lastRuntimeScenarioId']?.toString().trim();
+
+      if (runtimeScenarioId == null || runtimeScenarioId.isEmpty) {
+        return <String, _RuntimePlaceConfig>{};
+      }
+
+      final runtimeDoc = await _firestore
+          .collection('runtime_scenarios')
+          .doc(runtimeScenarioId)
+          .get();
+
+      final runtimeData = runtimeDoc.data();
+      final rawPlaces = runtimeData?['places'];
+
+      if (rawPlaces is! List) {
+        return <String, _RuntimePlaceConfig>{};
+      }
+
+      final result = <String, _RuntimePlaceConfig>{};
+      for (final rawPlace in rawPlaces) {
+        if (rawPlace is! Map) continue;
+        final place = rawPlace.map(
+          (key, value) => MapEntry(key.toString(), value),
+        );
+        final id = place['id']?.toString().trim();
+        final type = place['type']?.toString().trim();
+        if (id == null || id.isEmpty || type == null || type.isEmpty) {
+          continue;
+        }
+
+        final mechanic = _asStringKeyMap(place['mechanic']);
+        final reward = _asStringKeyMap(place['reward']);
+        final scoring = _asStringKeyMap(place['scoring']);
+
+        result[id] = _RuntimePlaceConfig(
+          type: type,
+          mechanicMode: mechanic['mode']?.toString(),
+          interaction: mechanic['interaction']?.toString(),
+          rewardMode: reward['mode']?.toString(),
+          rewardTargetType: reward['targetType']?.toString(),
+          rewardTargetSlot: reward['targetSlot']?.toString(),
+          rulesSummary: _runtimeRulesSummary(mechanic['rules']),
+          scoringSummary: _runtimeScoringSummary(scoring),
+          hasScoring: scoring.isNotEmpty,
+        );
+      }
+
+      return result;
+    } catch (_) {
+      return <String, _RuntimePlaceConfig>{};
+    }
+  }
+
+  Map<String, dynamic> _asStringKeyMap(dynamic raw) {
+    if (raw is! Map) return const <String, dynamic>{};
+    return raw.map(
+      (key, value) => MapEntry(key.toString(), value),
+    );
+  }
+
+  String? _runtimeRulesSummary(dynamic rawRules) {
+    final rules = _asStringKeyMap(rawRules);
+    if (rules.isEmpty) return null;
+
+    final parts = <String>[];
+    for (final entry in rules.entries) {
+      final value = entry.value;
+      if (value is Map || value is List) continue;
+      final valueText = value?.toString().trim();
+      if (valueText == null || valueText.isEmpty) continue;
+      parts.add('${entry.key}: $valueText');
+    }
+
+    if (parts.isEmpty) return 'règles runtime présentes';
+    return parts.take(4).join(' · ');
+  }
+
+  String? _runtimeScoringSummary(dynamic rawScoring) {
+    final scoring = _asStringKeyMap(rawScoring);
+    if (scoring.isEmpty) return null;
+
+    final type = scoring['type']?.toString().trim();
+    final thresholds = scoring['thresholds'];
+    if (thresholds is List && thresholds.isNotEmpty) {
+      final items = thresholds
+          .whereType<Map>()
+          .map((raw) {
+            final map = raw.map((key, value) => MapEntry(key.toString(), value));
+            final min = map['min'];
+            final max = map['max'];
+            final result = map['result'] ?? map['strength'];
+            if (result == null) return null;
+            if (min == null && max == null) return result.toString();
+            return '$result: ${min ?? '?'}-${max ?? '?'}';
+          })
+          .whereType<String>()
+          .take(3)
+          .toList();
+
+      if (items.isNotEmpty) {
+        final prefix = type == null || type.isEmpty ? 'scoring' : type;
+        return '$prefix (${items.join(' · ')})';
+      }
+    }
+
+    return type == null || type.isEmpty ? 'scoring runtime présent' : type;
   }
 
   Future<void> _loadSessionAndProgress() async {
@@ -380,6 +528,8 @@ class _HomeScreenState extends State<HomeScreen> {
   void _openPlaceMedia(PlaceNode place) {
     _setCurrentHelpPlace(place);
 
+    final runtimeConfig = _runtimePlaceConfigById[place.id];
+    final runtimeType = runtimeConfig?.type ?? 'media';
     final revealedSuspect = _findSuspect(_session?.suspectByPlace[place.id]);
     final revealedMotive = _findMotive(_session?.motiveByPlace[place.id]);
 
@@ -392,7 +542,14 @@ class _HomeScreenState extends State<HomeScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Média à connecter plus tard.'),
+              Text(_runtimeOpeningMessage(runtimeType)),
+              if (runtimeConfig != null && runtimeConfig.hasPreparedEngine) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _runtimeEnginePreview(runtimeConfig),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
               if (revealedSuspect != null) ...[
                 const SizedBox(height: 12),
                 Text('Suspect innocenté : ${revealedSuspect.name}'),
@@ -412,6 +569,51 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       },
     );
+  }
+
+  String _runtimeOpeningMessage(String runtimeType) {
+    switch (runtimeType) {
+      case 'physical':
+        return 'Épreuve physique à connecter plus tard.';
+      case 'observation':
+        return 'Poste d’observation à connecter plus tard.';
+      case 'media':
+      default:
+        return 'Média à connecter plus tard.';
+    }
+  }
+
+  String _runtimeEnginePreview(_RuntimePlaceConfig config) {
+    final parts = <String>[];
+
+    if (config.mechanicMode != null && config.mechanicMode!.trim().isNotEmpty) {
+      parts.add('mécanique: ${config.mechanicMode}');
+    }
+    if (config.interaction != null && config.interaction!.trim().isNotEmpty) {
+      parts.add('interaction: ${config.interaction}');
+    }
+    if (config.rulesSummary != null && config.rulesSummary!.trim().isNotEmpty) {
+      parts.add('règles: \${config.rulesSummary}');
+    }
+    if (config.scoringSummary != null && config.scoringSummary!.trim().isNotEmpty) {
+      parts.add('scoring: \${config.scoringSummary}');
+    } else if (config.hasScoring) {
+      parts.add('scoring préparé');
+    }
+    if (config.rewardTargetType != null &&
+        config.rewardTargetType!.trim().isNotEmpty) {
+      final target = config.rewardTargetSlot == null ||
+              config.rewardTargetSlot!.trim().isEmpty
+          ? config.rewardTargetType!
+          : '${config.rewardTargetType}/${config.rewardTargetSlot}';
+      parts.add('récompense: $target');
+    }
+
+    if (parts.isEmpty) {
+      return 'Moteur runtime prêt, configuration détaillée absente.';
+    }
+
+    return 'Moteur runtime préparé : ${parts.join(' · ')}.';
   }
 
   List<String> _missingPrerequisites(PlaceNode place) {

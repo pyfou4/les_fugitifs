@@ -7,7 +7,15 @@ class CreatorQuestionnaireTab extends StatelessWidget {
   final TextEditingController a0QuestionCtrl;
   final TextEditingController b0QuestionCtrl;
   final TextEditingController c0QuestionCtrl;
+  final TextEditingController a0AnswerCtrl;
+  final TextEditingController b0AnswerCtrl;
+  final TextEditingController c0AnswerCtrl;
+  final TextEditingController a0AliasesCtrl;
+  final TextEditingController b0AliasesCtrl;
+  final TextEditingController c0AliasesCtrl;
   final List<TextEditingController> sideQuestionCtrls;
+  final List<TextEditingController> sideAnswerCtrls;
+  final List<TextEditingController> sideAliasesCtrls;
   final List<String?> sideQuestionPlaceIds;
   final bool isSaving;
   final VoidCallback onSave;
@@ -21,7 +29,15 @@ class CreatorQuestionnaireTab extends StatelessWidget {
     required this.a0QuestionCtrl,
     required this.b0QuestionCtrl,
     required this.c0QuestionCtrl,
+    required this.a0AnswerCtrl,
+    required this.b0AnswerCtrl,
+    required this.c0AnswerCtrl,
+    required this.a0AliasesCtrl,
+    required this.b0AliasesCtrl,
+    required this.c0AliasesCtrl,
     required this.sideQuestionCtrls,
+    required this.sideAnswerCtrls,
+    required this.sideAliasesCtrls,
     required this.sideQuestionPlaceIds,
     required this.isSaving,
     required this.onSave,
@@ -53,10 +69,65 @@ class CreatorQuestionnaireTab extends StatelessWidget {
     );
   }
 
+  Widget _answerFields({
+    required TextEditingController answerController,
+    required TextEditingController aliasesController,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 12),
+        const Text(
+          'Réponse correcte',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+            fontSize: 14,
+          ),
+        ),
+        const SizedBox(height: 6),
+        TextField(
+          controller: answerController,
+          maxLines: 1,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 15,
+            height: 1.3,
+          ),
+          decoration: _decoration('Réponse attendue'),
+        ),
+        const SizedBox(height: 10),
+        TextField(
+          controller: aliasesController,
+          maxLines: 2,
+          minLines: 1,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 15,
+            height: 1.3,
+          ),
+          decoration: _decoration('Alias acceptés, séparés par des virgules'),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'Comparaison intelligente : minuscules, accents, espaces et ponctuation sont ignorés. Une petite tolérance aux fautes est prévue côté runtime.',
+          style: TextStyle(
+            color: Color(0xFF7F8DA3),
+            fontSize: 12,
+            height: 1.35,
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _mainQuestionCard({
     required String title,
     required String subtitle,
     required TextEditingController controller,
+    TextEditingController? answerController,
+    TextEditingController? aliasesController,
+    String? automaticAnswerNotice,
   }) {
     return Container(
       padding: const EdgeInsets.all(16),
@@ -96,6 +167,31 @@ class CreatorQuestionnaireTab extends StatelessWidget {
             ),
             decoration: _decoration('Texte de la question'),
           ),
+          if (answerController != null && aliasesController != null)
+            _answerFields(
+              answerController: answerController,
+              aliasesController: aliasesController,
+            ),
+          if (automaticAnswerNotice != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFF17243A),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFF31435F)),
+              ),
+              child: Text(
+                automaticAnswerNotice,
+                style: const TextStyle(
+                  color: Color(0xFFB8C3D6),
+                  fontSize: 13,
+                  height: 1.35,
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -122,7 +218,7 @@ class CreatorQuestionnaireTab extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           const Text(
-            'Choisis un lieu annexe, puis écris la question finale liée à ce poste.',
+            'Choisis un lieu annexe, écris la question finale liée à ce poste, puis indique la réponse correcte.',
             style: TextStyle(
               color: Color(0xFFAAB7C8),
               height: 1.35,
@@ -165,6 +261,10 @@ class CreatorQuestionnaireTab extends StatelessWidget {
               height: 1.3,
             ),
             decoration: _decoration('Texte de la question annexe'),
+          ),
+          _answerFields(
+            answerController: sideAnswerCtrls[index],
+            aliasesController: sideAliasesCtrls[index],
           ),
         ],
       ),
@@ -211,30 +311,40 @@ class CreatorQuestionnaireTab extends StatelessWidget {
               title: '1. Meurtrier',
               subtitle: 'Question principale sur l’identité du coupable.',
               controller: killerQuestionCtrl,
+              automaticAnswerNotice:
+                  'La bonne réponse n’est pas saisie ici : elle vient du coupable réel choisi pour la session.',
             ),
             const SizedBox(height: 12),
             _mainQuestionCard(
               title: '2. Mobile',
               subtitle: 'Question principale sur le mobile du meurtrier.',
               controller: motiveQuestionCtrl,
+              automaticAnswerNotice:
+                  'La bonne réponse n’est pas saisie ici : elle vient du mobile réel choisi pour la session.',
             ),
             const SizedBox(height: 12),
             _mainQuestionCard(
               title: '3. Question sur A0',
               subtitle: 'Question principale liée à la scène de crime.',
               controller: a0QuestionCtrl,
+              answerController: a0AnswerCtrl,
+              aliasesController: a0AliasesCtrl,
             ),
             const SizedBox(height: 12),
             _mainQuestionCard(
               title: '4. Question sur B0',
               subtitle: 'Question principale liée au pivot B0.',
               controller: b0QuestionCtrl,
+              answerController: b0AnswerCtrl,
+              aliasesController: b0AliasesCtrl,
             ),
             const SizedBox(height: 12),
             _mainQuestionCard(
               title: '5. Question sur C0',
               subtitle: 'Question principale liée au pivot C0.',
               controller: c0QuestionCtrl,
+              answerController: c0AnswerCtrl,
+              aliasesController: c0AliasesCtrl,
             ),
             const SizedBox(height: 22),
             const Text(
