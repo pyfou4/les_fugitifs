@@ -58,11 +58,44 @@ function mapReward(place) {
 
   if (!clue) return null;
 
+  const targetType = clue.target || place.targetType || null;
+  const targetSlot =
+    place.targetSlot ||
+    firstTargetSlotForType(place.targets, targetType) ||
+    null;
+
   return {
     mode: clue.mode || "fixed",
-    targetType: clue.target || null,
-    targetSlot: place.targetSlot || null
+    targetType,
+    targetSlot
   };
+}
+
+function firstTargetSlotForType(targets, targetType) {
+  if (!Array.isArray(targets)) return null;
+
+  const normalizedTargetType = normalizeTargetType(targetType);
+
+  const matchingTarget = targets.find((target) => {
+    if (!target || typeof target !== "object") return false;
+    return normalizeTargetType(target.targetType) === normalizedTargetType;
+  });
+
+  if (matchingTarget?.targetSlot) {
+    return matchingTarget.targetSlot;
+  }
+
+  const firstTarget = targets.find((target) => target?.targetSlot);
+  return firstTarget?.targetSlot || null;
+}
+
+function normalizeTargetType(value) {
+  const normalized = (value || "").toString().trim().toLowerCase();
+  if (normalized === "suspect" || normalized === "pc") return "suspect";
+  if (normalized === "motive" || normalized === "mobile" || normalized === "mo") {
+    return "motive";
+  }
+  return normalized;
 }
 
 function mapVisibility(place) {
@@ -111,7 +144,13 @@ function buildRuntimePlace(place) {
     scoring: mapScoring(place),
     reward: mapReward(place),
     trigger: mapTrigger(place),
-    media: mapMedia(place)
+    media: mapMedia(place),
+
+    // Données conservées pour le moteur de fin de poste.
+    // Elles ne recréent aucune règle : elles transportent le contrat scénariste.
+    allowedClueStrengths: place.allowedClueStrengths || [],
+    targets: Array.isArray(place.targets) ? place.targets : [],
+    targetSelectionMode: place.targetSelectionMode || null
   };
 }
 

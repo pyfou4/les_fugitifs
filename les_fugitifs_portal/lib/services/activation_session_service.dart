@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../features/site_readiness/site_readiness_service.dart';
+import 'site_route_analyzer.dart';
 
 class ActivationSessionResult {
   final bool success;
@@ -54,6 +55,8 @@ class ActivationSessionService {
         message: 'Le scénario verrouillé sélectionné est introuvable.',
       );
     }
+
+    final estimatedDistanceMeters = await _estimateSiteDistanceMeters(siteId);
 
     final lockedScenarioData = lockedScenarioSnap.data() ?? <String, dynamic>{};
     final lockedScenarioStatus =
@@ -177,6 +180,7 @@ class ActivationSessionService {
           'baseDurationHours': 5,
           'extraDurationHours': 0,
           'effectiveEndsAt': expiresAt,
+          'estimatedDistanceMeters': estimatedDistanceMeters,
           'runtime': {
             'visitedPlaces': <String>[],
             'foundKeywords': <String>[],
@@ -304,6 +308,50 @@ class ActivationSessionService {
         });
       }
     });
+  }
+
+
+  Future<double?> _estimateSiteDistanceMeters(String siteId) async {
+    try {
+      final sitePlacesSnap = await _firestore
+          .collection('sites')
+          .doc(siteId)
+          .collection('places')
+          .get();
+
+      final places = <Place>[];
+
+      for (final doc in sitePlacesSnap.docs) {
+        final data = doc.data();
+        final lat = _readDouble(data['lat']);
+        final lng = _readDouble(data['lng']);
+
+        if (lat == null || lng == null) {
+          continue;
+        }
+
+        places.add(
+          Place(
+            id: (data['id'] ?? doc.id).toString().trim(),
+            lat: lat,
+            lng: lng,
+          ),
+        );
+      }
+
+      final analysis = SiteRouteAnalyzer.analyze(places);
+      return analysis.avgDistance;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  static double? _readDouble(dynamic value) {
+    if (value is int) return value.toDouble();
+    if (value is double) return value;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value.trim());
+    return null;
   }
 
   static DateTime _parseCreatedAt(dynamic value) {

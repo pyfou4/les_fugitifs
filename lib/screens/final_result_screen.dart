@@ -217,6 +217,11 @@ class _FinalResultScreenState extends State<FinalResultScreen> {
               color: Colors.white.withValues(alpha: 0.64),
             ),
           ),
+          if (widget.result.estimatedDistanceMeters != null &&
+              widget.result.estimatedDistanceMeters! > 0) ...<Widget>[
+            const SizedBox(height: 14),
+            _buildEstimatedDistanceBlock(theme),
+          ],
           const SizedBox(height: 18),
           ClipRRect(
             borderRadius: BorderRadius.circular(999),
@@ -232,6 +237,43 @@ class _FinalResultScreenState extends State<FinalResultScreen> {
             style: theme.textTheme.bodyLarge?.copyWith(
               color: Colors.white.withValues(alpha: 0.78),
               height: 1.45,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEstimatedDistanceBlock(ThemeData theme) {
+    final double meters = widget.result.estimatedDistanceMeters ?? 0;
+    final String distanceLabel = meters >= 1000
+        ? '${(meters / 1000).toStringAsFixed(2)} km'
+        : '${meters.toStringAsFixed(0)} m';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.045),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: Column(
+        children: <Widget>[
+          Text(
+            'Distance parcourue estimée : $distanceLabel',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleSmall?.copyWith(
+              color: Colors.white.withValues(alpha: 0.82),
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'n’influence pas le score',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: Colors.white.withValues(alpha: 0.52),
+              fontStyle: FontStyle.italic,
             ),
           ),
         ],

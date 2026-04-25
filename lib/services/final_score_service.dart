@@ -19,6 +19,7 @@ class FinalScoreResult {
   final int totalQuestionsCount;
   final int maxQuestionScore;
   final int maxScore;
+  final double? estimatedDistanceMeters;
 
   const FinalScoreResult({
     required this.questionScore,
@@ -34,6 +35,7 @@ class FinalScoreResult {
     required this.totalQuestionsCount,
     required this.maxQuestionScore,
     this.maxScore = 2500,
+    this.estimatedDistanceMeters,
   });
 
   Map<String, dynamic> toJson() {
@@ -51,6 +53,7 @@ class FinalScoreResult {
       'totalQuestionsCount': totalQuestionsCount,
       'maxQuestionScore': maxQuestionScore,
       'maxScore': maxScore,
+      'estimatedDistanceMeters': estimatedDistanceMeters,
     };
   }
 }
@@ -129,6 +132,7 @@ class FinalScoreService {
       correctAnswersCount: correctAnswersCount,
       totalQuestionsCount: orderedQuestions.length,
       maxQuestionScore: maxQuestionScore,
+      estimatedDistanceMeters: session.estimatedDistanceMeters,
     );
   }
 

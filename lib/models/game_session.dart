@@ -6,6 +6,7 @@ class GameSession {
   final String status;
   final String? startedAt;
   final String? expiresAt;
+  final double? estimatedDistanceMeters;
 
   final String trueSuspectId;
   final String trueMotiveId;
@@ -33,6 +34,7 @@ class GameSession {
     required this.motiveByPlace,
     this.startedAt,
     this.expiresAt,
+    this.estimatedDistanceMeters,
     Set<String>? playerMarkedSuspectIds,
     Set<String>? playerMarkedMotiveIds,
     this.humanHelpEnabled = false,
@@ -53,6 +55,7 @@ class GameSession {
       'status': status,
       'startedAt': startedAt,
       'expiresAt': expiresAt,
+      'estimatedDistanceMeters': estimatedDistanceMeters,
       'trueSuspectId': trueSuspectId,
       'trueMotiveId': trueMotiveId,
       'suspectByPlace': suspectByPlace,
@@ -77,6 +80,7 @@ class GameSession {
       status: (json['status'] ?? '').toString(),
       startedAt: json['startedAt']?.toString(),
       expiresAt: json['expiresAt']?.toString(),
+      estimatedDistanceMeters: _readNullableDouble(json['estimatedDistanceMeters']),
       trueSuspectId: (json['trueSuspectId'] ?? '').toString(),
       trueMotiveId: (json['trueMotiveId'] ?? '').toString(),
       suspectByPlace: (json['suspectByPlace'] as Map<String, dynamic>? ?? const {})
@@ -109,6 +113,9 @@ class GameSession {
       status: (json['status'] ?? '').toString(),
       startedAt: json['startedAt']?.toString(),
       expiresAt: json['expiresAt']?.toString(),
+      estimatedDistanceMeters: _readNullableDouble(
+        json['estimatedDistanceMeters'] ?? runtime['estimatedDistanceMeters'],
+      ),
       trueSuspectId: (json['trueSuspectId'] ?? mystery['trueSuspectId'] ?? '').toString(),
       trueMotiveId: (json['trueMotiveId'] ?? mystery['trueMotiveId'] ?? '').toString(),
       suspectByPlace: _readNullableStringMap(
@@ -160,6 +167,13 @@ class GameSession {
     if (value is String) return value.toLowerCase() == 'true';
     if (value is num) return value != 0;
     return false;
+  }
+
+  static double? _readNullableDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value);
+    return null;
   }
 
   static int _readInt(dynamic value) {

@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../../features/site_readiness/site_readiness_models.dart';
+import '../../services/site_route_analyzer.dart';
 
 class CreatorSiteHeaderSection extends StatelessWidget {
   final DocumentSnapshot<Map<String, dynamic>> selectedSiteDoc;
@@ -14,6 +15,7 @@ class CreatorSiteHeaderSection extends StatelessWidget {
   final Future<void> Function()? onValidateReadiness;
   final Future<void> Function()? onFreeze;
   final Future<void> Function()? onUnfreeze;
+  final Map<String, Map<String, dynamic>> sitePlacesById;
 
   const CreatorSiteHeaderSection({
     super.key,
@@ -27,6 +29,7 @@ class CreatorSiteHeaderSection extends StatelessWidget {
     required this.onValidateReadiness,
     required this.onFreeze,
     required this.onUnfreeze,
+    required this.sitePlacesById,
   });
 
   @override
@@ -151,6 +154,10 @@ class CreatorSiteHeaderSection extends StatelessWidget {
             errorsCount: errorsCount,
             warningsCount: warningsCount,
           ),
+          if (isFrozen) ...[
+            const SizedBox(height: 14),
+            _RouteAnalysisSummary(sitePlacesById: sitePlacesById),
+          ],
         ],
       ),
     );
@@ -249,6 +256,201 @@ class _ReadinessSummary extends StatelessWidget {
                 ),
               ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+
+class _RouteAnalysisSummary extends StatelessWidget {
+  final Map<String, Map<String, dynamic>> sitePlacesById;
+
+  const _RouteAnalysisSummary({required this.sitePlacesById});
+
+  @override
+  Widget build(BuildContext context) {
+    try {
+      final places = <Place>[];
+
+      for (final entry in sitePlacesById.entries) {
+        final lat = _readDouble(entry.value['lat']);
+        final lng = _readDouble(entry.value['lng']);
+
+        if (lat == null || lng == null) {
+          continue;
+        }
+
+        places.add(
+          Place(
+            id: entry.key,
+            lat: lat,
+            lng: lng,
+          ),
+        );
+      }
+
+      final analysis = SiteRouteAnalyzer.analyze(places);
+
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0D192C),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFF294C74)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Row(
+              children: [
+                Icon(
+                  Icons.route_outlined,
+                  color: Color(0xFFAED0FF),
+                  size: 18,
+                ),
+                SizedBox(width: 8),
+                Text(
+                  'Analyse du parcours',
+                  style: TextStyle(
+                    color: Color(0xFFAED0FF),
+                    fontWeight: FontWeight.w900,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Calcul basé sur les parcours valides depuis A0 : 2 postes A, B0, 2 postes B, C0, 1 poste C, D0.',
+              style: TextStyle(
+                color: Color(0xFFAAB7C8),
+                height: 1.35,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _MetricPill(
+                  label: 'Distance min',
+                  value: _formatKilometers(analysis.minDistance),
+                ),
+                _MetricPill(
+                  label: 'Distance moyenne',
+                  value: _formatKilometers(analysis.avgDistance),
+                ),
+                _MetricPill(
+                  label: 'Distance max',
+                  value: _formatKilometers(analysis.maxDistance),
+                ),
+                _MetricPill(
+                  label: 'Segment min',
+                  value: _formatMeters(analysis.minSegment),
+                ),
+                _MetricPill(
+                  label: 'Segment moyen',
+                  value: _formatMeters(analysis.avgSegment),
+                ),
+                _MetricPill(
+                  label: 'Segment médian',
+                  value: _formatMeters(analysis.medianSegment),
+                ),
+                _MetricPill(
+                  label: 'Segment max',
+                  value: _formatMeters(analysis.maxSegment),
+                ),
+                _MetricPill(
+                  label: 'Parcours simulés',
+                  value: analysis.totalRoutes.toString(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Phrase marketing : enquête en plein air estimée entre ${_formatKilometers(analysis.minDistance)} et ${_formatKilometers(analysis.maxDistance)}, pour une moyenne de ${_formatKilometers(analysis.avgDistance)} à pied.',
+              style: const TextStyle(
+                color: Color(0xFFFFD7B8),
+                fontWeight: FontWeight.w700,
+                height: 1.35,
+              ),
+            ),
+          ],
+        ),
+      );
+    } catch (error) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFF0D192C),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFF7A4A24)),
+        ),
+        child: Text(
+          'Analyse du parcours indisponible : $error',
+          style: const TextStyle(
+            color: Color(0xFFFFD7B8),
+            height: 1.35,
+          ),
+        ),
+      );
+    }
+  }
+
+  static double? _readDouble(dynamic value) {
+    if (value is num) return value.toDouble();
+    if (value is String) return double.tryParse(value.replaceAll(',', '.'));
+    return null;
+  }
+
+  static String _formatMeters(double meters) => '${meters.round()} m';
+
+  static String _formatKilometers(double meters) =>
+      '${(meters / 1000).toStringAsFixed(2)} km';
+}
+
+class _MetricPill extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _MetricPill({
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: const Color(0xFF101C31),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF223250)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(
+              color: Color(0xFFAAB7C8),
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
         ],
       ),
     );

@@ -11,14 +11,19 @@ class RuntimeSessionBundle {
   final List<PlaceNode> places;
   final List<SuspectModel> suspects;
   final List<MotiveModel> motives;
+  final Map<String, dynamic> runtimeScenarioData;
+  final Map<String, dynamic> lockedScenarioData;
 
   const RuntimeSessionBundle({
     required this.session,
     required this.places,
     required this.suspects,
     required this.motives,
+    required this.runtimeScenarioData,
+    required this.lockedScenarioData,
   });
 }
+
 
 class RuntimeSessionService {
   RuntimeSessionService({
@@ -193,12 +198,56 @@ class RuntimeSessionService {
     }).toList()
       ..sort((a, b) => a.id.compareTo(b.id));
 
+    final normalizedLockedData = _normalizeScenarioData(lockedData);
+    final normalizedRuntimeData = _normalizeScenarioData(
+      runtimeData ?? const <String, dynamic>{},
+      fallbackScenarioData: normalizedLockedData,
+    );
+
     return RuntimeSessionBundle(
       session: session,
       places: places,
       suspects: suspects,
       motives: motives,
+      runtimeScenarioData: normalizedRuntimeData,
+      lockedScenarioData: normalizedLockedData,
     );
+  }
+
+  Map<String, dynamic> _normalizeScenarioData(
+    Map<String, dynamic> source, {
+    Map<String, dynamic>? fallbackScenarioData,
+  }) {
+    final normalized = Map<String, dynamic>.from(source);
+    final data = _asStringKeyMap(normalized['data']);
+    final fallback = fallbackScenarioData ?? const <String, dynamic>{};
+
+    void hoist(String key) {
+      if (_hasUsefulValue(normalized[key])) return;
+      if (_hasUsefulValue(data[key])) {
+        normalized[key] = data[key];
+        return;
+      }
+      if (_hasUsefulValue(fallback[key])) {
+        normalized[key] = fallback[key];
+      }
+    }
+
+    hoist('clueSystem');
+    hoist('suspects');
+    hoist('motives');
+    hoist('places');
+    hoist('placeTemplates');
+
+    return normalized;
+  }
+
+  bool _hasUsefulValue(dynamic value) {
+    if (value == null) return false;
+    if (value is String) return value.trim().isNotEmpty;
+    if (value is Map) return value.isNotEmpty;
+    if (value is Iterable) return value.isNotEmpty;
+    return true;
   }
 
   Future<Map<String, dynamic>?> _loadRuntimeScenarioDataForSession({
@@ -233,14 +282,46 @@ class RuntimeSessionService {
     final gameData = gameSnapshot.data();
     final runtimeScenarioId = gameData?['lastRuntimeScenarioId']?.toString();
 
-    if (runtimeScenarioId == null || runtimeScenarioId.trim().isEmpty) {
+    if (runtimeScenarioId != null && runtimeScenarioId.trim().isNotEmpty) {
+      final runtimeData = await _loadRuntimeScenarioById(
+        runtimeScenarioId.trim(),
+        expectedLockedScenarioId: session.lockedScenarioId,
+      );
+      if (runtimeData != null) {
+        return runtimeData;
+      }
+    }
+
+    return _loadRuntimeScenarioByLockedScenarioId(session.lockedScenarioId);
+  }
+
+  Future<Map<String, dynamic>?> _loadRuntimeScenarioByLockedScenarioId(
+    String lockedScenarioId,
+  ) async {
+    final query = await _firestore
+        .collection('runtime_scenarios')
+        .where('sourceLockedScenarioId', isEqualTo: lockedScenarioId)
+        .limit(20)
+        .get();
+
+    if (query.docs.isEmpty) {
       return null;
     }
 
-    return _loadRuntimeScenarioById(
-      runtimeScenarioId.trim(),
-      expectedLockedScenarioId: session.lockedScenarioId,
-    );
+    final candidates = query.docs
+        .map((doc) => {
+              ...doc.data(),
+              'id': doc.id,
+            })
+        .toList();
+
+    candidates.sort((a, b) {
+      final aGeneratedAt = (a['generatedAt'] ?? '').toString();
+      final bGeneratedAt = (b['generatedAt'] ?? '').toString();
+      return bGeneratedAt.compareTo(aGeneratedAt);
+    });
+
+    return candidates.first;
   }
 
   Future<Map<String, dynamic>?> _loadRuntimeScenarioById(

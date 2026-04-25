@@ -415,6 +415,41 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
     super.dispose();
   }
 
+
+  bool _isUsableHttpUrl(String value) {
+    final uri = Uri.tryParse(value.trim());
+    return uri != null &&
+        (uri.scheme == 'https' || uri.scheme == 'http') &&
+        uri.host.trim().isNotEmpty;
+  }
+
+  Widget _buildCallBackground() {
+    final resolvedImageUrl = _imageUrl.trim();
+
+    if (!_isUsableHttpUrl(resolvedImageUrl)) {
+      debugPrint(
+        'CALL_BACKGROUND_URL_INVALID: callId=$_callId imageUrl=$resolvedImageUrl',
+      );
+      return const _IncomingCallFallbackBackground();
+    }
+
+    return Image.network(
+      resolvedImageUrl,
+      fit: BoxFit.cover,
+      gaplessPlayback: true,
+      loadingBuilder: (context, child, loadingProgress) {
+        if (loadingProgress == null) return child;
+        return const _IncomingCallFallbackBackground();
+      },
+      errorBuilder: (context, error, stackTrace) {
+        debugPrint(
+          'CALL_BACKGROUND_LOAD_FAILED: callId=$_callId imageUrl=$resolvedImageUrl error=$error',
+        );
+        return const _IncomingCallFallbackBackground();
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
@@ -427,13 +462,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
       body: Stack(
         children: [
           Positioned.fill(
-            child: Image.network(
-              _imageUrl,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Container(color: Colors.black);
-              },
-            ),
+            child: _buildCallBackground(),
           ),
           Positioned.fill(
             child: IgnorePointer(
@@ -646,6 +675,41 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
               ),
             ),
         ],
+      ),
+    );
+  }
+}
+
+class _IncomingCallFallbackBackground extends StatelessWidget {
+  const _IncomingCallFallbackBackground();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: RadialGradient(
+          center: Alignment(0, 0.72),
+          radius: 1.18,
+          colors: [
+            Color(0xFF23140C),
+            Color(0xFF0B0908),
+            Color(0xFF000000),
+          ],
+          stops: [0.0, 0.52, 1.0],
+        ),
+      ),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.black.withValues(alpha: 0.18),
+              Colors.transparent,
+              Colors.black.withValues(alpha: 0.42),
+            ],
+          ),
+        ),
       ),
     );
   }

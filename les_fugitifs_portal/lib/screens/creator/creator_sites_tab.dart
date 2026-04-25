@@ -222,6 +222,7 @@ class CreatorSitesTab extends StatelessWidget {
                                       ),
                                     );
                                   },
+                            sitePlacesById: sitePlacesById,
                           ),
                           const SizedBox(height: 14),
                           CreatorSitePlacesGridSection(
