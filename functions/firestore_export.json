@@ -37,14 +37,15 @@
         "creatorLockedBy": "admin_portal",
         "creatorUnlockedBy": "admin_portal",
         "briefing": "Mise en contexte :\nNous sommes en 2041. Un ancien quartier industriel « Le Grid » dans la ville de Varon a été laissé à l’abandon et la vie s’y est redistribuée en gangs unifiés dans le meilleur des cas, en groupes éphémères de loups isolés et peu commodes dans le pire des cas. Une seule personne élue par consensus silencieux est chargée de faire respecter l’ordre dans Le Grid : Le Gardien du Pacte.\n\nDescription:\nTerritoire partagé entre plusieurs groupes\nAvec leurs propres règles\nÉquilibre fragile \nLe Gardien du Pacte veille aux respect du Pacte, des règles et équilibre \nLes conflits dans Le Grid sont réglés non pas par la violence directe mais par des épreuves codifiées qui déterminent les rapports de force.\n\nLe Grid : \nZone tolérée par le reste de la ville\nActivités surveillées \nPrésence policière en périphérie \nTant que les règles sont respectées, la police n’intervient pas, d’où l’importance de respecter Le Pacte.\n« Pas de violence grave, pas de mise en danger, pas de crime réel » sinon, intervention immédiate des autorités.\n\nIl y a 7 mois, le Gardien du Pacte a été retrouvé mort, visiblement assassiné avec une balle en plein cœur et les yeux arrachés, dans le garage d’un habitant de Varon, à la frontière du Grid. Vous, les membres du gang Korva avez été accusés et emprisonnés à tort. Aujourd’hui, grâce à l’aide extérieure de votre ami « Cherry On The Cake » (COTC) et d’un gardien de prison corrompu, vous avez réussi à vous évader. Vous devez maintenant prouver votre innocence et livrer un coupable à la police ou vous retournerez en prison pour 10 ans (et encore, c’est combien pour une évasion?)\n\nUn mot sur vous, les Korva :\nLes Korva ne dirigent pas le Grid, ils le traversent. Vous faites le lien entre Le Grid et Varon et passez là où d’autres s’arrêtent.\nMessagers, intermédiaires, observateurs: vous parlez à tout le monde sans appartenir à personne. Vous voyez ce que les autres ratent et savez souvent ce que les autres cachent. Sans surprise, ça vous cause quelques ennuis.",
-        "gameRules": "- ne pas mettre le téléphone sous silence durant le jeu\n- avoir assez de batterie (avant le jeu)",
         "creatorLockedAt": "2026-04-21T22:43:25.893",
         "lastLockedAt": "2026-04-21T22:43:25.893",
         "lastLockedScenarioId": "SdeTLxjJfMc8duN2J5Ab",
         "creatorLocked": false,
         "creatorUnlockedAt": "2026-04-22T07:18:02.474",
         "status": "draft",
-        "updatedAt": "2026-04-24T17:47:28.649"
+        "lastRuntimeScenarioId": "runtime_1777047796784",
+        "gameRules": "- ne pas mettre le téléphone sous silence durant le jeu\n- avoir assez de batterie (avant le jeu)",
+        "updatedAt": "2026-04-25T18:04:45.245"
       }
     }
   ],
@@ -6988,6 +6989,108 @@
       }
     },
     {
+      "id": "HZ5x1LLuczICrWE7CsAu",
+      "data": {
+        "id": "HZ5x1LLuczICrWE7CsAu",
+        "status": "active",
+        "active": true,
+        "activationCode": "32G8DJ",
+        "activationBatchId": "batch_1775252394541",
+        "lockedScenarioId": "TMAh2ipKTpnqtzeZqdCN",
+        "siteId": "cartagne_des_indes",
+        "gameId": "les_fugitifs",
+        "title": "Les Fugitifs",
+        "startedAt": "2026-04-25T15:57:14.052Z",
+        "expiresAt": "2026-04-25T20:57:14.052Z",
+        "createdAt": "2026-04-25T15:57:14.052Z",
+        "createdBy": "4XEzMrJWTVdXb7xg4HywYaQI8RG3",
+        "baseDurationHours": 5,
+        "extraDurationHours": 0,
+        "effectiveEndsAt": "2026-04-25T20:57:14.052Z",
+        "runtime": {
+          "visitedPlaces": [],
+          "foundKeywords": [],
+          "revealedSuspects": [],
+          "revealedMotives": [],
+          "flags": {}
+        },
+        "usedByDeviceId": "BP2A.250605.031.A3",
+        "activatedAt": "2026-04-25T10:57:25.413049",
+        "teamName": "test",
+        "playerCount": 1,
+        "teamSetupCompletedAt": {
+          "_seconds": 1777132651,
+          "_nanoseconds": 3000000
+        },
+        "scheduledCalls": {
+          "scheduled_cherry_call_2": {
+            "missedAt": null,
+            "displayName": "Cherry on the Cake",
+            "showMissedPopup": false,
+            "answeredAt": null,
+            "missedPopupShownAt": null,
+            "mediaSlotKey": "intro_call_2",
+            "popupMessage": "Cherry on the Cake a essayé de vous joindre.",
+            "allowOnlyWhenOutOfLocatedPost": true,
+            "triggerAfterSeconds": 9000,
+            "windowStartAt": "2026-04-25T18:27:14.052Z",
+            "expiredAt": null,
+            "windowEndAt": "2026-04-25T18:57:14.052Z",
+            "audioUrl": "",
+            "lastOutcomeReason": "",
+            "id": "scheduled_cherry_call_2",
+            "triggeredAt": null,
+            "ringtoneUrl": "https://actions.google.com/sounds/v1/alarms/phone_alerts_and_rings.ogg",
+            "updatedAt": "2026-04-25T15:58:30.116726Z",
+            "windowDurationSeconds": 1800,
+            "backgroundImageUrl": "https://firebasestorage.googleapis.com/v0/b/les-fugitifs-6d6f4.firebasestorage.app/o/incoming_call_bg.jpg?alt=media",
+            "status": "pending"
+          },
+          "scheduled_cherry_call_1": {
+            "missedAt": null,
+            "showMissedPopup": false,
+            "displayName": "Cherry on the Cake",
+            "answeredAt": null,
+            "missedPopupShownAt": null,
+            "mediaSlotKey": "intro_call_1",
+            "popupMessage": "Cherry on the Cake a essayé de vous joindre.",
+            "allowOnlyWhenOutOfLocatedPost": true,
+            "triggerAfterSeconds": 3600,
+            "windowStartAt": "2026-04-25T16:57:14.052Z",
+            "windowEndAt": "2026-04-25T17:27:14.052Z",
+            "expiredAt": null,
+            "audioUrl": "",
+            "id": "scheduled_cherry_call_1",
+            "ringtoneUrl": "https://actions.google.com/sounds/v1/alarms/phone_alerts_and_rings.ogg",
+            "windowDurationSeconds": 1800,
+            "backgroundImageUrl": "https://firebasestorage.googleapis.com/v0/b/les-fugitifs-6d6f4.firebasestorage.app/o/incoming_call_bg.jpg?alt=media",
+            "lastOutcomeReason": "triggered",
+            "triggeredAt": "2026-04-25T17:07:18.586613Z",
+            "updatedAt": "2026-04-25T17:07:18.586613Z",
+            "status": "ringing"
+          }
+        },
+        "callContext": {
+          "callId": "scheduled_cherry_call_1",
+          "helpAttemptsDuringCall": 0,
+          "retryPolicy": "no_retry",
+          "displayName": "Cherry on the Cake",
+          "uiVariant": "simple_call",
+          "mediaSlotKey": "intro_call_1",
+          "callType": "scheduled",
+          "audioUrl": "",
+          "ringtoneUrl": "https://actions.google.com/sounds/v1/alarms/phone_alerts_and_rings.ogg",
+          "backgroundImageUrl": "https://firebasestorage.googleapis.com/v0/b/les-fugitifs-6d6f4.firebasestorage.app/o/incoming_call_bg.jpg?alt=media",
+          "phase": "resolved",
+          "active": false,
+          "sourceEvent": "incoming_call_rejected",
+          "updatedAt": "2026-04-25T17:07:30.141354Z"
+        },
+        "mapTargetPlaceId": "A3",
+        "mapTargetUpdatedAt": "2026-04-25T17:07:39.242116Z"
+      }
+    },
+    {
       "id": "INh6qkIS5loA1SLmXBG6",
       "data": {
         "id": "INh6qkIS5loA1SLmXBG6",
@@ -8827,6 +8930,108 @@
       }
     },
     {
+      "id": "pnzXRxgI2MnXhHeJOT8V",
+      "data": {
+        "id": "pnzXRxgI2MnXhHeJOT8V",
+        "status": "active",
+        "active": true,
+        "activationCode": "2ZSTBT",
+        "activationBatchId": "batch_1775252394541",
+        "lockedScenarioId": "TMAh2ipKTpnqtzeZqdCN",
+        "siteId": "cartagne_des_indes",
+        "gameId": "les_fugitifs",
+        "title": "Les Fugitifs",
+        "startedAt": "2026-04-24T22:40:12.731Z",
+        "expiresAt": "2026-04-25T03:40:12.731Z",
+        "createdAt": "2026-04-24T22:40:12.731Z",
+        "createdBy": "4XEzMrJWTVdXb7xg4HywYaQI8RG3",
+        "baseDurationHours": 5,
+        "extraDurationHours": 0,
+        "effectiveEndsAt": "2026-04-25T03:40:12.731Z",
+        "runtime": {
+          "visitedPlaces": [],
+          "foundKeywords": [],
+          "revealedSuspects": [],
+          "revealedMotives": [],
+          "flags": {}
+        },
+        "usedByDeviceId": "BP2A.250605.031.A3",
+        "activatedAt": "2026-04-24T17:40:24.027632",
+        "teamName": "test",
+        "playerCount": 1,
+        "teamSetupCompletedAt": {
+          "_seconds": 1777070429,
+          "_nanoseconds": 737000000
+        },
+        "scheduledCalls": {
+          "scheduled_cherry_call_2": {
+            "missedAt": null,
+            "displayName": "Cherry on the Cake",
+            "showMissedPopup": false,
+            "answeredAt": null,
+            "mediaSlotKey": "intro_call_2",
+            "missedPopupShownAt": null,
+            "popupMessage": "Cherry on the Cake a essayé de vous joindre.",
+            "allowOnlyWhenOutOfLocatedPost": true,
+            "triggerAfterSeconds": 9000,
+            "windowStartAt": "2026-04-25T01:10:12.731Z",
+            "expiredAt": null,
+            "windowEndAt": "2026-04-25T01:40:12.731Z",
+            "lastOutcomeReason": "",
+            "audioUrl": "",
+            "id": "scheduled_cherry_call_2",
+            "triggeredAt": null,
+            "ringtoneUrl": "https://actions.google.com/sounds/v1/alarms/phone_alerts_and_rings.ogg",
+            "updatedAt": "2026-04-24T22:40:47.411143Z",
+            "backgroundImageUrl": "https://firebasestorage.googleapis.com/v0/b/les-fugitifs-6d6f4.firebasestorage.app/o/incoming_call_bg.jpg?alt=media",
+            "status": "pending",
+            "windowDurationSeconds": 1800
+          },
+          "scheduled_cherry_call_1": {
+            "missedAt": null,
+            "displayName": "Cherry on the Cake",
+            "answeredAt": null,
+            "mediaSlotKey": "intro_call_1",
+            "allowOnlyWhenOutOfLocatedPost": true,
+            "popupMessage": "Cherry on the Cake a essayé de vous joindre.",
+            "triggerAfterSeconds": 3600,
+            "windowStartAt": "2026-04-24T23:40:12.731Z",
+            "windowEndAt": "2026-04-25T00:10:12.731Z",
+            "audioUrl": "",
+            "id": "scheduled_cherry_call_1",
+            "triggeredAt": null,
+            "ringtoneUrl": "https://actions.google.com/sounds/v1/alarms/phone_alerts_and_rings.ogg",
+            "windowDurationSeconds": 1800,
+            "backgroundImageUrl": "https://firebasestorage.googleapis.com/v0/b/les-fugitifs-6d6f4.firebasestorage.app/o/incoming_call_bg.jpg?alt=media",
+            "expiredAt": "2026-04-25T01:09:16.537442Z",
+            "lastOutcomeReason": "window_expired",
+            "status": "expired",
+            "showMissedPopup": false,
+            "missedPopupShownAt": "2026-04-25T01:09:23.399541Z",
+            "updatedAt": "2026-04-25T01:09:23.399541Z"
+          }
+        },
+        "mapTargetPlaceId": "A0",
+        "mapTargetUpdatedAt": "2026-04-25T01:09:44.389447Z",
+        "callContext": {
+          "callId": "scheduled_cherry_call_2",
+          "phase": "ringing",
+          "helpAttemptsDuringCall": 0,
+          "retryPolicy": "no_retry",
+          "uiVariant": "simple_call",
+          "displayName": "Cherry on the Cake",
+          "active": true,
+          "mediaSlotKey": "intro_call_2",
+          "callType": "scheduled",
+          "audioUrl": "",
+          "sourceEvent": "scheduled_call_triggered",
+          "ringtoneUrl": "https://actions.google.com/sounds/v1/alarms/phone_alerts_and_rings.ogg",
+          "backgroundImageUrl": "https://firebasestorage.googleapis.com/v0/b/les-fugitifs-6d6f4.firebasestorage.app/o/incoming_call_bg.jpg?alt=media",
+          "updatedAt": "2026-04-25T01:10:18.106700Z"
+        }
+      }
+    },
+    {
       "id": "qZd6K8Heawi1JutjhyVM",
       "data": {
         "id": "qZd6K8Heawi1JutjhyVM",
@@ -9098,6 +9303,108 @@
         "currentBlockageLevel": "high",
         "lastHelpRequestAt": "2026-04-09T23:53:46.983748Z",
         "aiHelpCount": 21
+      }
+    },
+    {
+      "id": "shQyij0xjS2FO1kr6DNo",
+      "data": {
+        "id": "shQyij0xjS2FO1kr6DNo",
+        "status": "active",
+        "active": true,
+        "activationCode": "2WTIQC",
+        "activationBatchId": "batch_1775252394541",
+        "lockedScenarioId": "TMAh2ipKTpnqtzeZqdCN",
+        "siteId": "cartagne_des_indes",
+        "gameId": "les_fugitifs",
+        "title": "Les Fugitifs",
+        "startedAt": "2026-04-24T16:42:09.810Z",
+        "expiresAt": "2026-04-24T21:42:09.810Z",
+        "createdAt": "2026-04-24T16:42:09.810Z",
+        "createdBy": "4XEzMrJWTVdXb7xg4HywYaQI8RG3",
+        "baseDurationHours": 5,
+        "extraDurationHours": 0,
+        "effectiveEndsAt": "2026-04-24T21:42:09.810Z",
+        "runtime": {
+          "visitedPlaces": [],
+          "foundKeywords": [],
+          "revealedSuspects": [],
+          "revealedMotives": [],
+          "flags": {}
+        },
+        "usedByDeviceId": "BP2A.250605.031.A3",
+        "activatedAt": "2026-04-24T11:49:11.999516",
+        "teamName": "test",
+        "playerCount": 1,
+        "teamSetupCompletedAt": {
+          "_seconds": 1777049359,
+          "_nanoseconds": 232000000
+        },
+        "scheduledCalls": {
+          "scheduled_cherry_call_2": {
+            "missedAt": null,
+            "displayName": "Cherry on the Cake",
+            "showMissedPopup": false,
+            "answeredAt": null,
+            "mediaSlotKey": "intro_call_2",
+            "missedPopupShownAt": null,
+            "popupMessage": "Cherry on the Cake a essayé de vous joindre.",
+            "allowOnlyWhenOutOfLocatedPost": true,
+            "triggerAfterSeconds": 9000,
+            "windowStartAt": "2026-04-24T19:12:09.810Z",
+            "windowEndAt": "2026-04-24T19:42:09.810Z",
+            "expiredAt": null,
+            "lastOutcomeReason": "",
+            "audioUrl": "",
+            "id": "scheduled_cherry_call_2",
+            "triggeredAt": null,
+            "ringtoneUrl": "https://actions.google.com/sounds/v1/alarms/phone_alerts_and_rings.ogg",
+            "backgroundImageUrl": "https://firebasestorage.googleapis.com/v0/b/les-fugitifs-6d6f4.firebasestorage.app/o/incoming_call_bg.jpg?alt=media",
+            "windowDurationSeconds": 1800,
+            "status": "pending",
+            "updatedAt": "2026-04-24T16:49:33.563730Z"
+          },
+          "scheduled_cherry_call_1": {
+            "missedAt": null,
+            "displayName": "Cherry on the Cake",
+            "answeredAt": null,
+            "mediaSlotKey": "intro_call_1",
+            "allowOnlyWhenOutOfLocatedPost": true,
+            "popupMessage": "Cherry on the Cake a essayé de vous joindre.",
+            "triggerAfterSeconds": 3600,
+            "windowStartAt": "2026-04-24T17:42:09.810Z",
+            "windowEndAt": "2026-04-24T18:12:09.810Z",
+            "audioUrl": "",
+            "id": "scheduled_cherry_call_1",
+            "triggeredAt": null,
+            "ringtoneUrl": "https://actions.google.com/sounds/v1/alarms/phone_alerts_and_rings.ogg",
+            "backgroundImageUrl": "https://firebasestorage.googleapis.com/v0/b/les-fugitifs-6d6f4.firebasestorage.app/o/incoming_call_bg.jpg?alt=media",
+            "windowDurationSeconds": 1800,
+            "expiredAt": "2026-04-24T19:07:29.792426Z",
+            "lastOutcomeReason": "window_expired",
+            "status": "expired",
+            "showMissedPopup": false,
+            "missedPopupShownAt": "2026-04-24T19:07:40.394758Z",
+            "updatedAt": "2026-04-24T19:07:40.394758Z"
+          }
+        },
+        "mapTargetPlaceId": "",
+        "mapTargetUpdatedAt": "2026-04-24T19:07:45.806748Z",
+        "callContext": {
+          "callId": "scheduled_cherry_call_2",
+          "phase": "ringing",
+          "helpAttemptsDuringCall": 0,
+          "retryPolicy": "no_retry",
+          "uiVariant": "simple_call",
+          "displayName": "Cherry on the Cake",
+          "active": true,
+          "mediaSlotKey": "intro_call_2",
+          "callType": "scheduled",
+          "audioUrl": "",
+          "sourceEvent": "scheduled_call_triggered",
+          "ringtoneUrl": "https://actions.google.com/sounds/v1/alarms/phone_alerts_and_rings.ogg",
+          "backgroundImageUrl": "https://firebasestorage.googleapis.com/v0/b/les-fugitifs-6d6f4.firebasestorage.app/o/incoming_call_bg.jpg?alt=media",
+          "updatedAt": "2026-04-24T19:12:14.291635Z"
+        }
       }
     },
     {
@@ -9478,10 +9785,10 @@
           }
         },
         "mapTargetPlaceId": "",
-        "mapTargetUpdatedAt": "2026-04-20T15:00:52.910180Z",
         "extraDurationHours": 2,
         "effectiveEndsAt": "2026-04-21T02:25:21.196Z",
-        "humanHelpEnabled": false
+        "humanHelpEnabled": false,
+        "mapTargetUpdatedAt": "2026-04-20T11:45:06.267362Z"
       }
     }
   ],
@@ -9505,7 +9812,7 @@
           "video"
         ],
         "scenarioId": "les_fugitifs",
-        "updatedAt": "2026-04-23T14:20:53.235"
+        "updatedAt": "2026-04-25T17:04:40.199"
       }
     },
     {
@@ -9527,7 +9834,7 @@
           "image"
         ],
         "scenarioId": "les_fugitifs",
-        "updatedAt": "2026-04-23T14:20:53.235"
+        "updatedAt": "2026-04-25T17:04:40.199"
       }
     },
     {
@@ -9550,7 +9857,7 @@
           "video"
         ],
         "scenarioId": "les_fugitifs",
-        "updatedAt": "2026-04-23T14:20:53.235"
+        "updatedAt": "2026-04-25T17:04:40.199"
       }
     },
     {
@@ -9561,7 +9868,6 @@
         "updatedBy": "creator_portal",
         "workflowStatus": "test",
         "displayOrder": 100,
-        "label": "Nouvelle épreuve physique",
         "slotKey": "step_hhvtiacwls_i9u_primary_image",
         "source": "scenario_creator_dynamic",
         "blockId": "A1",
@@ -9572,7 +9878,30 @@
           "image"
         ],
         "scenarioId": "les_fugitifs",
-        "updatedAt": "2026-04-24T17:47:28.855"
+        "label": "Face au mur",
+        "updatedAt": "2026-04-25T18:04:45.434"
+      }
+    },
+    {
+      "id": "les_fugitifs_A4_step_hhxurqmkmg_lqnj_primary_image",
+      "data": {
+        "isRequired": true,
+        "notes": "",
+        "updatedBy": "creator_portal",
+        "workflowStatus": "test",
+        "displayOrder": 100,
+        "label": "Nouvelle épreuve physique",
+        "slotKey": "step_hhxurqmkmg_lqnj_primary_image",
+        "source": "scenario_creator_dynamic",
+        "blockId": "A4",
+        "createdAt": "2026-04-25T17:43:07.811",
+        "isEnabled": true,
+        "isImplemented": true,
+        "acceptedTypes": [
+          "image"
+        ],
+        "scenarioId": "les_fugitifs",
+        "updatedAt": "2026-04-25T17:43:07.811"
       }
     },
     {

@@ -148,6 +148,14 @@ async function generateRuntimeScenario() {
   }
 
   const locked = lockedDoc.data();
+
+  // =========================
+  // EXTRACTION CLUE SYSTEM + ENTITÉS LOCKÉES
+  // =========================
+
+  const clueSystem = locked.data?.clueSystem || locked.clueSystem || null;
+  const suspects = locked.data?.suspects || locked.suspects || [];
+  const motives = locked.data?.motives || locked.motives || [];
   const placesMap = locked.data?.placeTemplates;
 
   if (!placesMap) {
@@ -171,6 +179,13 @@ async function generateRuntimeScenario() {
     version: 1,
     status: "active",
     generatedAt: new Date().toISOString(),
+
+    // Données globales nécessaires au runtime Flutter
+    // Elles existent déjà dans le lockedScenario : on les transporte sans les réinventer.
+    clueSystem,
+    suspects,
+    motives,
+
     places: runtimePlaces
   };
 

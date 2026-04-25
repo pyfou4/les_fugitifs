@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -27,6 +28,24 @@ class HomeScreen extends StatefulWidget {
 }
 
 
+class _RuntimeScoringThreshold {
+  final num? min;
+  final num? max;
+  final String result;
+
+  const _RuntimeScoringThreshold({
+    required this.min,
+    required this.max,
+    required this.result,
+  });
+
+  bool matches(num score) {
+    final aboveMin = min == null || score >= min!;
+    final belowMax = max == null || score <= max!;
+    return aboveMin && belowMax;
+  }
+}
+
 class _RuntimePlaceConfig {
   final String type;
   final String? mechanicMode;
@@ -36,6 +55,11 @@ class _RuntimePlaceConfig {
   final String? rewardTargetSlot;
   final String? rulesSummary;
   final String? scoringSummary;
+  final String? observationQuestion;
+  final String? observationAnswerType;
+  final String? observationSolution;
+  final num? observationTolerance;
+  final List<_RuntimeScoringThreshold> scoringThresholds;
   final bool hasScoring;
 
   const _RuntimePlaceConfig({
@@ -47,6 +71,11 @@ class _RuntimePlaceConfig {
     this.rewardTargetSlot,
     this.rulesSummary,
     this.scoringSummary,
+    this.observationQuestion,
+    this.observationAnswerType,
+    this.observationSolution,
+    this.observationTolerance,
+    this.scoringThresholds = const <_RuntimeScoringThreshold>[],
     required this.hasScoring,
   });
 
@@ -54,8 +83,12 @@ class _RuntimePlaceConfig {
       (mechanicMode != null && mechanicMode!.trim().isNotEmpty) ||
       (interaction != null && interaction!.trim().isNotEmpty) ||
       hasScoring ||
+      scoringThresholds.isNotEmpty ||
       (rulesSummary != null && rulesSummary!.trim().isNotEmpty) ||
       (scoringSummary != null && scoringSummary!.trim().isNotEmpty) ||
+      (observationQuestion != null && observationQuestion!.trim().isNotEmpty) ||
+      (observationAnswerType != null && observationAnswerType!.trim().isNotEmpty) ||
+      (observationSolution != null && observationSolution!.trim().isNotEmpty) ||
       (rewardMode != null && rewardMode!.trim().isNotEmpty) ||
       (rewardTargetType != null && rewardTargetType!.trim().isNotEmpty) ||
       (rewardTargetSlot != null && rewardTargetSlot!.trim().isNotEmpty);
@@ -179,6 +212,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final mechanic = _asStringKeyMap(place['mechanic']);
         final reward = _asStringKeyMap(place['reward']);
         final scoring = _asStringKeyMap(place['scoring']);
+        final rules = _asStringKeyMap(mechanic['rules']);
 
         result[id] = _RuntimePlaceConfig(
           type: type,
@@ -187,8 +221,13 @@ class _HomeScreenState extends State<HomeScreen> {
           rewardMode: reward['mode']?.toString(),
           rewardTargetType: reward['targetType']?.toString(),
           rewardTargetSlot: reward['targetSlot']?.toString(),
-          rulesSummary: _runtimeRulesSummary(mechanic['rules']),
+          rulesSummary: _runtimeRulesSummary(rules),
           scoringSummary: _runtimeScoringSummary(scoring),
+          observationQuestion: _runtimeObservationQuestion(rules, place),
+          observationAnswerType: _runtimeObservationAnswerType(rules),
+          observationSolution: _runtimeObservationSolution(rules),
+          observationTolerance: _toNum(rules['tolerance']),
+          scoringThresholds: _runtimeScoringThresholds(scoring),
           hasScoring: scoring.isNotEmpty,
         );
       }
@@ -223,6 +262,49 @@ class _HomeScreenState extends State<HomeScreen> {
     return parts.take(4).join(' · ');
   }
 
+  String? _runtimeObservationQuestion(
+    Map<String, dynamic> rules,
+    Map<String, dynamic> place,
+  ) {
+    final narration = _asStringKeyMap(place['narration']);
+    final candidates = <dynamic>[
+      rules['question'],
+      rules['prompt'],
+      rules['taskDescription'],
+      narration['brief'],
+      narration['description'],
+      place['title'],
+    ];
+
+    for (final candidate in candidates) {
+      final text = candidate?.toString().trim();
+      if (text != null && text.isNotEmpty) return text;
+    }
+    return null;
+  }
+
+  String? _runtimeObservationAnswerType(Map<String, dynamic> rules) {
+    final raw = (rules['answerType'] ?? rules['type'] ?? rules['inputType'])
+        ?.toString()
+        .trim()
+        .toLowerCase();
+    if (raw == null || raw.isEmpty) return null;
+    if (raw == 'number' || raw == 'numeric' || raw == 'integer') {
+      return 'number';
+    }
+    if (raw == 'bool' || raw == 'boolean' || raw == 'yes_no') {
+      return 'boolean';
+    }
+    return 'text';
+  }
+
+  String? _runtimeObservationSolution(Map<String, dynamic> rules) {
+    final raw = rules['solution'] ?? rules['answer'] ?? rules['expectedAnswer'];
+    final text = raw?.toString().trim();
+    if (text == null || text.isEmpty) return null;
+    return text;
+  }
+
   String? _runtimeScoringSummary(dynamic rawScoring) {
     final scoring = _asStringKeyMap(rawScoring);
     if (scoring.isEmpty) return null;
@@ -252,6 +334,34 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return type == null || type.isEmpty ? 'scoring runtime présent' : type;
+  }
+
+  List<_RuntimeScoringThreshold> _runtimeScoringThresholds(
+    Map<String, dynamic> scoring,
+  ) {
+    final thresholds = scoring['thresholds'];
+    if (thresholds is! List) return const <_RuntimeScoringThreshold>[];
+
+    final result = <_RuntimeScoringThreshold>[];
+    for (final raw in thresholds) {
+      if (raw is! Map) continue;
+      final map = raw.map((key, value) => MapEntry(key.toString(), value));
+      final label = (map['result'] ?? map['strength'])?.toString().trim();
+      if (label == null || label.isEmpty) continue;
+      result.add(
+        _RuntimeScoringThreshold(
+          min: _toNum(map['min']),
+          max: _toNum(map['max']),
+          result: label,
+        ),
+      );
+    }
+    return result;
+  }
+
+  num? _toNum(dynamic value) {
+    if (value is num) return value;
+    return num.tryParse(value?.toString() ?? '');
   }
 
   Future<void> _loadSessionAndProgress() async {
@@ -529,7 +639,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _setCurrentHelpPlace(place);
 
     final runtimeConfig = _runtimePlaceConfigById[place.id];
-    final runtimeType = runtimeConfig?.type ?? 'media';
+    final runtimeType = _normalizedRuntimeType(runtimeConfig);
     final revealedSuspect = _findSuspect(_session?.suspectByPlace[place.id]);
     final revealedMotive = _findMotive(_session?.motiveByPlace[place.id]);
 
@@ -538,26 +648,262 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (_) {
         return AlertDialog(
           title: Text(place.name),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(_runtimeOpeningMessage(runtimeType)),
+                if (runtimeConfig != null && runtimeConfig.hasPreparedEngine) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    _runtimePlayerInstruction(runtimeConfig),
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
+                const SizedBox(height: 12),
+                _buildRuntimeTypePanel(runtimeType, runtimeConfig),
+                if (revealedSuspect != null) ...[
+                  const SizedBox(height: 12),
+                  Text('Suspect innocenté : ${revealedSuspect.name}'),
+                ],
+                if (revealedMotive != null) ...[
+                  const SizedBox(height: 8),
+                  Text('Mobile innocenté : ${revealedMotive.name}'),
+                ],
+              ],
+            ),
+          ),
+          actions: _runtimeDialogActions(runtimeType, place),
+        );
+      },
+    );
+  }
+
+  String _normalizedRuntimeType(_RuntimePlaceConfig? config) {
+    final type = config?.type.trim().toLowerCase();
+    if (type == 'media' || type == 'observation' || type == 'physical') {
+      return type!;
+    }
+    return 'media';
+  }
+
+  Widget _buildRuntimeTypePanel(
+    String runtimeType,
+    _RuntimePlaceConfig? runtimeConfig,
+  ) {
+    final theme = Theme.of(context);
+
+    String title;
+    String body;
+    IconData icon;
+
+    switch (runtimeType) {
+      case 'physical':
+        title = 'Épreuve physique';
+        body =
+            'Le poste est reconnu comme une épreuve physique. Le moteur peut déjà lire la mécanique, mais le calcul final du score sera activé quand les règles de poste seront stabilisées.';
+        icon = Icons.directions_run;
+        break;
+      case 'observation':
+        title = 'Observation';
+        body =
+            'Le poste est reconnu comme une observation. Le moteur peut déjà ouvrir une question ou une confirmation selon les données runtime disponibles.';
+        icon = Icons.visibility;
+        break;
+      case 'media':
+      default:
+        title = 'Média';
+        body =
+            'Le poste est reconnu comme un média. La lecture finale passera par les slots média du backend lorsque le comportement de lecture sera activé.';
+        icon = Icons.movie_filter;
+        break;
+    }
+
+    final enginePreview = runtimeConfig == null
+        ? null
+        : _runtimeEnginePreview(runtimeConfig);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.black.withOpacity(0.08)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                title,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(body),
+          if (enginePreview != null && enginePreview.trim().isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              enginePreview,
+              style: theme.textTheme.bodySmall,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  List<Widget> _runtimeDialogActions(String runtimeType, PlaceNode place) {
+    final actions = <Widget>[
+      TextButton(
+        onPressed: () => Navigator.pop(context),
+        child: const Text('Fermer'),
+      ),
+    ];
+
+    if (runtimeType == 'media') {
+      actions.add(
+        FilledButton(
+          onPressed: () {
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Lecture média prête pour ${place.name}.'),
+              ),
+            );
+          },
+          child: const Text('Prévisualiser'),
+        ),
+      );
+    }
+
+    if (runtimeType == 'observation') {
+      actions.add(
+        FilledButton(
+          onPressed: () {
+            Navigator.pop(context);
+            _showObservationTestDialog(place);
+          },
+          child: const Text('Tester observation'),
+        ),
+      );
+    }
+
+    if (runtimeType == 'physical') {
+      actions.add(
+        FilledButton(
+          onPressed: () {
+            Navigator.pop(context);
+            _showPhysicalTestResult(place);
+          },
+          child: const Text('Tester épreuve'),
+        ),
+      );
+    }
+
+    return actions;
+  }
+
+  void _showObservationTestDialog(PlaceNode place) {
+    final config = _runtimePlaceConfigById[place.id];
+    final question = config?.observationQuestion?.trim().isNotEmpty == true
+        ? config!.observationQuestion!.trim()
+        : 'Observe le lieu et confirme ce que ton équipe constate.';
+    final answerType = config?.observationAnswerType ?? 'confirmation';
+    final hasSolution = config?.observationSolution?.trim().isNotEmpty == true;
+    final controller = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: Text('Observation - ${place.name}'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(question),
+                const SizedBox(height: 12),
+                if (hasSolution) ...[
+                  TextField(
+                    controller: controller,
+                    keyboardType: answerType == 'number'
+                        ? TextInputType.number
+                        : TextInputType.text,
+                    decoration: InputDecoration(
+                      labelText: answerType == 'number'
+                          ? 'Réponse chiffrée'
+                          : 'Réponse',
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Mode test : la réponse est comparée au contrat runtime quand il existe.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ] else ...[
+                  Text(
+                    'Mode confirmation : aucune solution n’est encore définie dans le runtime. Le poste valide seulement que l’observation a été faite.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Fermer'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final result = _runtimeObservationResult(
+                  controller.text,
+                  config,
+                );
+                Navigator.pop(context);
+                _showObservationResult(place, result);
+              },
+              child: Text(hasSolution ? 'Valider' : 'Confirmer'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _showObservationResult(PlaceNode place, String result) {
+    final target = _runtimeRewardLabel(_runtimePlaceConfigById[place.id]);
+
+    showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: Text('Résultat observation - ${place.name}'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(_runtimeOpeningMessage(runtimeType)),
-              if (runtimeConfig != null && runtimeConfig.hasPreparedEngine) ...[
-                const SizedBox(height: 12),
-                Text(
-                  _runtimeEnginePreview(runtimeConfig),
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-              ],
-              if (revealedSuspect != null) ...[
-                const SizedBox(height: 12),
-                Text('Suspect innocenté : ${revealedSuspect.name}'),
-              ],
-              if (revealedMotive != null) ...[
+              Text('Résultat runtime : $result'),
+              if (target != null) ...[
                 const SizedBox(height: 8),
-                Text('Mobile innocenté : ${revealedMotive.name}'),
+                Text('Récompense visée : $target'),
               ],
+              const SizedBox(height: 12),
+              Text(
+                'Ce test valide le moteur observation. Les vraies questions et solutions seront alimentées par le portal quand le contrat observation sera complété.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
             ],
           ),
           actions: [
@@ -571,16 +917,166 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  String _runtimeObservationResult(
+    String input,
+    _RuntimePlaceConfig? config,
+  ) {
+    final solution = config?.observationSolution?.trim();
+    if (solution == null || solution.isEmpty) {
+      return 'confirmed';
+    }
+
+    final answerType = config?.observationAnswerType ?? 'text';
+    final cleanInput = input.trim();
+
+    if (answerType == 'number') {
+      final expected = num.tryParse(solution.replaceAll(',', '.'));
+      final actual = num.tryParse(cleanInput.replaceAll(',', '.'));
+      if (expected == null || actual == null) return 'weak';
+      final tolerance = config?.observationTolerance ?? 0;
+      final diff = (actual - expected).abs();
+      if (diff == 0) return 'strong';
+      if (diff <= tolerance) return 'medium';
+      return 'weak';
+    }
+
+    if (answerType == 'boolean') {
+      final expected = _parseRuntimeBoolean(solution);
+      final actual = _parseRuntimeBoolean(cleanInput);
+      if (expected == null || actual == null) return 'weak';
+      return expected == actual ? 'strong' : 'weak';
+    }
+
+    return cleanInput.toLowerCase() == solution.toLowerCase()
+        ? 'strong'
+        : 'weak';
+  }
+
+  bool? _parseRuntimeBoolean(String value) {
+    final normalized = value.trim().toLowerCase();
+    if (normalized == 'true' || normalized == 'oui' || normalized == 'yes') {
+      return true;
+    }
+    if (normalized == 'false' || normalized == 'non' || normalized == 'no') {
+      return false;
+    }
+    return null;
+  }
+
+  void _showPhysicalTestResult(PlaceNode place) {
+    final config = _runtimePlaceConfigById[place.id];
+    final random = Random();
+    final score = random.nextInt(101);
+    final result = _runtimePhysicalResult(score, config);
+    final target = _runtimeRewardLabel(config);
+
+    showDialog(
+      context: context,
+      builder: (_) {
+        return AlertDialog(
+          title: Text('Résultat de l’épreuve - ${place.name}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Score simulé : $score'),
+              const SizedBox(height: 8),
+              Text('Résultat runtime : $result'),
+              if (target != null) ...[
+                const SizedBox(height: 8),
+                Text('Récompense visée : $target'),
+              ],
+              const SizedBox(height: 12),
+              Text(
+                'Ce test valide le moteur de score. Le score réel sera branché quand les règles précises du poste seront définies.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Fermer'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  String _runtimePhysicalResult(
+    int score,
+    _RuntimePlaceConfig? config,
+  ) {
+    final thresholds = config?.scoringThresholds ?? const <_RuntimeScoringThreshold>[];
+    for (final threshold in thresholds) {
+      if (threshold.matches(score)) {
+        return threshold.result;
+      }
+    }
+
+    if (score <= 30) return 'weak';
+    if (score <= 70) return 'medium';
+    return 'strong';
+  }
+
+  String? _runtimeRewardLabel(_RuntimePlaceConfig? config) {
+    final targetType = config?.rewardTargetType?.trim();
+    final targetSlot = config?.rewardTargetSlot?.trim();
+    if (targetType == null || targetType.isEmpty) return null;
+    if (targetSlot == null || targetSlot.isEmpty) return targetType;
+    return '$targetType / $targetSlot';
+  }
+
   String _runtimeOpeningMessage(String runtimeType) {
     switch (runtimeType) {
       case 'physical':
         return 'Épreuve physique à connecter plus tard.';
       case 'observation':
-        return 'Poste d’observation à connecter plus tard.';
+        return 'Poste d’observation prêt pour test.';
       case 'media':
       default:
         return 'Média à connecter plus tard.';
     }
+  }
+
+  String _runtimePlayerInstruction(_RuntimePlaceConfig config) {
+    final type = config.type.trim().toLowerCase();
+    final interaction = config.interaction?.trim().toLowerCase();
+    final rules = config.rulesSummary?.trim();
+    final scoring = config.scoringSummary?.trim();
+
+    if (type == 'media') {
+      if (rules != null && rules.contains('play_to_end')) {
+        return 'Regarde attentivement le média jusqu’à la fin. Il prépare la suite de l’enquête.';
+      }
+      return 'Consulte le média disponible pour avancer dans l’enquête.';
+    }
+
+    if (type == 'observation') {
+      if (interaction == 'confirmation_only') {
+        return 'Observe le lieu, vérifie l’indice demandé, puis confirme quand l’équipe est sûre d’elle.';
+      }
+      if (interaction == 'numeric_input') {
+        return 'Observe le lieu et saisis la réponse chiffrée demandée.';
+      }
+      if (interaction == 'text_input') {
+        return 'Observe le lieu et saisis la réponse demandée.';
+      }
+      return 'Observe le lieu et réponds à la consigne du poste.';
+    }
+
+    if (type == 'physical') {
+      final buffer = StringBuffer(
+        'Réalise l’épreuve physique indiquée par le poste.',
+      );
+      if (scoring != null && scoring.isNotEmpty) {
+        buffer.write(' Le résultat sera évalué selon la performance de l’équipe.');
+      }
+      return buffer.toString();
+    }
+
+    return 'Poste runtime prêt. Les consignes détaillées seront affichées ici.';
   }
 
   String _runtimeEnginePreview(_RuntimePlaceConfig config) {
@@ -593,10 +1089,10 @@ class _HomeScreenState extends State<HomeScreen> {
       parts.add('interaction: ${config.interaction}');
     }
     if (config.rulesSummary != null && config.rulesSummary!.trim().isNotEmpty) {
-      parts.add('règles: \${config.rulesSummary}');
+      parts.add('règles: ${config.rulesSummary}');
     }
     if (config.scoringSummary != null && config.scoringSummary!.trim().isNotEmpty) {
-      parts.add('scoring: \${config.scoringSummary}');
+      parts.add('scoring: ${config.scoringSummary}');
     } else if (config.hasScoring) {
       parts.add('scoring préparé');
     }

@@ -18,6 +18,16 @@ import '../services/runtime_call_context_service.dart';
 import '../services/scheduled_calls_bootstrap_service.dart';
 import '../services/scheduled_calls_service.dart';
 
+// Mode de test temporaire : permet d'ouvrir un poste en touchant son marqueur,
+// sans devoir être physiquement dans le rayon GPS du poste.
+// À remettre à false avant une version de production terrain.
+const bool _debugOpenPlaceOnMarkerTap = true;
+
+// Mode de test temporaire : ignore les règles de progression pour permettre
+// de tester A1, B, C ou D0 depuis n'importe où, sans valider les postes précédents.
+// À remettre à false avant une version de production terrain.
+const bool _debugUnlockAllPlaces = true;
+
 class MapScreen extends StatefulWidget {
   final VoidCallback onBack;
   final List<PlaceNode> places;
@@ -344,6 +354,10 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   bool _isPlaceAccessible(PlaceNode place) {
+    if (_debugUnlockAllPlaces) {
+      return true;
+    }
+
     final id = place.id.trim().toUpperCase();
 
     if (id == 'A0') {
@@ -405,6 +419,10 @@ class _MapScreenState extends State<MapScreen> {
   }
 
   bool _isPlaceVisibleOnMap(PlaceNode place) {
+    if (_debugUnlockAllPlaces) {
+      return true;
+    }
+
     if (place.isVisited) {
       return true;
     }
@@ -1277,6 +1295,39 @@ class _MapScreenState extends State<MapScreen> {
     }
   }
 
+
+  Future<void> _showFallbackDirectRoute(PlaceNode place) async {
+    if (_userMarker == null) return;
+
+    final origin = _userMarker!.position;
+    final destination = place.latLng;
+    final distanceMeters = Geolocator.distanceBetween(
+      origin.latitude,
+      origin.longitude,
+      destination.latitude,
+      destination.longitude,
+    ).round();
+
+    final estimatedMinutes = (distanceMeters / 75).ceil().clamp(1, 120);
+    final directPoints = <LatLng>[origin, destination];
+
+    unawaited(HapticFeedback.selectionClick());
+    setState(() {
+      _currentRoute = RouteInfo(
+        distanceMeters: distanceMeters,
+        durationText: '~${estimatedMinutes} min',
+        points: directPoints,
+      );
+      _showRouteBanner = true;
+    });
+
+    await _fitCameraToBounds(
+      routePoints: directPoints,
+      origin: origin,
+      destination: destination,
+    );
+  }
+
   Future<void> _computeInAppRoute(PlaceNode place) async {
     await _refreshPlaceOccupancy();
 
@@ -1341,6 +1392,11 @@ class _MapScreenState extends State<MapScreen> {
 
       final decodedPoints = _decodePolyline(encodedPolyline);
 
+      if (decodedPoints.isEmpty) {
+        await _showFallbackDirectRoute(place);
+        return;
+      }
+
       unawaited(HapticFeedback.selectionClick());
       setState(() {
         _currentRoute = RouteInfo(
@@ -1358,8 +1414,14 @@ class _MapScreenState extends State<MapScreen> {
       );
     } catch (e) {
       if (!mounted) return;
+      await _showFallbackDirectRoute(place);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Impossible de calculer l’itinéraire : $e')),
+        const SnackBar(
+          content: Text(
+            'Itinéraire précis indisponible : repérage direct affiché.',
+          ),
+        ),
       );
     } finally {
       if (!mounted) return;
@@ -1512,6 +1574,16 @@ class _MapScreenState extends State<MapScreen> {
             }
 
             _setSelectedPlace(place);
+
+            if (_debugOpenPlaceOnMarkerTap) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Mode test : ouverture de ${place.name}'),
+                ),
+              );
+              widget.onOpenPlaceMedia(place);
+              return;
+            }
           },
         ),
       );
