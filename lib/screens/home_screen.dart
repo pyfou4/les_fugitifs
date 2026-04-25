@@ -6,13 +6,16 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../media/repository/firestore_media_repository.dart';
 import '../models/game_session.dart';
 import '../models/motive_model.dart';
 import '../models/place_node.dart';
 import '../models/suspect_model.dart';
 import '../services/ai_service.dart';
 import '../services/narrative_progress_service.dart';
+import '../services/post_completion_engine.dart';
 import '../services/runtime_session_service.dart';
+import '../widgets/post_completion/post_completion_cards_section.dart';
 
 import 'archives_screen.dart';
 import 'investigation_screen.dart';
@@ -59,7 +62,10 @@ class _RuntimePlaceConfig {
   final String? observationAnswerType;
   final String? observationSolution;
   final num? observationTolerance;
+  final String? fixedStrength;
   final List<_RuntimeScoringThreshold> scoringThresholds;
+  final num? scoreMin;
+  final num? scoreMax;
   final bool hasScoring;
 
   const _RuntimePlaceConfig({
@@ -75,7 +81,10 @@ class _RuntimePlaceConfig {
     this.observationAnswerType,
     this.observationSolution,
     this.observationTolerance,
+    this.fixedStrength,
     this.scoringThresholds = const <_RuntimeScoringThreshold>[],
+    this.scoreMin,
+    this.scoreMax,
     required this.hasScoring,
   });
 
@@ -84,11 +93,14 @@ class _RuntimePlaceConfig {
       (interaction != null && interaction!.trim().isNotEmpty) ||
       hasScoring ||
       scoringThresholds.isNotEmpty ||
+      scoreMin != null ||
+      scoreMax != null ||
       (rulesSummary != null && rulesSummary!.trim().isNotEmpty) ||
       (scoringSummary != null && scoringSummary!.trim().isNotEmpty) ||
       (observationQuestion != null && observationQuestion!.trim().isNotEmpty) ||
       (observationAnswerType != null && observationAnswerType!.trim().isNotEmpty) ||
       (observationSolution != null && observationSolution!.trim().isNotEmpty) ||
+      (fixedStrength != null && fixedStrength!.trim().isNotEmpty) ||
       (rewardMode != null && rewardMode!.trim().isNotEmpty) ||
       (rewardTargetType != null && rewardTargetType!.trim().isNotEmpty) ||
       (rewardTargetSlot != null && rewardTargetSlot!.trim().isNotEmpty);
@@ -96,6 +108,9 @@ class _RuntimePlaceConfig {
 
 class _HomeScreenState extends State<HomeScreen> {
   final RuntimeSessionService _runtimeSessionService = RuntimeSessionService();
+  final PostCompletionEngine _postCompletionEngine = PostCompletionEngine(
+    mediaRepository: FirestoreMediaRepository(),
+  );
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   int currentIndex = 0;
@@ -111,6 +126,8 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _storagePrefix;
   String? _currentHelpPlaceId;
   Map<String, _RuntimePlaceConfig> _runtimePlaceConfigById = {};
+  Map<String, dynamic> _runtimeScenarioData = const <String, dynamic>{};
+  Map<String, dynamic> _lockedScenarioData = const <String, dynamic>{};
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
       _humanHelpMessagesSubscription;
   bool _humanHelpDialogOpen = false;
@@ -156,6 +173,8 @@ class _HomeScreenState extends State<HomeScreen> {
       _suspects = bundle.suspects;
       _motives = bundle.motives;
       _session = bundle.session;
+      _runtimeScenarioData = bundle.runtimeScenarioData;
+      _lockedScenarioData = bundle.lockedScenarioData;
       _storagePrefix = 'session_${bundle.session.id}';
       _runtimePlaceConfigById = await _loadRuntimePlaceConfigs();
 
@@ -191,6 +210,18 @@ class _HomeScreenState extends State<HomeScreen> {
           .get();
 
       final runtimeData = runtimeDoc.data();
+      if (runtimeData != null && runtimeData.isNotEmpty) {
+        final embeddedData = runtimeData['data'];
+        _runtimeScenarioData = <String, dynamic>{
+          ..._runtimeScenarioData,
+          if (embeddedData is Map)
+            ...embeddedData.map(
+              (key, value) => MapEntry(key.toString(), value),
+            ),
+          ...runtimeData,
+        };
+      }
+
       final rawPlaces = runtimeData?['places'];
 
       if (rawPlaces is! List) {
@@ -227,7 +258,10 @@ class _HomeScreenState extends State<HomeScreen> {
           observationAnswerType: _runtimeObservationAnswerType(rules),
           observationSolution: _runtimeObservationSolution(rules),
           observationTolerance: _toNum(rules['tolerance']),
+          fixedStrength: _runtimeFixedStrength(rules),
           scoringThresholds: _runtimeScoringThresholds(scoring),
+          scoreMin: _toNum(rules['scoreMin']),
+          scoreMax: _toNum(rules['scoreMax']),
           hasScoring: scoring.isNotEmpty,
         );
       }
@@ -334,6 +368,19 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return type == null || type.isEmpty ? 'scoring runtime présent' : type;
+  }
+
+  String? _runtimeFixedStrength(Map<String, dynamic> rules) {
+    final clue = _asStringKeyMap(rules['clue']);
+    final mode = (clue['mode'] ?? '').toString().trim().toLowerCase();
+    final strength = (clue['strength'] ?? '').toString().trim().toLowerCase();
+
+    if (mode == 'fixed_strength' &&
+        (strength == 'strong' || strength == 'medium' || strength == 'weak')) {
+      return strength;
+    }
+
+    return null;
   }
 
   List<_RuntimeScoringThreshold> _runtimeScoringThresholds(
@@ -702,7 +749,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case 'physical':
         title = 'Épreuve physique';
         body =
-            'Le poste est reconnu comme une épreuve physique. Le moteur peut déjà lire la mécanique, mais le calcul final du score sera activé quand les règles de poste seront stabilisées.';
+            'Le poste est reconnu comme une épreuve physique. Le moteur lit les seuils du runtime et peut produire une fin de poste selon le score obtenu.';
         icon = Icons.directions_run;
         break;
       case 'observation':
@@ -774,13 +821,10 @@ class _HomeScreenState extends State<HomeScreen> {
         FilledButton(
           onPressed: () {
             Navigator.pop(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Lecture média prête pour ${place.name}.'),
-              ),
-            );
+            final strength = _runtimePlaceConfigById[place.id]?.fixedStrength ?? 'none';
+            _showPostCompletionForPlace(place, strength);
           },
-          child: const Text('Prévisualiser'),
+          child: const Text('Terminer le média'),
         ),
       );
     }
@@ -883,47 +927,22 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showObservationResult(PlaceNode place, String result) {
-    final target = _runtimeRewardLabel(_runtimePlaceConfigById[place.id]);
-
-    showDialog(
-      context: context,
-      builder: (_) {
-        return AlertDialog(
-          title: Text('Résultat observation - ${place.name}'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Résultat runtime : $result'),
-              if (target != null) ...[
-                const SizedBox(height: 8),
-                Text('Récompense visée : $target'),
-              ],
-              const SizedBox(height: 12),
-              Text(
-                'Ce test valide le moteur observation. Les vraies questions et solutions seront alimentées par le portal quand le contrat observation sera complété.',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Fermer'),
-            ),
-          ],
-        );
-      },
-    );
+    _showPostCompletionForPlace(place, result);
   }
+
 
   String _runtimeObservationResult(
     String input,
     _RuntimePlaceConfig? config,
   ) {
     final solution = config?.observationSolution?.trim();
+    final fixedStrength = config?.fixedStrength?.trim().toLowerCase();
+    if (fixedStrength == 'strong' || fixedStrength == 'medium' || fixedStrength == 'weak') {
+      return fixedStrength!;
+    }
+
     if (solution == null || solution.isEmpty) {
-      return 'confirmed';
+      return 'none';
     }
 
     final answerType = config?.observationAnswerType ?? 'text';
@@ -965,47 +984,56 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _showPhysicalTestResult(PlaceNode place) {
     final config = _runtimePlaceConfigById[place.id];
-    final random = Random();
-    final score = random.nextInt(101);
+    final score = _runtimePhysicalTestScore(config);
     final result = _runtimePhysicalResult(score, config);
-    final target = _runtimeRewardLabel(config);
 
-    showDialog(
-      context: context,
-      builder: (_) {
-        return AlertDialog(
-          title: Text('Résultat de l’épreuve - ${place.name}'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Score simulé : $score'),
-              const SizedBox(height: 8),
-              Text('Résultat runtime : $result'),
-              if (target != null) ...[
-                const SizedBox(height: 8),
-                Text('Récompense visée : $target'),
-              ],
-              const SizedBox(height: 12),
-              Text(
-                'Ce test valide le moteur de score. Le score réel sera branché quand les règles précises du poste seront définies.',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Fermer'),
-            ),
-          ],
-        );
-      },
+    _showPostCompletionForPlace(
+      place,
+      result,
+      debugPrefix: 'Score simulé : ${_formatRuntimeScore(score)}',
     );
   }
 
+  num _runtimePhysicalTestScore(_RuntimePlaceConfig? config) {
+    final random = Random();
+    final thresholds = config?.scoringThresholds ?? const <_RuntimeScoringThreshold>[];
+
+    final configuredMin = config?.scoreMin;
+    final configuredMax = config?.scoreMax;
+    final thresholdMins = thresholds
+        .map((threshold) => threshold.min)
+        .whereType<num>()
+        .toList(growable: false);
+    final thresholdMaxes = thresholds
+        .map((threshold) => threshold.max)
+        .whereType<num>()
+        .toList(growable: false);
+
+    final minScore = configuredMin ??
+        (thresholdMins.isEmpty ? 0 : thresholdMins.reduce(min));
+    final maxScore = configuredMax ??
+        (thresholdMaxes.isEmpty ? minScore : thresholdMaxes.reduce(max));
+
+    if (maxScore <= minScore) return minScore;
+
+    final minInt = minScore.round();
+    final maxInt = maxScore.round();
+    if (minScore == minInt && maxScore == maxInt) {
+      return minInt + random.nextInt(maxInt - minInt + 1);
+    }
+
+    return minScore + (random.nextDouble() * (maxScore - minScore));
+  }
+
+  String _formatRuntimeScore(num score) {
+    if (score == score.roundToDouble()) {
+      return score.round().toString();
+    }
+    return score.toStringAsFixed(1);
+  }
+
   String _runtimePhysicalResult(
-    int score,
+    num score,
     _RuntimePlaceConfig? config,
   ) {
     final thresholds = config?.scoringThresholds ?? const <_RuntimeScoringThreshold>[];
@@ -1015,9 +1043,117 @@ class _HomeScreenState extends State<HomeScreen> {
       }
     }
 
-    if (score <= 30) return 'weak';
-    if (score <= 70) return 'medium';
-    return 'strong';
+    return 'none';
+  }
+
+  Future<void> _showPostCompletionForPlace(
+    PlaceNode place,
+    String resultStrength, {
+    String? debugPrefix,
+  }) async {
+    final session = _session;
+    if (session == null) return;
+
+    final result = await _postCompletionEngine.build(
+      place: place,
+      resultStrength: resultStrength,
+      session: session,
+      runtimeScenarioData: _runtimeScenarioData,
+      lockedScenarioData: _lockedScenarioData,
+    );
+
+    if (!mounted) return;
+
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) {
+        return AlertDialog(
+          title: Text('Signal du Grid - ${place.name}'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (debugPrefix != null && debugPrefix.trim().isNotEmpty) ...[
+                  Text(debugPrefix),
+                  const SizedBox(height: 8),
+                ],
+                Text(_postCompletionStrengthLabel(result.strength)),
+                const SizedBox(height: 8),
+                Text(result.message),
+                if (result.hasTelegram) ...[
+                  const SizedBox(height: 16),
+                  Text(
+                    'Télégramme du Grid',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                  const SizedBox(height: 8),
+                  PostCompletionCardsSection(cards: result.cards),
+                ],
+                const SizedBox(height: 12),
+                _buildPostCompletionAudioPanel(result),
+              ],
+            ),
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _markPlaceVisited(place.id);
+              },
+              child: const Text('Retour au jeu'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+
+  Widget _buildPostCompletionAudioPanel(PostCompletionResult result) {
+    final theme = Theme.of(context);
+    final hasAudio = result.hasAudio;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.black.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.black.withOpacity(0.08)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(hasAudio ? Icons.volume_up : Icons.volume_off, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              hasAudio
+                  ? 'Audio prêt : ${result.audioSlotKey}'
+                  : 'Audio manquant dans le backend média : ${result.audioSlotKey}',
+              style: theme.textTheme.bodyMedium,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _postCompletionStrengthLabel(String strength) {
+    switch (strength) {
+      case 'strong':
+        return 'Résultat : signal fort';
+      case 'medium':
+        return 'Résultat : signal moyen';
+      case 'weak':
+        return 'Résultat : signal faible';
+      default:
+        return 'Résultat : aucun indice';
+    }
   }
 
   String? _runtimeRewardLabel(_RuntimePlaceConfig? config) {
